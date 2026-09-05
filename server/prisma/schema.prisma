@@ -1,17 +1,18 @@
 // LOFT data model.
 //
-// Ships on SQLite so the app runs with zero external setup. Every field uses
-// types available on SQLite, PostgreSQL and MySQL (String/Int/DateTime/Boolean,
-// no native enums, no arrays, no Json) — switching `provider` below to
-// "postgresql" and pointing DATABASE_URL at a real instance is the only
-// change needed for production.
+// Runs on PostgreSQL (Neon). Every field uses types available on SQLite,
+// PostgreSQL and MySQL (String/Int/DateTime/Boolean, no native enums, no
+// arrays, no Json), so it stays portable across those providers.
+// DIRECT_URL is Neon's unpooled connection, used only by `prisma migrate`;
+// the app itself connects through the pooled DATABASE_URL.
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
