@@ -1,0 +1,223 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  }
+  body {
+    @apply text-ink-800 antialiased;
+    background-color: #F8FAFC;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-gradient-to-br from-brand-400 to-brand-700 text-white shadow-sm transition hover:brightness-110 active:brightness-95;
+  }
+  .brand-mark {
+    @apply bg-gradient-to-br from-brand-400 to-brand-700;
+  }
+  .btn-secondary {
+    @apply btn border border-ink-200 bg-white text-ink-700 hover:bg-ink-50;
+  }
+  .btn-ghost {
+    @apply btn text-ink-600 hover:bg-ink-100;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700;
+  }
+  .input {
+    @apply w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-800 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500;
+  }
+  .card {
+    @apply rounded-xl border border-ink-200 bg-white shadow-soft;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold;
+  }
+}
+
+/* Tiptap document editor content — hand-rolled instead of the Tailwind
+   typography plugin (not installed) since only StarterKit's node set needs
+   covering. Tailwind's preflight strips default list/blockquote styling
+   entirely, so without this bullet/numbered lists would render with no
+   markers at all. */
+.doc-content {
+  color: theme("colors.ink.800");
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+.doc-content p {
+  margin: 0.5em 0;
+}
+.doc-content h1,
+.doc-content h2 {
+  font-weight: 700;
+  color: theme("colors.ink.900");
+  margin: 1em 0 0.4em;
+}
+.doc-content h1 {
+  font-size: 1.5rem;
+}
+.doc-content h2 {
+  font-size: 1.2rem;
+}
+.doc-content ul,
+.doc-content ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+.doc-content ul {
+  list-style: disc;
+}
+.doc-content ol {
+  list-style: decimal;
+}
+.doc-content li p {
+  margin: 0.15em 0;
+}
+.doc-content blockquote {
+  margin: 0.75em 0;
+  padding-left: 1em;
+  border-left: 3px solid theme("colors.ink.200");
+  color: theme("colors.ink.500");
+  font-style: italic;
+}
+.doc-content pre {
+  margin: 0.75em 0;
+  padding: 0.75em 1em;
+  border-radius: 0.5rem;
+  background: theme("colors.ink.900");
+  color: theme("colors.ink.50");
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  overflow-x: auto;
+}
+.doc-content code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.doc-content hr {
+  margin: 1.25em 0;
+  border: none;
+  border-top: 1px solid theme("colors.ink.200");
+}
+.doc-content a {
+  color: theme("colors.brand.600");
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.doc-content ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.25em;
+}
+.doc-content ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+.doc-content ul[data-type="taskList"] li > label {
+  margin-top: 0.35em;
+  user-select: none;
+}
+.doc-content ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+.doc-content ul[data-type="taskList"] li[data-checked="true"] > div {
+  color: theme("colors.ink.400");
+  text-decoration: line-through;
+}
+.doc-content mark {
+  border-radius: 2px;
+  padding: 0 0.1em;
+}
+.doc-content span[data-suggestion-insert] {
+  background: rgba(217, 119, 6, 0.14);
+  text-decoration: underline;
+  text-decoration-color: theme("colors.accent.600");
+  text-decoration-thickness: 1.5px;
+}
+.doc-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 0.5em 0;
+}
+.doc-content table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0.75em 0;
+}
+.doc-content table td,
+.doc-content table th {
+  border: 1px solid theme("colors.ink.200");
+  padding: 0.4em 0.6em;
+  vertical-align: top;
+  position: relative;
+}
+.doc-content table th {
+  background: theme("colors.ink.50");
+  font-weight: 600;
+  text-align: left;
+}
+.doc-content table .selectedCell {
+  background: theme("colors.brand.50");
+}
+.doc-content table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: theme("colors.brand.400");
+  pointer-events: none;
+}
+
+/* Print override for the paper-view page card — a plain @media rule instead
+   of Tailwind's print: variant, since it must beat the shadow-soft/rounded/
+   max-w utility classes already on the same element regardless of Tailwind's
+   internal utility ordering (cross-utility precedence between a custom
+   theme.boxShadow key and print:shadow-none isn't guaranteed to resolve the
+   way class order in the JSX would suggest). */
+@media print {
+  .doc-page {
+    box-shadow: none !important;
+    margin: 0 !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    border-radius: 0 !important;
+  }
+}
+
+/* Tiptap's CollaborationCaret extension (class names are its own default
+   `render`/`selectionRender` output, not something Tailwind utilities reach
+   since these are ProseMirror-injected decoration nodes). */
+.collaboration-carets__caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 1px solid;
+  border-right: 1px solid;
+  word-break: normal;
+  pointer-events: none;
+}
+.collaboration-carets__label {
+  position: absolute;
+  top: -1.4em;
+  left: -1px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: normal;
+  user-select: none;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 3px 3px 3px 0;
+  white-space: nowrap;
+}

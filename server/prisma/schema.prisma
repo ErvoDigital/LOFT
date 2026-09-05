@@ -1,0 +1,297 @@
+// LOFT data model.
+//
+// Ships on SQLite so the app runs with zero external setup. Every field uses
+// types available on SQLite, PostgreSQL and MySQL (String/Int/DateTime/Boolean,
+// no native enums, no arrays, no Json) — switching `provider` below to
+// "postgresql" and pointing DATABASE_URL at a real instance is the only
+// change needed for production.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(uuid())
+  name              String
+  email             String   @unique
+  passwordHash      String
+  avatarUrl         String?
+  avatarColor       String   @default("#5B5BD6")
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  ownedWorkspaces   Workspace[]        @relation("WorkspaceOwner")
+  memberships       WorkspaceMember[]
+  createdEvents     Event[]            @relation("EventCreator")
+  eventAttendances  EventAttendee[]
+  createdTasks      Task[]             @relation("TaskCreator")
+  assignedTasks     Task[]             @relation("TaskAssignee")
+  sentMessages      Message[]          @relation("MessageSender")
+  conversations     ConversationParticipant[]
+  createdConversations Conversation[]  @relation("ConversationCreator")
+  notifications     Notification[]
+  uploadedAssets    Asset[]            @relation("AssetUploader")
+  uploadedVersions  AssetVersion[]     @relation("AssetVersionUploader")
+  createdFolders    Folder[]           @relation("FolderCreator")
+  folderMemberships FolderMember[]
+  createdDocuments  Document[]         @relation("DocumentCreator")
+}
+
+model Workspace {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  type        String   @default("other") // school | work | org | church | other
+  color       String   @default("#5B5BD6")
+  inviteCode  String   @unique
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner         User              @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members       WorkspaceMember[]
+  events        Event[]
+  tasks         Task[]
+  taskStatuses  TaskStatus[]
+  conversations Conversation[]
+  assets        Asset[]
+  folders       Folder[]
+  documents     Document[]
+}
+
+model WorkspaceMember {
+  id          String   @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        String   @default("MEMBER") // ADMIN | MANAGER | MEMBER
+  joinedAt    DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  workspaceId String
+  title       String
+  description String?
+  location    String?
+  startTime   DateTime
+  endTime     DateTime
+  createdById String
+  remindedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User            @relation("EventCreator", fields: [createdById], references: [id])
+  attendees EventAttendee[]
+}
+
+model EventAttendee {
+  id      String @id @default(uuid())
+  eventId String
+  userId  String
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+}
+
+model Task {
+  id          String    @id @default(uuid())
+  workspaceId String
+  title       String
+  description String?
+  priority    String    @default("MEDIUM") // LOW | MEDIUM | HIGH | URGENT
+  status      String    @default("TODO")   // TODO | IN_PROGRESS | COMPLETED
+  dueDate     DateTime?
+  order       Float     @default(0)
+  createdById String
+  assigneeId  String?
+  remindedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User      @relation("TaskCreator", fields: [createdById], references: [id])
+  assignee  User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
+}
+
+// A workspace's kanban columns — fully admin-customizable (labels, colors,
+// order, add/delete). Every workspace is seeded with three on first use
+// ("To do" / "In progress" / "Completed"), but none of them are special-cased
+// in code beyond `isDone`: exactly one status per workspace can be flagged as
+// the terminal one, which is what overdue checks, due-soon reminders, and
+// deadline-conflict detection key off of instead of a hardcoded status name.
+// A status's id is stored directly as the Task.status value.
+model TaskStatus {
+  id          String   @id @default(uuid())
+  workspaceId String
+  label       String
+  color       String   @default("#8a8578")
+  order       Float    @default(0)
+  isDone      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// A chat thread: either a workspace channel (isGroup=true, scoped to one
+// workspace — every workspace gets a "General" channel with isDefault=true
+// that new members are auto-added to; admins can create additional named
+// channels with hand-picked members) or a 1:1 direct message (isGroup=false,
+// workspaceId null). Access is always via an explicit ConversationParticipant
+// row, so channels never leak into workspaces their members aren't in.
+model Conversation {
+  id          String   @id @default(uuid())
+  workspaceId String?
+  isGroup     Boolean  @default(false)
+  isDefault   Boolean  @default(false)
+  title       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  workspace    Workspace?                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy    User?                      @relation("ConversationCreator", fields: [createdById], references: [id])
+  participants ConversationParticipant[]
+  messages     Message[]
+}
+
+model ConversationParticipant {
+  id             String   @id @default(uuid())
+  conversationId String
+  userId         String
+  lastReadAt     DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  senderId       String
+  content        String
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("MessageSender", fields: [senderId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // TASK_ASSIGNED | EVENT_REMINDER | NEW_MESSAGE | DEADLINE_CONFLICT | WORKSPACE_INVITE | TASK_DUE_SOON
+  title     String
+  body      String?
+  link      String?
+  meta      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// A logical file entry in workspace storage. Uploading a second take of the
+// same file and dragging it onto this entry adds an AssetVersion instead of
+// creating a second entry — that's how "V2" badges happen.
+model Asset {
+  id           String   @id @default(uuid())
+  workspaceId  String
+  folderId     String?
+  name         String
+  uploadedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace  Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  folder     Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  uploadedBy User           @relation("AssetUploader", fields: [uploadedById], references: [id])
+  versions   AssetVersion[]
+}
+
+// A workspace-scoped folder for organizing Assets. Folders themselves live
+// only in the DB — files stay flat on disk under the workspace's upload dir
+// (see uploads.js), organized purely via Asset.folderId.
+//
+// visibility gates the whole folder (and everything inside it): WORKSPACE
+// means every member can see it, RESTRICTED means only ADMINs, the creator,
+// and members listed in FolderMember can. There is no independent per-file
+// visibility — restricting is a folder-level action only.
+model Folder {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  parentId    String?
+  visibility  String   @default("WORKSPACE") // WORKSPACE | RESTRICTED
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent    Folder?        @relation("FolderChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[]       @relation("FolderChildren")
+  createdBy User           @relation("FolderCreator", fields: [createdById], references: [id])
+  assets    Asset[]
+  members   FolderMember[]
+}
+
+model FolderMember {
+  id       String @id @default(uuid())
+  folderId String
+  userId   String
+
+  folder Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([folderId, userId])
+}
+
+// A workspace-scoped rich-text document, collaboratively edited over Yjs.
+// content stores the latest periodic Yjs state snapshot
+// (Y.encodeStateAsUpdate), not per-keystroke history — the live sync/merge
+// path and its debounced persistence live in sockets/documents.socket.js,
+// entirely separate from this table (content only ever travels over the
+// socket, never through a REST body).
+model Document {
+  id          String   @id @default(uuid())
+  workspaceId String
+  title       String   @default("Untitled document")
+  content     Bytes?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User      @relation("DocumentCreator", fields: [createdById], references: [id])
+}
+
+model AssetVersion {
+  id           String   @id @default(uuid())
+  assetId      String
+  version      Int
+  originalName String
+  storedName   String // filename on disk, uuid-based — never derived from user input
+  mimeType     String
+  size         Int
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  asset      Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  uploadedBy User  @relation("AssetVersionUploader", fields: [uploadedById], references: [id])
+
+  @@unique([assetId, version])
+}
