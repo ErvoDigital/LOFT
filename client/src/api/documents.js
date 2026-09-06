@@ -12,5 +12,8 @@ export const createDocument = (workspaceId, data = {}) =>
 export const renameDocument = (workspaceId, documentId, title) =>
   api.patch(`/workspaces/${workspaceId}/documents/${documentId}`, { title }).then((r) => r.data.document);
 
+export const updateDocumentAccess = (workspaceId, documentId, data) =>
+  api.patch(`/workspaces/${workspaceId}/documents/${documentId}/access`, data).then((r) => r.data.document);
+
 export const deleteDocument = (workspaceId, documentId) =>
   api.delete(`/workspaces/${workspaceId}/documents/${documentId}`).then((r) => r.data);

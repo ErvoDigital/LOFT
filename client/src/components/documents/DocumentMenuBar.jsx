@@ -40,6 +40,7 @@ import {
   ChevronRight,
   Columns2,
   Columns3,
+  Lock,
 } from "lucide-react";
 import { promptForLink } from "../../lib/tiptapLink.js";
 import TableGridPicker from "./TableGridPicker.jsx";
@@ -89,6 +90,7 @@ export default function DocumentMenuBar({
   onFindReplace,
   onWordCount,
   onDetails,
+  onAccess,
   onInsertImage,
   fullscreen,
   onToggleFullscreen,
@@ -153,6 +155,7 @@ export default function DocumentMenuBar({
         <Item Icon={FilePlus} label="New document" onClick={run(onNew)} />
         <Item Icon={Copy} label="Make a copy" onClick={run(onMakeCopy)} />
         <Item Icon={Pencil} label="Rename" onClick={run(onRename)} />
+        <Item Icon={Lock} label="Access" onClick={run(onAccess)} />
         <Sep />
         <Item Icon={FileDown} label="Download as PDF" onClick={run(() => onDownload("pdf"))} />
         <Item Icon={FileText} label="Download as Markdown" onClick={run(() => onDownload("markdown"))} />

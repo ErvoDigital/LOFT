@@ -16,8 +16,9 @@ import TaskItem from "@tiptap/extension-task-item";
 import ImageExtension from "@tiptap/extension-image";
 import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
 import * as Y from "yjs";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import * as documentsApi from "../api/documents.js";
+import * as workspacesApi from "../api/workspaces.js";
 import { apiErrorMessage } from "../api/client.js";
 import { exportDocument } from "../lib/documentExport.js";
 import { fileToDataUri, pickImageFile } from "../lib/documentImageUpload.js";
@@ -34,6 +35,7 @@ import SuggestionBar from "../components/documents/SuggestionBar.jsx";
 import FindReplacePanel from "../components/documents/FindReplacePanel.jsx";
 import WordCountModal from "../components/documents/WordCountModal.jsx";
 import DocumentDetailsModal from "../components/documents/DocumentDetailsModal.jsx";
+import DocumentAccessModal from "../components/documents/DocumentAccessModal.jsx";
 
 const PAGE_WIDTH = { letter: "max-w-[816px]", a4: "max-w-[794px]" };
 
@@ -144,6 +146,8 @@ export default function DocumentEditor() {
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
   const [wordCountOpen, setWordCountOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
+  const [members, setMembers] = useState([]);
   const [editorInstance, setEditorInstance] = useState(null);
   // Real state, not a ref: a ref mutation doesn't trigger a re-render, so a
   // TiptapEditor remount racing the docId transition (key={docId} changes in
@@ -183,6 +187,13 @@ export default function DocumentEditor() {
       cancelled = true;
     };
   }, [workspaceId, docId]);
+
+  useEffect(() => {
+    workspacesApi
+      .getWorkspace(workspaceId)
+      .then((ws) => setMembers(ws.members))
+      .catch(() => {});
+  }, [workspaceId]);
 
   useEffect(() => {
     if (!socket || !meta) return;
@@ -321,6 +332,9 @@ export default function DocumentEditor() {
           placeholder="Untitled document"
           className="min-w-0 flex-1 truncate border-none bg-transparent text-lg font-semibold text-ink-800 outline-none placeholder:text-ink-300"
         />
+        {meta?.visibility === "ASSIGNED" && (
+          <Lock className="h-3.5 w-3.5 shrink-0 text-accent-500" aria-label="Restricted to the assigned person" />
+        )}
         <div className="flex shrink-0 items-center -space-x-2">
           {peers.map((p) => (
             <div key={p.userId} title={p.name} className="ring-2 ring-white rounded-full">
@@ -351,6 +365,7 @@ export default function DocumentEditor() {
             onFindReplace={() => setFindReplaceOpen(true)}
             onWordCount={() => setWordCountOpen(true)}
             onDetails={() => setDetailsOpen(true)}
+            onAccess={() => setAccessOpen(true)}
             onInsertImage={handleInsertImage}
             fullscreen={fullscreen}
             onToggleFullscreen={() => setFullscreen((f) => !f)}
@@ -379,6 +394,14 @@ export default function DocumentEditor() {
 
       <WordCountModal open={wordCountOpen} onClose={() => setWordCountOpen(false)} editor={editorInstance} />
       <DocumentDetailsModal open={detailsOpen} onClose={() => setDetailsOpen(false)} meta={meta} />
+      <DocumentAccessModal
+        open={accessOpen}
+        onClose={() => setAccessOpen(false)}
+        workspaceId={workspaceId}
+        members={members}
+        document={meta}
+        onSaved={(saved) => setMeta(saved)}
+      />
     </div>
   );
 }

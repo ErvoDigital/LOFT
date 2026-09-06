@@ -42,6 +42,7 @@ model User {
   createdFolders    Folder[]           @relation("FolderCreator")
   folderMemberships FolderMember[]
   createdDocuments  Document[]         @relation("DocumentCreator")
+  documentAssignments DocumentAssignee[]
 }
 
 model Workspace {
@@ -267,17 +268,35 @@ model FolderMember {
 // path and its debounced persistence live in sockets/documents.socket.js,
 // entirely separate from this table (content only ever travels over the
 // socket, never through a REST body).
+//
+// visibility gates who can open the document: WORKSPACE means every member
+// can (the original, still-default behavior), ASSIGNED means only the
+// creator, workspace ADMINs, and whoever is listed in assignees can — same
+// shape and same allow-list model as Folder.visibility/FolderMember.
 model Document {
   id          String   @id @default(uuid())
   workspaceId String
   title       String   @default("Untitled document")
   content     Bytes?
   createdById String
+  visibility  String   @default("WORKSPACE") // WORKSPACE | ASSIGNED
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdBy User      @relation("DocumentCreator", fields: [createdById], references: [id])
+  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User               @relation("DocumentCreator", fields: [createdById], references: [id])
+  assignees DocumentAssignee[]
+}
+
+model DocumentAssignee {
+  id         String @id @default(uuid())
+  documentId String
+  userId     String
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, userId])
 }
 
 // Cross-process pub/sub relay: the REST API (Vercel) and the realtime

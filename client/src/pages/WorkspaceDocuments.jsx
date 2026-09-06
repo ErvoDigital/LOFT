@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
-import { FileText, Plus, Trash2 } from "lucide-react";
+import { FileText, Lock, Plus, Settings, Trash2 } from "lucide-react";
 import * as documentsApi from "../api/documents.js";
 import * as workspacesApi from "../api/workspaces.js";
 import { apiErrorMessage } from "../api/client.js";
@@ -10,6 +10,7 @@ import { useSocket } from "../context/SocketContext.jsx";
 import Avatar from "../components/common/Avatar.jsx";
 import EmptyState from "../components/common/EmptyState.jsx";
 import Spinner from "../components/common/Spinner.jsx";
+import DocumentAccessModal from "../components/documents/DocumentAccessModal.jsx";
 
 const DOCUMENT_EVENTS = ["document:created", "document:renamed", "document:updated", "document:deleted"];
 
@@ -21,15 +22,18 @@ export default function WorkspaceDocuments() {
 
   const [documents, setDocuments] = useState([]);
   const [myRole, setMyRole] = useState("MEMBER");
+  const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
+  const [accessDoc, setAccessDoc] = useState(null);
 
   const load = useCallback(() => {
     Promise.all([documentsApi.listDocuments(workspaceId), workspacesApi.getWorkspace(workspaceId)])
       .then(([docs, ws]) => {
         setDocuments(docs);
         setMyRole(ws.myRole);
+        setMembers(ws.members);
         setLoading(false);
       })
       .catch((err) => {
@@ -108,7 +112,7 @@ export default function WorkspaceDocuments() {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {documents.map((doc) => {
-            const canDelete = myRole === "ADMIN" || doc.createdBy.id === user.id;
+            const canManage = myRole === "ADMIN" || doc.createdBy.id === user.id;
             return (
               <div
                 key={doc.id}
@@ -119,19 +123,35 @@ export default function WorkspaceDocuments() {
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-ink-500">
                     <FileText className="h-4 w-4" />
                   </span>
-                  {canDelete && (
-                    <button
-                      onClick={(e) => deleteDocument(e, doc.id)}
-                      title="Delete document"
-                      aria-label="Delete document"
-                      className="rounded-lg p-1.5 text-ink-300 opacity-0 transition-colors hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                  {canManage && (
+                    <div className="flex shrink-0 items-center gap-1 opacity-0 transition-colors group-hover:opacity-100">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAccessDoc(doc);
+                        }}
+                        title="Document access"
+                        aria-label="Document access"
+                        className="rounded-lg p-1.5 text-ink-300 hover:bg-brand-50 hover:text-brand-600"
+                      >
+                        <Settings className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => deleteDocument(e, doc.id)}
+                        title="Delete document"
+                        aria-label="Delete document"
+                        className="rounded-lg p-1.5 text-ink-300 hover:bg-red-50 hover:text-red-500"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   )}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-ink-800">{doc.title}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="truncate text-sm font-medium text-ink-800">{doc.title}</p>
+                    {doc.visibility === "ASSIGNED" && <Lock className="h-3 w-3 shrink-0 text-accent-500" />}
+                  </div>
                   <p className="mt-0.5 text-xs text-ink-400">
                     Updated {formatDistanceToNow(new Date(doc.updatedAt), { addSuffix: true })}
                   </p>
@@ -139,12 +159,24 @@ export default function WorkspaceDocuments() {
                 <div className="mt-auto flex items-center gap-1.5 text-xs text-ink-400">
                   <Avatar name={doc.createdBy.name} color={doc.createdBy.avatarColor} size={16} />
                   <span className="truncate">{doc.createdBy.name}</span>
+                  {doc.visibility === "ASSIGNED" && doc.assignees?.length > 0 && (
+                    <span className="truncate">· assigned to {doc.assignees.map((a) => a.name).join(", ")}</span>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      <DocumentAccessModal
+        open={!!accessDoc}
+        onClose={() => setAccessDoc(null)}
+        workspaceId={workspaceId}
+        members={members}
+        document={accessDoc}
+        onSaved={(saved) => setDocuments((prev) => prev.map((d) => (d.id === saved.id ? saved : d)))}
+      />
     </div>
   );
 }

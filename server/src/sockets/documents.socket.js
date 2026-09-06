@@ -1,6 +1,7 @@
 import * as Y from "yjs";
 import { prisma } from "../db/prisma.js";
 import { emitToWorkspace } from "./io.js";
+import { isDocumentVisible } from "../services/documentAccess.js";
 
 // In-memory authoritative merge point per open document — lets a late joiner
 // sync via one full-state message instead of replayed history, and decouples
@@ -56,7 +57,7 @@ export function evictDocument(documentId) {
 export function registerDocumentHandlers(io, socket) {
   socket.on("document:join", async (documentId, ack) => {
     try {
-      const doc = await prisma.document.findUnique({ where: { id: documentId } });
+      const doc = await prisma.document.findUnique({ where: { id: documentId }, include: { assignees: true } });
       if (!doc) return ack?.({ error: "Document not found" });
 
       const [member, user] = await Promise.all([
@@ -66,6 +67,9 @@ export function registerDocumentHandlers(io, socket) {
         prisma.user.findUnique({ where: { id: socket.userId }, select: { id: true, name: true, avatarColor: true } }),
       ]);
       if (!member) return ack?.({ error: "Not a member of this workspace" });
+      if (!isDocumentVisible(socket.userId, member.role, doc)) {
+        return ack?.({ error: "You don't have access to this document" });
+      }
 
       let entry = docs.get(documentId);
       if (!entry) {
