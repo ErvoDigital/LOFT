@@ -8,7 +8,11 @@ export default function TableGridPicker({ onInsert }) {
 
   return (
     <div className="p-2">
-      <div className="grid grid-cols-8 gap-0.5">
+      {/* Fixed-size columns, not grid-cols-8's `fr` tracks — `fr` can't
+          resolve a size inside this flyout's shrink-to-fit width (it's
+          `position: absolute` with no explicit width), so tracks collapsed
+          to ~2px and the fixed 16px cells overlapped instead of tiling. */}
+      <div className="grid gap-0.5" style={{ gridTemplateColumns: "repeat(8, 1rem)" }}>
         {CELLS.map(({ row, col }) => {
           const active = row <= hover.rows && col <= hover.cols;
           return (
