@@ -32,8 +32,10 @@ export function MeetingProvider({ children }) {
   const [camOn, setCamOn] = useState(true);
   // False when the current/pending stream never requested an audio track
   // (the "Use camera" choice) — toggling mic on such a stream would be a
-  // no-op, so the UI hides/disables the control instead.
+  // no-op, so the UI shows a "turn on your mic?" confirmation instead (see
+  // micRequestOpen) rather than a plain toggle.
   const [micAvailable, setMicAvailable] = useState(true);
+  const [micRequestOpen, setMicRequestOpen] = useState(false);
   const [sharingScreen, setSharingScreen] = useState(false);
   const [participants, setParticipants] = useState({}); // userId -> { name, avatarColor }
   const [remoteStreams, setRemoteStreams] = useState({}); // userId -> camera MediaStream
@@ -286,6 +288,7 @@ export function MeetingProvider({ children }) {
     setMicOn(true);
     setCamOn(true);
     setMicAvailable(true);
+    setMicRequestOpen(false);
   }
 
   // The actual join, called once the user confirms from the lobby — reuses
@@ -341,6 +344,8 @@ export function MeetingProvider({ children }) {
     setJoined(false);
     setActiveWorkspaceId(null);
     setAnnotations([]);
+    setMicAvailable(true);
+    setMicRequestOpen(false);
   }
 
   // Leaves whatever call is currently active and immediately opens the
@@ -382,6 +387,8 @@ export function MeetingProvider({ children }) {
     setActiveWorkspaceId(null);
     setSharingScreen(false);
     setAnnotations([]);
+    setMicAvailable(true);
+    setMicRequestOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
@@ -395,6 +402,52 @@ export function MeetingProvider({ children }) {
     const next = !camOn;
     localStreamRef.current?.getVideoTracks().forEach((t) => (t.enabled = next));
     setCamOn(next);
+  }
+
+  // Clicking the mic control when it was never requested (the "Use camera"
+  // choice) opens this confirmation instead of toggling — mirrors the
+  // pre-permission dialog shown before joining, just scoped to the mic alone.
+  function promptEnableMic() {
+    if (micAvailable) return;
+    setMicRequestOpen(true);
+  }
+
+  function cancelMicRequest() {
+    setMicRequestOpen(false);
+  }
+
+  // Requests a mic track after the fact and folds it into the call already
+  // in progress — adds it to the existing local stream and, for any peer
+  // already connected, renegotiates so they start receiving audio too
+  // (same offer/renegotiate pattern as startScreenShare).
+  async function confirmEnableMic() {
+    setMicRequestOpen(false);
+    try {
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioTrack = audioStream.getAudioTracks()[0];
+      if (!localStreamRef.current) {
+        localStreamRef.current = audioStream;
+        setLocalStream(audioStream);
+      } else {
+        localStreamRef.current.addTrack(audioTrack);
+      }
+
+      for (const [peerId, pc] of peersRef.current) {
+        pc.addTrack(audioTrack, localStreamRef.current);
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          socket.emit("meeting:signal", { toUserId: peerId, data: { type: "offer", sdp: pc.localDescription } });
+        } catch (err) {
+          console.error("add-mic renegotiation failed", err);
+        }
+      }
+
+      setMicAvailable(true);
+      setMicOn(true);
+    } catch (err) {
+      setError("Couldn't access your microphone. Check your browser permissions and try again.");
+    }
   }
 
   // Local update + broadcast so every participant's canvas matches. Used both
@@ -484,6 +537,7 @@ export function MeetingProvider({ children }) {
     micOn,
     camOn,
     micAvailable,
+    micRequestOpen,
     sharingScreen,
     participants,
     remoteStreams,
@@ -506,6 +560,9 @@ export function MeetingProvider({ children }) {
     switchMeeting,
     toggleMic,
     toggleCam,
+    promptEnableMic,
+    cancelMicRequest,
+    confirmEnableMic,
     startScreenShare,
     stopScreenShare,
   };

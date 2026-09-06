@@ -39,6 +39,33 @@ function ControlButton({ onClick, variant = "default", wide, title, children }) 
   );
 }
 
+// The mic control's "not requested yet" state is clickable (not disabled) —
+// clicking it here rather than a plain toggle, since turning the mic on for
+// the first time needs a fresh getUserMedia call (and so the browser's own
+// permission prompt), same idea as the pre-join confirmation but scoped to
+// just the mic.
+function MicRequestModal({ open, onCancel, onConfirm }) {
+  return (
+    <Modal open={open} onClose={onCancel} title="" width="max-w-xs">
+      <div className="text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent-500/15 text-accent-600">
+          <Mic className="h-6 w-6" />
+        </div>
+        <h2 className="text-base font-semibold text-ink-900">Turn on your microphone?</h2>
+        <p className="mt-1 text-sm text-ink-400">Others will be able to hear you once you allow access.</p>
+        <div className="mt-4 flex items-center gap-2">
+          <button onClick={onCancel} className="btn-secondary flex-1">
+            Cancel
+          </button>
+          <button onClick={onConfirm} className="btn-primary flex-1">
+            Turn on mic
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function WorkspaceMeeting() {
   const { workspaceId } = useParams();
   const { socket } = useSocket();
@@ -55,6 +82,7 @@ export default function WorkspaceMeeting() {
     micOn,
     camOn,
     micAvailable,
+    micRequestOpen,
     sharingScreen,
     participants,
     remoteStreams,
@@ -77,6 +105,9 @@ export default function WorkspaceMeeting() {
     switchMeeting,
     toggleMic,
     toggleCam,
+    promptEnableMic,
+    cancelMicRequest,
+    confirmEnableMic,
     startScreenShare,
     stopScreenShare,
   } = useMeeting();
@@ -132,9 +163,9 @@ export default function WorkspaceMeeting() {
 
           <div className="mt-4 flex items-center justify-center gap-3">
             <ControlButton
-              onClick={micAvailable ? toggleMic : undefined}
+              onClick={micAvailable ? toggleMic : promptEnableMic}
               variant={!micAvailable ? "off" : micOn ? "default" : "off"}
-              title={!micAvailable ? "Microphone not enabled for this call" : micOn ? "Mute" : "Unmute"}
+              title={!micAvailable ? "Turn on your microphone" : micOn ? "Mute" : "Unmute"}
             >
               {!micAvailable || !micOn ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </ControlButton>
@@ -154,6 +185,8 @@ export default function WorkspaceMeeting() {
             </button>
           </div>
         </div>
+
+        <MicRequestModal open={micRequestOpen} onCancel={cancelMicRequest} onConfirm={confirmEnableMic} />
       </div>
     );
   }
@@ -304,9 +337,9 @@ export default function WorkspaceMeeting() {
 
       <div className="mt-4 flex items-center justify-center gap-3">
         <ControlButton
-          onClick={micAvailable ? toggleMic : undefined}
+          onClick={micAvailable ? toggleMic : promptEnableMic}
           variant={!micAvailable ? "off" : micOn ? "default" : "off"}
-          title={!micAvailable ? "Microphone not enabled for this call" : micOn ? "Mute" : "Unmute"}
+          title={!micAvailable ? "Turn on your microphone" : micOn ? "Mute" : "Unmute"}
         >
           {!micAvailable || !micOn ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
         </ControlButton>
@@ -324,6 +357,8 @@ export default function WorkspaceMeeting() {
           <PhoneOff className="h-5 w-5" />
         </ControlButton>
       </div>
+
+      <MicRequestModal open={micRequestOpen} onCancel={cancelMicRequest} onConfirm={confirmEnableMic} />
     </div>
   );
 }
