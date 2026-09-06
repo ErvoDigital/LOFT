@@ -1,9 +1,7 @@
-import fs from "fs";
-import path from "path";
 import { z } from "zod";
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
-import { workspaceUploadDir } from "../utils/uploads.js";
+import { generateStoredName, uploadObject, deleteObject, presignDownloadUrl } from "../utils/uploads.js";
 import { emitToWorkspace } from "../sockets/io.js";
 import { isFolderVisible } from "../services/folderAccess.js";
 
@@ -69,6 +67,9 @@ export async function uploadAsset(req, res) {
     }
   }
 
+  const storedName = generateStoredName(req.file.originalname);
+  await uploadObject(workspaceId, storedName, req.file.buffer, req.file.mimetype);
+
   const asset = await prisma.asset.create({
     data: {
       workspaceId,
@@ -79,7 +80,7 @@ export async function uploadAsset(req, res) {
         create: {
           version: 1,
           originalName: req.file.originalname,
-          storedName: req.file.filename,
+          storedName,
           mimeType: req.file.mimetype,
           size: req.file.size,
           uploadedById: req.userId,
@@ -104,12 +105,14 @@ export async function uploadVersion(req, res) {
   await assertAssetFolderAccess(req, existing);
 
   const nextVersion = Math.max(0, ...existing.versions.map((v) => v.version)) + 1;
+  const storedName = generateStoredName(req.file.originalname);
+  await uploadObject(workspaceId, storedName, req.file.buffer, req.file.mimetype);
   await prisma.assetVersion.create({
     data: {
       assetId,
       version: nextVersion,
       originalName: req.file.originalname,
-      storedName: req.file.filename,
+      storedName,
       mimeType: req.file.mimetype,
       size: req.file.size,
       uploadedById: req.userId,
@@ -170,10 +173,8 @@ export async function downloadVersion(req, res) {
   }
   await assertAssetFolderAccess(req, version.asset);
 
-  const filePath = path.join(workspaceUploadDir(workspaceId), version.storedName);
-  if (!fs.existsSync(filePath)) throw new ApiError(404, "File not found on disk");
-
-  res.download(filePath, version.originalName);
+  const url = await presignDownloadUrl(workspaceId, version.storedName, version.originalName);
+  res.redirect(url);
 }
 
 export async function deleteAsset(req, res) {
@@ -185,10 +186,7 @@ export async function deleteAsset(req, res) {
   }
   await assertAssetFolderAccess(req, asset);
 
-  const dir = workspaceUploadDir(workspaceId);
-  for (const v of asset.versions) {
-    fs.rm(path.join(dir, v.storedName), { force: true }, () => {});
-  }
+  await Promise.all(asset.versions.map((v) => deleteObject(workspaceId, v.storedName)));
   await prisma.asset.delete({ where: { id: assetId } });
 
   emitToWorkspace(workspaceId, "asset:deleted", { id: assetId });

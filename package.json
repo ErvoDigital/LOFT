@@ -16,6 +16,13 @@
     "prisma:seed": "npm run prisma:seed -w server"
   },
   "devDependencies": {
+    "@neon/config": "^1.3.0",
     "concurrently": "^9.1.0"
+  },
+  "dependencies": {
+    "@neon/functions": "^0.9.0",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.0",
+    "yjs": "^13.6.32"
   }
 }

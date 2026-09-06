@@ -2,15 +2,9 @@ import { Router } from "express";
 import multer from "multer";
 import * as assetsController from "../controllers/assets.controller.js";
 import { requireAuth, requireWorkspaceMember } from "../middleware/auth.js";
-import { workspaceUploadDir, generateStoredName } from "../utils/uploads.js";
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, workspaceUploadDir(req.params.workspaceId)),
-  filename: (req, file, cb) => cb(null, generateStoredName(file.originalname)),
-});
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 500 * 1024 * 1024 }, // 500MB, generous for video
 });
 

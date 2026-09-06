@@ -1,6 +1,20 @@
 import * as Y from "yjs";
 import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate, removeAwarenessStates } from "y-protocols/awareness";
 
+// Yjs updates are binary; the realtime service's wire protocol is JSON text,
+// so binary payloads travel as base64 in both directions.
+function toBase64(bytes) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+function fromBase64(str) {
+  const binary = atob(str);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
 // A minimal Yjs "provider" riding the app's single existing Socket.io
 // connection instead of a separate y-websocket server — the whole app is
 // built around one Socket.io instance (see SocketContext/sockets/io.js), so
@@ -24,24 +38,24 @@ export class SocketYjsProvider {
     // straight back out to the server that just sent it.
     this._onLocalUpdate = (update, origin) => {
       if (origin === this) return;
-      this.socket.emit("document:update", { documentId: this.documentId, update });
+      this.socket.emit("document:update", { documentId: this.documentId, update: toBase64(update) });
     };
     this._onLocalAwareness = ({ added, updated, removed }) => {
       const changed = added.concat(updated, removed);
       if (!changed.length) return;
       this.socket.emit("document:awareness", {
         documentId: this.documentId,
-        update: encodeAwarenessUpdate(this.awareness, changed),
+        update: toBase64(encodeAwarenessUpdate(this.awareness, changed)),
       });
     };
-    this._onRemoteUpdate = ({ update }) => Y.applyUpdate(this.ydoc, new Uint8Array(update), this);
-    this._onRemoteAwareness = ({ update }) => applyAwarenessUpdate(this.awareness, new Uint8Array(update), this);
+    this._onRemoteUpdate = ({ update }) => Y.applyUpdate(this.ydoc, fromBase64(update), this);
+    this._onRemoteAwareness = ({ update }) => applyAwarenessUpdate(this.awareness, fromBase64(update), this);
     this._onAwarenessRequest = () => {
       const state = this.awareness.getLocalState();
       if (!state) return;
       this.socket.emit("document:awareness", {
         documentId: this.documentId,
-        update: encodeAwarenessUpdate(this.awareness, [this.ydoc.clientID]),
+        update: toBase64(encodeAwarenessUpdate(this.awareness, [this.ydoc.clientID])),
       });
     };
     // The shared socket auto-reconnects on a network blip, but the server's
@@ -62,7 +76,7 @@ export class SocketYjsProvider {
     return new Promise((resolve, reject) => {
       this.socket.emit("document:join", this.documentId, (res) => {
         if (res?.error) return reject(new Error(res.error));
-        Y.applyUpdate(this.ydoc, new Uint8Array(res.update), this);
+        Y.applyUpdate(this.ydoc, fromBase64(res.update), this);
         resolve(res);
       });
     });

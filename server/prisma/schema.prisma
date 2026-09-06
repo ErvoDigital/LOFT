@@ -280,6 +280,38 @@ model Document {
   createdBy User      @relation("DocumentCreator", fields: [createdById], references: [id])
 }
 
+// Cross-process pub/sub relay: the REST API (Vercel) and the realtime
+// WebSocket service (Neon Functions) are separate deployments with no shared
+// memory, so a push ("asset created", "notification:new", a chat message)
+// is written here instead of held in an in-process socket registry. The
+// realtime service polls for new rows and forwards matching ones to whatever
+// connections it currently holds. `target` is a room key: "user:<id>",
+// "workspace:<id>", "conversation:<id>", "meeting:<workspaceId>", or
+// "document:<id>". Rows are transient — the poller's cursor is the only
+// thing that reads them, so old rows are pruned on a timer rather than kept.
+model RealtimeEvent {
+  id        Int      @id @default(autoincrement())
+  target    String
+  event     String
+  payload   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// Who's currently in a workspace's meeting. Kept in Postgres rather than
+// in-memory: the realtime service can run multiple isolates in parallel,
+// each with its own process memory, so an in-memory roster on one isolate
+// would miss participants who happened to connect through another.
+model MeetingParticipant {
+  id          String   @id @default(uuid())
+  workspaceId String
+  userId      String
+  joinedAt    DateTime @default(now())
+
+  @@unique([workspaceId, userId])
+}
+
 model AssetVersion {
   id           String   @id @default(uuid())
   assetId      String

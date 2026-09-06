@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { io } from "socket.io-client";
+import { SocketLike } from "../lib/socketShim.js";
 import { useAuth } from "./AuthContext.jsx";
 
 const SocketContext = createContext(null);
@@ -18,10 +18,7 @@ export function SocketProvider({ children }) {
     }
 
     const token = localStorage.getItem("loft_token");
-    const socket = io(import.meta.env.VITE_API_URL || "/", {
-      auth: { token },
-      transports: ["websocket", "polling"],
-    });
+    const socket = new SocketLike(import.meta.env.VITE_REALTIME_URL || "/", token);
     socketRef.current = socket;
 
     socket.on("connect", () => setConnected(true));
