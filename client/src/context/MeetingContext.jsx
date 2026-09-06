@@ -23,8 +23,17 @@ export function MeetingProvider({ children }) {
   // mic" lobby step, shown for both starting and joining a call.
   const [lobbyOpen, setLobbyOpen] = useState(false);
   const [pendingWorkspaceId, setPendingWorkspaceId] = useState(null);
+  // The workspace a "Start/Join meeting" click is pending confirmation for —
+  // set the moment the button is clicked, before getUserMedia (and so before
+  // the browser's own permission prompt) is ever called, so the user picks
+  // camera-only vs. camera+mic first.
+  const [confirmWorkspaceId, setConfirmWorkspaceId] = useState(null);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
+  // False when the current/pending stream never requested an audio track
+  // (the "Use camera" choice) — toggling mic on such a stream would be a
+  // no-op, so the UI hides/disables the control instead.
+  const [micAvailable, setMicAvailable] = useState(true);
   const [sharingScreen, setSharingScreen] = useState(false);
   const [participants, setParticipants] = useState({}); // userId -> { name, avatarColor }
   const [remoteStreams, setRemoteStreams] = useState({}); // userId -> camera MediaStream
@@ -218,21 +227,23 @@ export function MeetingProvider({ children }) {
     };
   }, [socket, joined, createPeerConnection, flushQueued]);
 
-  // Acquires the camera/mic stream and opens the pre-join lobby (a preview
-  // + mic/cam check) rather than joining the call outright — the actual
-  // socket join only happens once the user confirms via confirmJoin(). No
-  // guard against an already-active call here, since this is also used
-  // directly by switchMeeting() right after it tears the old call down, so
-  // it can't be blocked by `joined` still reading true from this render's
-  // stale closure (leaveMeeting()'s setJoined(false) hasn't been applied yet
-  // at that point).
-  async function acquireDevices(workspaceId) {
+  // Acquires the camera (and, if requested, mic) stream and opens the
+  // pre-join lobby (a preview + mic/cam check) rather than joining the call
+  // outright — the actual socket join only happens once the user confirms
+  // via confirmJoin(). No guard against an already-active call here, since
+  // this is also used directly by switchMeeting() right after it tears the
+  // old call down, so it can't be blocked by `joined` still reading true
+  // from this render's stale closure (leaveMeeting()'s setJoined(false)
+  // hasn't been applied yet at that point).
+  async function acquireDevices(workspaceId, withAudio = true) {
     setError("");
     setJoining(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: withAudio });
       localStreamRef.current = stream;
       setLocalStream(stream);
+      setMicAvailable(withAudio);
+      setMicOn(withAudio);
       setPendingWorkspaceId(workspaceId);
       setLobbyOpen(true);
     } catch (err) {
@@ -242,9 +253,26 @@ export function MeetingProvider({ children }) {
     }
   }
 
-  function prepareDevices(workspaceId) {
-    if (joined || joining || lobbyOpen) return;
-    return acquireDevices(workspaceId);
+  // Opens the "do you want people to see/hear you" confirmation — shown
+  // before any permission is requested, so the browser's own camera/mic
+  // prompt only fires once the user picks camera-only vs. camera+mic below.
+  function promptJoin(workspaceId) {
+    if (joined || joining || lobbyOpen || confirmWorkspaceId) return;
+    setConfirmWorkspaceId(workspaceId);
+  }
+
+  function cancelConfirm() {
+    setConfirmWorkspaceId(null);
+  }
+
+  // Called once the user picks a device combination from the confirmation —
+  // this is what actually triggers getUserMedia (and the browser's native
+  // permission prompt).
+  function confirmDevices(withAudio) {
+    const workspaceId = confirmWorkspaceId;
+    setConfirmWorkspaceId(null);
+    if (!workspaceId) return;
+    return acquireDevices(workspaceId, withAudio);
   }
 
   // Backs out of the lobby without ever having joined the call — releases
@@ -257,6 +285,7 @@ export function MeetingProvider({ children }) {
     setPendingWorkspaceId(null);
     setMicOn(true);
     setCamOn(true);
+    setMicAvailable(true);
   }
 
   // The actual join, called once the user confirms from the lobby — reuses
@@ -316,11 +345,11 @@ export function MeetingProvider({ children }) {
 
   // Leaves whatever call is currently active and immediately opens the
   // lobby for a different workspace's — used by the "leave & join here"
-  // cross-workspace prompt. Goes through acquireDevices directly (not
-  // prepareDevices) since leaveMeeting()'s setJoined(false) hasn't taken
-  // effect yet at this point in the same synchronous call —
-  // prepareDevices's `if (joined) return` guard would still see the
-  // pre-leave value and no-op.
+  // cross-workspace prompt. Skips the confirmation dialog (defaults to
+  // camera+mic) and goes through acquireDevices directly (not promptJoin)
+  // since leaveMeeting()'s setJoined(false) hasn't taken effect yet at this
+  // point in the same synchronous call — promptJoin's `if (joined) return`
+  // guard would still see the pre-leave value and no-op.
   function switchMeeting(workspaceId) {
     leaveMeeting();
     return acquireDevices(workspaceId);
@@ -332,7 +361,8 @@ export function MeetingProvider({ children }) {
   // connections directly — otherwise the browser's camera indicator would
   // stay on with no UI left to turn it off.
   useEffect(() => {
-    if (user || (!joined && !lobbyOpen)) return;
+    if (user || (!joined && !lobbyOpen && !confirmWorkspaceId)) return;
+    setConfirmWorkspaceId(null);
     peersRef.current.forEach((pc) => pc.close());
     peersRef.current.clear();
     localScreenStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -450,8 +480,10 @@ export function MeetingProvider({ children }) {
     error,
     lobbyOpen,
     pendingWorkspaceId,
+    confirmWorkspaceId,
     micOn,
     camOn,
+    micAvailable,
     sharingScreen,
     participants,
     remoteStreams,
@@ -465,7 +497,9 @@ export function MeetingProvider({ children }) {
     undoAnnotation,
     updateAnnotation,
     clearAnnotations,
-    prepareDevices,
+    promptJoin,
+    cancelConfirm,
+    confirmDevices,
     confirmJoin,
     cancelPrepare,
     leaveMeeting,

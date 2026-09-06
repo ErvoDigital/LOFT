@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useMeeting } from "../context/MeetingContext.jsx";
 import { useWorkspaces } from "../context/WorkspaceContext.jsx";
 import VideoTile from "../components/meeting/VideoTile.jsx";
+import Modal from "../components/common/Modal.jsx";
 
 // Camera grid density scales with headcount — more participants, smaller tiles.
 // A single participant is handled separately (one big centered tile).
@@ -50,8 +51,10 @@ export default function WorkspaceMeeting() {
     error,
     lobbyOpen,
     pendingWorkspaceId,
+    confirmWorkspaceId,
     micOn,
     camOn,
+    micAvailable,
     sharingScreen,
     participants,
     remoteStreams,
@@ -65,7 +68,9 @@ export default function WorkspaceMeeting() {
     undoAnnotation,
     updateAnnotation,
     clearAnnotations,
-    prepareDevices,
+    promptJoin,
+    cancelConfirm,
+    confirmDevices,
     confirmJoin,
     cancelPrepare,
     leaveMeeting,
@@ -81,6 +86,7 @@ export default function WorkspaceMeeting() {
   const inThisWorkspacesCall = joined && activeWorkspaceId === workspaceId;
   const inAnotherWorkspacesCall = joined && activeWorkspaceId !== workspaceId;
   const lobbyForThisWorkspace = lobbyOpen && pendingWorkspaceId === workspaceId;
+  const confirmForThisWorkspace = confirmWorkspaceId === workspaceId;
 
   // "How many are already here" for the pre-join screen — page-scoped to
   // whichever workspace is currently being viewed, independent of whatever
@@ -125,8 +131,12 @@ export default function WorkspaceMeeting() {
           </div>
 
           <div className="mt-4 flex items-center justify-center gap-3">
-            <ControlButton onClick={toggleMic} variant={micOn ? "default" : "off"} title={micOn ? "Mute" : "Unmute"}>
-              {micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+            <ControlButton
+              onClick={micAvailable ? toggleMic : undefined}
+              variant={!micAvailable ? "off" : micOn ? "default" : "off"}
+              title={!micAvailable ? "Microphone not enabled for this call" : micOn ? "Mute" : "Unmute"}
+            >
+              {!micAvailable || !micOn ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </ControlButton>
             <ControlButton onClick={toggleCam} variant={camOn ? "default" : "off"} title={camOn ? "Turn off camera" : "Turn on camera"}>
               {camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
@@ -164,10 +174,34 @@ export default function WorkspaceMeeting() {
               : "Nobody's here yet — start one and workspace members will be notified."}
           </p>
           {error && <p className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
-          <button onClick={() => prepareDevices(workspaceId)} disabled={joining} className="btn-primary mt-5 w-full">
+          <button onClick={() => promptJoin(workspaceId)} disabled={joining} className="btn-primary mt-5 w-full">
             {joining ? "Requesting access…" : preJoinCount > 0 ? "Join meeting" : "Start meeting"}
           </button>
         </div>
+
+        <Modal open={confirmForThisWorkspace} onClose={cancelConfirm} title="" width="max-w-sm">
+          <div className="text-center">
+            <div className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-ink-100">
+              <Video className="h-9 w-9 text-ink-400" />
+              <span className="absolute -right-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full bg-brand-500 text-white shadow-soft">
+                <Video className="h-4 w-4" />
+              </span>
+              <span className="absolute -left-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full bg-accent-500 text-white shadow-soft">
+                <Mic className="h-4 w-4" />
+              </span>
+            </div>
+            <h2 className="text-lg font-semibold text-ink-900">Do you want people to see you in the meeting?</h2>
+            <p className="mt-1 text-sm text-ink-400">You can still turn off your camera anytime in the meeting.</p>
+            <div className="mt-5 flex flex-col gap-2">
+              <button onClick={() => confirmDevices(false)} className="btn-primary w-full justify-center">
+                <Video className="h-4 w-4" /> Use camera
+              </button>
+              <button onClick={() => confirmDevices(true)} className="btn-secondary w-full justify-center">
+                <Mic className="h-4 w-4" /> Use microphone and camera
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
     );
   }
@@ -269,8 +303,12 @@ export default function WorkspaceMeeting() {
       )}
 
       <div className="mt-4 flex items-center justify-center gap-3">
-        <ControlButton onClick={toggleMic} variant={micOn ? "default" : "off"} title={micOn ? "Mute" : "Unmute"}>
-          {micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+        <ControlButton
+          onClick={micAvailable ? toggleMic : undefined}
+          variant={!micAvailable ? "off" : micOn ? "default" : "off"}
+          title={!micAvailable ? "Microphone not enabled for this call" : micOn ? "Mute" : "Unmute"}
+        >
+          {!micAvailable || !micOn ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
         </ControlButton>
         <ControlButton onClick={toggleCam} variant={camOn ? "default" : "off"} title={camOn ? "Turn off camera" : "Turn on camera"}>
           {camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
