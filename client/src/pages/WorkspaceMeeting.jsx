@@ -48,6 +48,8 @@ export default function WorkspaceMeeting() {
     joined,
     joining,
     error,
+    lobbyOpen,
+    pendingWorkspaceId,
     micOn,
     camOn,
     sharingScreen,
@@ -63,7 +65,9 @@ export default function WorkspaceMeeting() {
     undoAnnotation,
     updateAnnotation,
     clearAnnotations,
-    joinMeeting,
+    prepareDevices,
+    confirmJoin,
+    cancelPrepare,
     leaveMeeting,
     switchMeeting,
     toggleMic,
@@ -76,6 +80,7 @@ export default function WorkspaceMeeting() {
 
   const inThisWorkspacesCall = joined && activeWorkspaceId === workspaceId;
   const inAnotherWorkspacesCall = joined && activeWorkspaceId !== workspaceId;
+  const lobbyForThisWorkspace = lobbyOpen && pendingWorkspaceId === workspaceId;
 
   // "How many are already here" for the pre-join screen — page-scoped to
   // whichever workspace is currently being viewed, independent of whatever
@@ -108,6 +113,41 @@ export default function WorkspaceMeeting() {
     );
   }
 
+  if (lobbyForThisWorkspace) {
+    return (
+      <div className="flex h-full items-center justify-center bg-ink-900 p-6">
+        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+          <h2 className="text-lg font-semibold text-white">Check your camera and mic</h2>
+          <p className="mt-1 text-sm text-white/50">Make sure you look and sound right before you join.</p>
+
+          <div className="mx-auto mt-4 w-full">
+            <VideoTile stream={localStream} name={user.name} avatarColor={user.avatarColor} isLocal camOn={camOn} />
+          </div>
+
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <ControlButton onClick={toggleMic} variant={micOn ? "default" : "off"} title={micOn ? "Mute" : "Unmute"}>
+              {micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+            </ControlButton>
+            <ControlButton onClick={toggleCam} variant={camOn ? "default" : "off"} title={camOn ? "Turn off camera" : "Turn on camera"}>
+              {camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+            </ControlButton>
+          </div>
+
+          {error && <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
+
+          <div className="mt-5 flex items-center gap-2">
+            <button onClick={cancelPrepare} className="btn-secondary flex-1">
+              Cancel
+            </button>
+            <button onClick={confirmJoin} disabled={joining} className="btn-primary flex-1">
+              {joining ? "Joining…" : "Join now"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!inThisWorkspacesCall) {
     return (
       <div className="flex h-full items-center justify-center bg-ink-900 p-6">
@@ -124,8 +164,8 @@ export default function WorkspaceMeeting() {
               : "Nobody's here yet — start one and workspace members will be notified."}
           </p>
           {error && <p className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
-          <button onClick={() => joinMeeting(workspaceId)} disabled={joining} className="btn-primary mt-5 w-full">
-            {joining ? "Connecting…" : preJoinCount > 0 ? "Join meeting" : "Start meeting"}
+          <button onClick={() => prepareDevices(workspaceId)} disabled={joining} className="btn-primary mt-5 w-full">
+            {joining ? "Requesting access…" : preJoinCount > 0 ? "Join meeting" : "Start meeting"}
           </button>
         </div>
       </div>

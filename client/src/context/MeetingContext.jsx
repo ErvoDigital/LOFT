@@ -18,6 +18,11 @@ export function MeetingProvider({ children }) {
   const [joined, setJoined] = useState(false);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState("");
+  // True once the camera/mic stream has been acquired and previewed but
+  // before the socket join actually happens — the "check your camera and
+  // mic" lobby step, shown for both starting and joining a call.
+  const [lobbyOpen, setLobbyOpen] = useState(false);
+  const [pendingWorkspaceId, setPendingWorkspaceId] = useState(null);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [sharingScreen, setSharingScreen] = useState(false);
@@ -213,47 +218,72 @@ export function MeetingProvider({ children }) {
     };
   }, [socket, joined, createPeerConnection, flushQueued]);
 
-  // The actual acquire-media-and-join sequence, with no guard against an
-  // already-active call — used directly by switchMeeting() right after it
-  // tears the old call down, so it can't be blocked by `joined` still
-  // reading true from this render's stale closure (leaveMeeting()'s
-  // setJoined(false) hasn't been applied yet at that point).
-  async function acquireAndJoin(workspaceId) {
+  // Acquires the camera/mic stream and opens the pre-join lobby (a preview
+  // + mic/cam check) rather than joining the call outright — the actual
+  // socket join only happens once the user confirms via confirmJoin(). No
+  // guard against an already-active call here, since this is also used
+  // directly by switchMeeting() right after it tears the old call down, so
+  // it can't be blocked by `joined` still reading true from this render's
+  // stale closure (leaveMeeting()'s setJoined(false) hasn't been applied yet
+  // at that point).
+  async function acquireDevices(workspaceId) {
     setError("");
     setJoining(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStreamRef.current = stream;
       setLocalStream(stream);
-
-      socket.emit("meeting:join", workspaceId, (res) => {
-        if (res?.error) {
-          setError(res.error);
-          setJoining(false);
-          stream.getTracks().forEach((t) => t.stop());
-          localStreamRef.current = null;
-          setLocalStream(null);
-          return;
-        }
-        const meta = {};
-        (res.peers || []).forEach((p) => {
-          meta[p.userId] = { name: p.name, avatarColor: p.avatarColor };
-        });
-        setParticipants(meta);
-        setActiveWorkspaceId(workspaceId);
-        setJoined(true);
-        setJoining(false);
-        (res.peers || []).forEach((p) => createPeerConnection(p.userId, true));
-      });
+      setPendingWorkspaceId(workspaceId);
+      setLobbyOpen(true);
     } catch (err) {
       setError("Couldn't access your camera or microphone. Check your browser permissions and try again.");
+    } finally {
       setJoining(false);
     }
   }
 
-  function joinMeeting(workspaceId) {
-    if (joined || joining) return;
-    return acquireAndJoin(workspaceId);
+  function prepareDevices(workspaceId) {
+    if (joined || joining || lobbyOpen) return;
+    return acquireDevices(workspaceId);
+  }
+
+  // Backs out of the lobby without ever having joined the call — releases
+  // the camera/mic and restores the mic/cam toggle defaults for next time.
+  function cancelPrepare() {
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
+    setLocalStream(null);
+    setLobbyOpen(false);
+    setPendingWorkspaceId(null);
+    setMicOn(true);
+    setCamOn(true);
+  }
+
+  // The actual join, called once the user confirms from the lobby — reuses
+  // the stream already acquired by acquireDevices() rather than requesting
+  // getUserMedia a second time.
+  function confirmJoin() {
+    const workspaceId = pendingWorkspaceId;
+    if (!workspaceId || !localStreamRef.current) return;
+    setJoining(true);
+    socket.emit("meeting:join", workspaceId, (res) => {
+      if (res?.error) {
+        setError(res.error);
+        setJoining(false);
+        return;
+      }
+      const meta = {};
+      (res.peers || []).forEach((p) => {
+        meta[p.userId] = { name: p.name, avatarColor: p.avatarColor };
+      });
+      setParticipants(meta);
+      setActiveWorkspaceId(workspaceId);
+      setJoined(true);
+      setJoining(false);
+      setLobbyOpen(false);
+      setPendingWorkspaceId(null);
+      (res.peers || []).forEach((p) => createPeerConnection(p.userId, true));
+    });
   }
 
   function stopLocalScreenShare() {
@@ -284,15 +314,16 @@ export function MeetingProvider({ children }) {
     setAnnotations([]);
   }
 
-  // Leaves whatever call is currently active and immediately joins a
-  // different workspace's — used by the "leave & join here" cross-workspace
-  // prompt. Goes through acquireAndJoin directly (not joinMeeting) since
-  // leaveMeeting()'s setJoined(false) hasn't taken effect yet at this point
-  // in the same synchronous call — joinMeeting's `if (joined) return` guard
-  // would still see the pre-leave value and no-op.
+  // Leaves whatever call is currently active and immediately opens the
+  // lobby for a different workspace's — used by the "leave & join here"
+  // cross-workspace prompt. Goes through acquireDevices directly (not
+  // prepareDevices) since leaveMeeting()'s setJoined(false) hasn't taken
+  // effect yet at this point in the same synchronous call —
+  // prepareDevices's `if (joined) return` guard would still see the
+  // pre-leave value and no-op.
   function switchMeeting(workspaceId) {
     leaveMeeting();
-    return acquireAndJoin(workspaceId);
+    return acquireDevices(workspaceId);
   }
 
   // Hard stop on logout: the socket is already disconnecting by the time this
@@ -301,7 +332,7 @@ export function MeetingProvider({ children }) {
   // connections directly — otherwise the browser's camera indicator would
   // stay on with no UI left to turn it off.
   useEffect(() => {
-    if (user || !joined) return;
+    if (user || (!joined && !lobbyOpen)) return;
     peersRef.current.forEach((pc) => pc.close());
     peersRef.current.clear();
     localScreenStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -316,6 +347,8 @@ export function MeetingProvider({ children }) {
     setRemoteStreams({});
     setRemoteScreenStreams({});
     setJoined(false);
+    setLobbyOpen(false);
+    setPendingWorkspaceId(null);
     setActiveWorkspaceId(null);
     setSharingScreen(false);
     setAnnotations([]);
@@ -415,6 +448,8 @@ export function MeetingProvider({ children }) {
     joined,
     joining,
     error,
+    lobbyOpen,
+    pendingWorkspaceId,
     micOn,
     camOn,
     sharingScreen,
@@ -430,7 +465,9 @@ export function MeetingProvider({ children }) {
     undoAnnotation,
     updateAnnotation,
     clearAnnotations,
-    joinMeeting,
+    prepareDevices,
+    confirmJoin,
+    cancelPrepare,
     leaveMeeting,
     switchMeeting,
     toggleMic,
