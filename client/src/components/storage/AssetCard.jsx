@@ -1,14 +1,20 @@
 import { useState } from "react";
-import { File, Film, Image, Music, FileText } from "lucide-react";
+import { Download, Eye, File, Film, FolderInput, Image, Music, FileText, Trash2 } from "lucide-react";
 import Avatar from "../common/Avatar.jsx";
 import { ASSET_DRAG_TYPE } from "./dragTypes.js";
+
+const DOCUMENT_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
 
 function FileIcon({ mimeType, className }) {
   if (!mimeType) return <File className={className} />;
   if (mimeType.startsWith("video/")) return <Film className={className} />;
   if (mimeType.startsWith("image/")) return <Image className={className} />;
   if (mimeType.startsWith("audio/")) return <Music className={className} />;
-  if (mimeType === "application/pdf") return <FileText className={className} />;
+  if (DOCUMENT_MIME_TYPES.has(mimeType)) return <FileText className={className} />;
   return <File className={className} />;
 }
 
@@ -121,12 +127,9 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
       )}
 
       <div className="flex items-center justify-between text-xs">
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
           <button onClick={() => onPreview(latest)} className="font-medium text-brand-600 hover:underline">
             Preview
-          </button>
-          <button onClick={() => onDownload(latest)} className="font-medium text-ink-500 hover:underline">
-            Download
           </button>
           {isMultiVersion && (
             <button onClick={() => setExpanded((e) => !e)} className="font-medium text-ink-500 hover:underline">
@@ -134,16 +137,36 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
             </button>
           )}
         </div>
-        {canManage && (
-          <div className="flex gap-3">
-            <button onClick={() => onMove(asset)} className="font-medium text-ink-500 hover:underline">
-              Move
-            </button>
-            <button onClick={() => onDelete(asset.id)} className="font-medium text-red-500 hover:underline">
-              Delete
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onDownload(latest)}
+            title="Download"
+            aria-label="Download"
+            className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+          >
+            <Download className="h-3.5 w-3.5" />
+          </button>
+          {canManage && (
+            <>
+              <button
+                onClick={() => onMove(asset)}
+                title="Move to folder"
+                aria-label="Move to folder"
+                className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+              >
+                <FolderInput className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => onDelete(asset.id)}
+                title="Delete"
+                aria-label="Delete"
+                className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-red-50 hover:text-red-500"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {expanded && (
@@ -152,12 +175,22 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
             <div key={v.id} className="flex items-center justify-between text-xs">
               <span className="font-medium text-ink-600">V{v.version}</span>
               <span className="truncate px-2 text-ink-400">{formatSize(v.size)} · {timeAgo(v.createdAt)}</span>
-              <div className="flex shrink-0 gap-2.5">
-                <button onClick={() => onPreview(v)} className="font-medium text-brand-600 hover:underline">
-                  Preview
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  onClick={() => onPreview(v)}
+                  title="Preview"
+                  aria-label="Preview"
+                  className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+                >
+                  <Eye className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => onDownload(v)} className="font-medium text-ink-500 hover:underline">
-                  Download
+                <button
+                  onClick={() => onDownload(v)}
+                  title="Download"
+                  aria-label="Download"
+                  className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+                >
+                  <Download className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
