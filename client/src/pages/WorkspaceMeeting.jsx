@@ -144,16 +144,22 @@ export default function WorkspaceMeeting() {
   const lobbyForThisWorkspace = lobbyOpen && pendingWorkspaceId === workspaceId;
   const confirmForThisWorkspace = confirmWorkspaceId === workspaceId;
 
-  // The in-call chat panel rides on the workspace's own "General" channel
-  // (the same one WorkspaceChat shows) rather than a call-scoped thread, so
-  // anything said during the meeting is just... the workspace's chat history,
-  // visible to everyone whether or not they were on the call.
+  // A dedicated "Meeting Chat" channel, separate from General, so meeting
+  // chatter doesn't mix into regular workspace chat history — created (and/or
+  // joined) lazily the moment someone actually opens the panel, not just for
+  // joining the call, so people who never touch chat don't get silently
+  // added to a channel they never look at.
   useEffect(() => {
-    if (!inThisWorkspacesCall) return;
-    conversationsApi.listWorkspaceConversations(workspaceId).then((convos) => {
-      setChatConversation(convos.find((c) => c.isDefault) || convos[0] || null);
-    });
-  }, [inThisWorkspacesCall, workspaceId]);
+    if (!chatOpen || chatConversation) return;
+    conversationsApi.getOrCreateMeetingChat(workspaceId).then(setChatConversation);
+  }, [chatOpen, chatConversation, workspaceId]);
+
+  // A different workspace's meeting page — drop the stale reference so it
+  // doesn't flash the previous workspace's chat before the new one loads.
+  useEffect(() => {
+    setChatConversation(null);
+    setChatOpen(false);
+  }, [workspaceId]);
 
   // "How many are already here" for the pre-join screen — page-scoped to
   // whichever workspace is currently being viewed, independent of whatever
@@ -304,6 +310,7 @@ export default function WorkspaceMeeting() {
               <VideoTile
                 stream={primaryScreen.stream}
                 name={primaryScreen.label}
+                isLocal={sharingScreen}
                 mirrored={false}
                 large
                 fit="contain"

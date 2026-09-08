@@ -41,12 +41,14 @@ export default function VideoTile({
   const hasVideo = stream && camOn;
   const videoRef = useRef(null);
 
-  // Always muted: this tile is display-only. A remote peer's actual audio
-  // plays through the persistent <audio> elements MeetingContext renders at
-  // the app root (see RemoteAudioTrack there), which — unlike this tile —
-  // keep running after the meeting page unmounts, so leaving the page no
-  // longer cuts off their voice. Muting here avoids doubling that audio
-  // whenever both are mounted at once (i.e. while actually on the call).
+  // A camera tile (the plain, non-annotatable <video> below) is always
+  // muted: it's display-only. A remote peer's actual voice plays through the
+  // persistent <audio> elements MeetingContext renders at the app root (see
+  // RemoteAudioTrack there), which — unlike this tile — keep running after
+  // the meeting page unmounts, so leaving the page no longer cuts off their
+  // voice. Muting here avoids doubling that audio whenever both are mounted
+  // at once (i.e. while actually on the call). The screen-share tile further
+  // down has its own, different muting rule — see the note on its <video>.
 
   // A stable ref (not an inline callback ref) so re-renders — e.g. every
   // pointermove while panning — don't change the ref's identity. A changed
@@ -192,7 +194,13 @@ export default function VideoTile({
               ref={videoRef}
               autoPlay
               playsInline
-              muted
+              // Unlike a camera tile, this one isn't always muted: a screen
+              // share can carry audio (tab/system sound), and — unlike
+              // camera audio — nothing else plays it back, so a remote
+              // presenter's shared audio needs this element unmuted to be
+              // heard at all. Muted only for our own share, so we don't
+              // hear our own shared tab audio doubled back at us.
+              muted={isLocal}
               className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${
                 zoomable && scale > MIN_SCALE ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""
               }`}
@@ -231,7 +239,7 @@ export default function VideoTile({
       )}
       <div className="absolute bottom-2 left-2 flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-md bg-ink-900/70 px-2 py-0.5">
         <span className="truncate text-xs font-medium text-white">
-          {name} {isLocal && "(you)"}
+          {name} {isLocal && !annotatable && "(you)"}
         </span>
         {showStatus && (
           <span className="flex shrink-0 items-center gap-1">

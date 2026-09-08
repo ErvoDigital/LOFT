@@ -93,6 +93,44 @@ export async function createWorkspaceConversation(req, res) {
   res.status(201).json({ conversation: serialize(conversation) });
 }
 
+// Finds (or creates, on first-ever use in this workspace) the one channel
+// the meeting page's chat panel reads/writes — kept separate from the
+// isDefault "General" channel so meeting chatter doesn't mix into regular
+// workspace chat history. Unlike General, membership here isn't granted to
+// the whole workspace roster up front; it's added lazily, one caller at a
+// time, only for whoever actually opens the panel.
+export async function getOrCreateMeetingChat(req, res) {
+  const { workspaceId } = req.params;
+
+  let conversation = await prisma.conversation.findFirst({
+    where: { workspaceId, isMeetingChat: true },
+    include: { participants: { include: { user: participantSelect } } },
+  });
+
+  if (!conversation) {
+    conversation = await prisma.conversation.create({
+      data: {
+        workspaceId,
+        isGroup: true,
+        isMeetingChat: true,
+        title: "Meeting Chat",
+        createdById: req.userId,
+        participants: { create: { userId: req.userId } },
+      },
+      include: { participants: { include: { user: participantSelect } } },
+    });
+    emitToWorkspace(workspaceId, "conversation:created", serialize(conversation));
+  } else if (!conversation.participants.some((p) => p.userId === req.userId)) {
+    await prisma.conversationParticipant.create({ data: { conversationId: conversation.id, userId: req.userId } });
+    conversation = await prisma.conversation.findUnique({
+      where: { id: conversation.id },
+      include: { participants: { include: { user: participantSelect } } },
+    });
+  }
+
+  res.json({ conversation: serialize(conversation) });
+}
+
 export async function deleteWorkspaceConversation(req, res) {
   if (req.membership.role !== "ADMIN") throw new ApiError(403, "Only workspace admins can delete group chats");
 

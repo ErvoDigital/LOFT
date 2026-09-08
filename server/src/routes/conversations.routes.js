@@ -7,6 +7,7 @@ router.use(requireAuth, requireWorkspaceMember());
 
 router.get("/", conversationsController.listWorkspaceConversations);
 router.post("/", conversationsController.createWorkspaceConversation);
+router.post("/meeting-chat", conversationsController.getOrCreateMeetingChat);
 router.delete("/:conversationId", conversationsController.deleteWorkspaceConversation);
 
 export default router;

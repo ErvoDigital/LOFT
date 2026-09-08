@@ -66,7 +66,7 @@ export function MeetingProvider({ children }) {
   const localScreenStreamRef = useRef(null); // the getDisplayMedia stream, while sharing
   const peersRef = useRef(new Map()); // userId -> RTCPeerConnection
   const pendingCandidatesRef = useRef(new Map()); // userId -> RTCIceCandidateInit[]
-  const screenSendersRef = useRef(new Map()); // userId -> RTCRtpSender carrying our screen track for that peer
+  const screenSendersRef = useRef(new Map()); // userId -> RTCRtpSender[] carrying our screen track(s) for that peer — video, plus audio when the share includes it
   const peerCameraStreamIdRef = useRef(new Map()); // userId -> the MediaStream id of their camera stream, so a later, different stream id is recognized as their screen share
   const annotationsRef = useRef([]); // mirrors `annotations` state, read inside the peer-joined handler below without needing it in that effect's deps
   const sharingScreenRef = useRef(false); // mirrors `sharingScreen` state, same reason
@@ -98,9 +98,14 @@ export function MeetingProvider({ children }) {
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       localStreamRef.current?.getTracks().forEach((track) => pc.addTrack(track, localStreamRef.current));
       if (localScreenStreamRef.current) {
-        localScreenStreamRef.current.getTracks().forEach((track) => {
-          screenSendersRef.current.set(peerId, pc.addTrack(track, localScreenStreamRef.current));
-        });
+        // One sender per track (video, plus audio when the share included
+        // it) — stored as an array so stopScreenShare can remove all of
+        // them; a single map slot per peer would drop every sender but the
+        // last one added.
+        const senders = localScreenStreamRef.current
+          .getTracks()
+          .map((track) => pc.addTrack(track, localScreenStreamRef.current));
+        screenSendersRef.current.set(peerId, senders);
       }
 
       pc.onicecandidate = (e) => {
@@ -531,14 +536,19 @@ export function MeetingProvider({ children }) {
   async function startScreenShare() {
     if (sharingScreen) return;
     try {
-      const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-      const screenTrack = displayStream.getVideoTracks()[0];
-      const screenStream = new MediaStream([screenTrack]);
+      // `audio: true` only makes the browser's own share picker offer a
+      // "share audio" checkbox — most browsers only honor it for a tab/
+      // window share, not a full screen, and it's silently absent if the
+      // user leaves it unchecked. Either way the resulting stream just has
+      // no audio track, so nothing else here needs to special-case it.
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      const screenStream = new MediaStream(displayStream.getTracks());
       localScreenStreamRef.current = screenStream;
       clearAnnotations();
 
       for (const [peerId, pc] of peersRef.current) {
-        screenSendersRef.current.set(peerId, pc.addTrack(screenTrack, screenStream));
+        const senders = screenStream.getTracks().map((track) => pc.addTrack(track, screenStream));
+        screenSendersRef.current.set(peerId, senders);
         try {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
@@ -548,7 +558,7 @@ export function MeetingProvider({ children }) {
         }
       }
 
-      screenTrack.onended = () => stopScreenShare();
+      screenStream.getVideoTracks()[0].onended = () => stopScreenShare();
       socket.emit("meeting:screen-share", { sharing: true });
       setSharingScreen(true);
     } catch (err) {
@@ -560,9 +570,9 @@ export function MeetingProvider({ children }) {
     if (!localScreenStreamRef.current) return;
 
     for (const [peerId, pc] of peersRef.current) {
-      const sender = screenSendersRef.current.get(peerId);
-      if (!sender) continue;
-      pc.removeTrack(sender);
+      const senders = screenSendersRef.current.get(peerId);
+      if (!senders) continue;
+      senders.forEach((sender) => pc.removeTrack(sender));
       try {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);

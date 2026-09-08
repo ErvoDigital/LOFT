@@ -156,13 +156,21 @@ model TaskStatus {
 // workspaceId null). Access is always via an explicit ConversationParticipant
 // row, so channels never leak into workspaces their members aren't in.
 model Conversation {
-  id          String   @id @default(uuid())
-  workspaceId String?
-  isGroup     Boolean  @default(false)
-  isDefault   Boolean  @default(false)
-  title       String?
-  createdById String?
-  createdAt   DateTime @default(now())
+  id            String   @id @default(uuid())
+  workspaceId   String?
+  isGroup       Boolean  @default(false)
+  isDefault     Boolean  @default(false)
+  // The one channel a workspace's meeting page reads/writes, kept separate
+  // from isDefault's "General" channel so meeting chatter doesn't mix into
+  // regular workspace chat history. Lazily created (getOrCreateMeetingChat
+  // in conversations.controller.js) the first time anyone opens the
+  // in-meeting chat panel, rather than eagerly on workspace creation —
+  // unlike General, membership isn't auto-granted to every workspace member,
+  // only to whoever actually opens it.
+  isMeetingChat Boolean  @default(false)
+  title         String?
+  createdById   String?
+  createdAt     DateTime @default(now())
 
   workspace    Workspace?                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy    User?                     @relation("ConversationCreator", fields: [createdById], references: [id])
