@@ -9,9 +9,14 @@ import VideoTile from "../components/meeting/VideoTile.jsx";
 import Modal from "../components/common/Modal.jsx";
 
 // Camera grid density scales with headcount — more participants, smaller tiles.
-// A single participant is handled separately (one big centered tile).
+// A single participant is handled separately (one big centered tile). 3 gets
+// its own case rather than falling into the <=4 bucket: a 2-column grid holding
+// 3 tiles leaves the last cell completely empty (a big dead rectangle next to
+// whoever landed alone in the second row) — a full row of 3 instead fills the
+// space evenly.
 function gridClass(count) {
   if (count <= 2) return "grid-cols-1 sm:grid-cols-2";
+  if (count === 3) return "grid-cols-1 sm:grid-cols-3";
   if (count <= 4) return "grid-cols-2";
   if (count <= 6) return "grid-cols-2 sm:grid-cols-3";
   if (count <= 9) return "grid-cols-3";
