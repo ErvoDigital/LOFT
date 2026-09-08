@@ -10,6 +10,22 @@ const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
 // floating summary of it when the user isn't on the meeting page itself.
 const MeetingContext = createContext(null);
 
+// One of these per remote participant, rendered below regardless of which
+// page is showing — a plain module-scope component (not a closure defined
+// inside MeetingProvider) so its identity is stable across re-renders and it
+// doesn't get remounted on every state change. This is what actually keeps a
+// peer's voice audible after navigating away from the meeting page: the
+// VideoTile elements that used to carry that audio only exist while
+// WorkspaceMeeting is mounted, so leaving the page used to silence everyone
+// (see VideoTile's own note on why its <video> is always muted now).
+function RemoteAudioTrack({ stream }) {
+  const audioRef = useRef(null);
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.srcObject = stream || null;
+  }, [stream]);
+  return <audio ref={audioRef} autoPlay hidden />;
+}
+
 export function MeetingProvider({ children }) {
   const { socket } = useSocket();
   const { user } = useAuth();
@@ -567,7 +583,13 @@ export function MeetingProvider({ children }) {
     stopScreenShare,
   };
 
-  return <MeetingContext.Provider value={value}>{children}</MeetingContext.Provider>;
+  return (
+    <MeetingContext.Provider value={value}>
+      {children}
+      {joined &&
+        Object.entries(remoteStreams).map(([userId, stream]) => <RemoteAudioTrack key={userId} stream={stream} />)}
+    </MeetingContext.Provider>
+  );
 }
 
 export function useMeeting() {

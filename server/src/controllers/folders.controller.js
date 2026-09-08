@@ -4,13 +4,16 @@ import { ApiError } from "../utils/ApiError.js";
 import { emitToWorkspace } from "../sockets/io.js";
 import { isFolderVisible, canManageFolder } from "../services/folderAccess.js";
 
-const folderInclude = {
+// Exported for assets.controller.js's chat-attachment upload path, which
+// creates/reuses a conversation's dedicated folder and needs the same
+// include/shape to emit a matching folder:created event.
+export const folderInclude = {
   createdBy: { select: { id: true, name: true, avatarColor: true } },
   members: { include: { user: { select: { id: true, name: true, avatarColor: true } } } },
   _count: { select: { assets: true, children: true } },
 };
 
-function serializeFolder(folder) {
+export function serializeFolder(folder) {
   return {
     id: folder.id,
     workspaceId: folder.workspaceId,

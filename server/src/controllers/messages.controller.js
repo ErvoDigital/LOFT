@@ -1,8 +1,51 @@
 import { z } from "zod";
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
+import { notify } from "../services/notification.service.js";
 
-const sendSchema = z.object({ content: z.string().min(1).max(4000) });
+const sendSchema = z.object({
+  content: z.string().max(4000).default(""),
+  attachmentAssetId: z.string().optional(),
+});
+
+// See the matching helper in sockets/chat.socket.js — kept in sync there and
+// in realtime/src/index.js (the raw-WebSocket service that actually handles
+// message:send in production; this REST path exists alongside it, not
+// instead of it).
+const MENTION_RE = /@\[([^\]]{1,80})\]\(([^)]{1,64})\)/g;
+
+function extractMentionedUserIds(content, participantIds, excludeUserId) {
+  const ids = new Set();
+  let match;
+  MENTION_RE.lastIndex = 0;
+  while ((match = MENTION_RE.exec(content))) {
+    if (match[2] !== excludeUserId && participantIds.includes(match[2])) ids.add(match[2]);
+  }
+  return [...ids];
+}
+
+function plainTextPreview(content) {
+  return content.replace(MENTION_RE, "@$1").trim();
+}
+
+function serializeAttachment(asset) {
+  if (!asset) return null;
+  const latest = asset.versions[0];
+  if (!latest) return null;
+  return {
+    assetId: asset.id,
+    versionId: latest.id,
+    name: asset.name,
+    originalName: latest.originalName,
+    mimeType: latest.mimeType,
+    size: latest.size,
+  };
+}
+
+const messageInclude = {
+  sender: { select: { id: true, name: true, avatarColor: true, avatarUrl: true } },
+  attachment: { include: { versions: { orderBy: { version: "desc" }, take: 1 } } },
+};
 
 function serializeMessage(message) {
   return {
@@ -11,6 +54,7 @@ function serializeMessage(message) {
     content: message.content,
     createdAt: message.createdAt,
     sender: message.sender,
+    attachment: serializeAttachment(message.attachment),
   };
 }
 
@@ -29,7 +73,7 @@ export async function listConversations(req, res) {
   const lastMessages = await prisma.message.findMany({
     where: { conversationId: { in: conversations.map((c) => c.id) } },
     orderBy: { createdAt: "desc" },
-    include: { sender: { select: { id: true, name: true } } },
+    include: { sender: { select: { id: true, name: true } }, attachment: { include: { versions: { orderBy: { version: "desc" }, take: 1 } } } },
   });
   const lastByConv = new Map();
   for (const m of lastMessages) {
@@ -40,6 +84,7 @@ export async function listConversations(req, res) {
     const base = {
       id: c.id,
       isGroup: c.isGroup,
+      participants: c.participants.map((p) => p.user),
       lastMessage: lastByConv.get(c.id) ? serializeMessage(lastByConv.get(c.id)) : null,
     };
     if (c.isGroup) {
@@ -81,7 +126,7 @@ export async function getMessages(req, res) {
 
   const messages = await prisma.message.findMany({
     where: { conversationId: req.params.conversationId },
-    include: { sender: { select: { id: true, name: true, avatarColor: true, avatarUrl: true } } },
+    include: messageInclude,
     orderBy: { createdAt: "asc" },
     take: 200,
   });
@@ -89,13 +134,38 @@ export async function getMessages(req, res) {
 }
 
 export async function sendMessageRest(req, res) {
-  const { content } = sendSchema.parse(req.body);
-  await assertParticipant(req.params.conversationId, req.userId);
+  const { content, attachmentAssetId } = sendSchema.parse(req.body);
+  const trimmed = content.trim();
+  if (!trimmed && !attachmentAssetId) throw new ApiError(400, "Message must have content or an attachment");
+
+  const conversation = await assertParticipant(req.params.conversationId, req.userId);
+  const conversationId = req.params.conversationId;
+
+  if (attachmentAssetId) {
+    const asset = await prisma.asset.findUnique({ where: { id: attachmentAssetId }, include: { folder: true } });
+    if (!asset || asset.workspaceId !== conversation.workspaceId || asset.folder?.chatConversationId !== conversationId) {
+      throw new ApiError(400, "Invalid attachment");
+    }
+  }
 
   const message = await prisma.message.create({
-    data: { conversationId: req.params.conversationId, senderId: req.userId, content },
-    include: { sender: { select: { id: true, name: true, avatarColor: true, avatarUrl: true } } },
+    data: { conversationId, senderId: req.userId, content: trimmed, attachmentAssetId: attachmentAssetId || null },
+    include: messageInclude,
   });
+
+  const participants = await prisma.conversationParticipant.findMany({ where: { conversationId } });
+  const mentionedIds = extractMentionedUserIds(trimmed, participants.map((p) => p.userId), req.userId);
+  const link = conversation.workspaceId ? `/workspaces/${conversation.workspaceId}/chat` : "/chat";
+  await Promise.all(
+    mentionedIds.map((userId) =>
+      notify(userId, {
+        type: "MENTION",
+        title: `${message.sender.name} mentioned you`,
+        body: plainTextPreview(trimmed).slice(0, 140) || "Sent an attachment",
+        link,
+      })
+    )
+  );
 
   res.status(201).json({ message: serializeMessage(message) });
 }

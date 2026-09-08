@@ -139,10 +139,36 @@ async function notify(userId, { type, title, body, link }) {
 
 // ---- Chat ----
 
+// Matches the `@[Name](userId)` tokens the client writes into message
+// content when it recognizes a typed name against the conversation's
+// participant list. Re-extracted here rather than trusted as-is, since
+// content otherwise arrives as untrusted client input — only ids that are
+// actually participants of this conversation get notified. Kept in sync
+// with the identical helper in server/src/sockets/chat.socket.js and
+// server/src/controllers/messages.controller.js — this service is a
+// separate deployment with no shared imports, so the logic is duplicated
+// rather than shared.
+const MENTION_RE = /@\[([^\]]{1,80})\]\(([^)]{1,64})\)/g;
+
+function extractMentionedUserIds(content, participantIds, excludeUserId) {
+  const ids = new Set();
+  let match;
+  MENTION_RE.lastIndex = 0;
+  while ((match = MENTION_RE.exec(content))) {
+    if (match[2] !== excludeUserId && participantIds.includes(match[2])) ids.add(match[2]);
+  }
+  return [...ids];
+}
+
+function plainTextPreview(content) {
+  return content.replace(MENTION_RE, "@$1").trim();
+}
+
 async function handleMessageSend(conn, data) {
   const content = String(data?.content || "").trim();
   const conversationId = data?.conversationId;
-  if (!content || !conversationId) return { error: "Invalid message" };
+  const attachmentAssetId = data?.attachmentAssetId || null;
+  if ((!content && !attachmentAssetId) || !conversationId) return { error: "Invalid message" };
 
   const convRes = await pool.query(`SELECT id, "workspaceId" FROM "Conversation" WHERE id=$1`, [conversationId]);
   const conversation = convRes.rows[0];
@@ -154,10 +180,42 @@ async function handleMessageSend(conn, data) {
   const participantIds = partRes.rows.map((r) => r.userId);
   if (!participantIds.includes(conn.userId)) return { error: "Not part of this conversation" };
 
+  // An attachment must live in this conversation's own chat folder — that
+  // folder is only ever populated via POST .../assets/chat-attachment, which
+  // already checked the uploader was a participant here, so this is both a
+  // sanity check and the full access-control story for attachments.
+  let attachment = null;
+  if (attachmentAssetId) {
+    const assetRes = await pool.query(
+      `SELECT a.id, a."workspaceId", a.name, f."chatConversationId" AS "chatConversationId",
+              v.id AS "versionId", v."originalName", v."mimeType", v.size
+       FROM "Asset" a
+       LEFT JOIN "Folder" f ON f.id = a."folderId"
+       LEFT JOIN "AssetVersion" v ON v."assetId" = a.id
+       WHERE a.id = $1
+       ORDER BY v.version DESC
+       LIMIT 1`,
+      [attachmentAssetId]
+    );
+    const row = assetRes.rows[0];
+    if (!row || row.workspaceId !== conversation.workspaceId || row.chatConversationId !== conversationId) {
+      return { error: "Invalid attachment" };
+    }
+    attachment = {
+      assetId: row.id,
+      versionId: row.versionId,
+      name: row.name,
+      originalName: row.originalName,
+      mimeType: row.mimeType,
+      size: row.size,
+    };
+  }
+
   const id = crypto.randomUUID();
   const insertRes = await pool.query(
-    `INSERT INTO "Message" (id, "conversationId", "senderId", content, "createdAt") VALUES ($1,$2,$3,$4,now()) RETURNING "createdAt"`,
-    [id, conversationId, conn.userId, content]
+    `INSERT INTO "Message" (id, "conversationId", "senderId", content, "attachmentAssetId", "createdAt")
+     VALUES ($1,$2,$3,$4,$5,now()) RETURNING "createdAt"`,
+    [id, conversationId, conn.userId, content, attachmentAssetId]
   );
 
   const payload = {
@@ -166,12 +224,26 @@ async function handleMessageSend(conn, data) {
     content,
     createdAt: insertRes.rows[0].createdAt,
     sender: { id: conn.userId, name: conn.name, avatarColor: conn.avatarColor, avatarUrl: conn.avatarUrl },
+    attachment,
   };
 
   await publish(`conversation:${conversationId}`, "message:new", payload);
   await Promise.all(
     participantIds.map((pid) =>
       publish(`user:${pid}`, "message:preview", { conversationId, workspaceId: conversation.workspaceId, ...payload })
+    )
+  );
+
+  const mentionedIds = extractMentionedUserIds(content, participantIds, conn.userId);
+  const link = conversation.workspaceId ? `/workspaces/${conversation.workspaceId}/chat` : "/chat";
+  await Promise.all(
+    mentionedIds.map((userId) =>
+      notify(userId, {
+        type: "MENTION",
+        title: `${conn.name} mentioned you`,
+        body: plainTextPreview(content).slice(0, 140) || "Sent an attachment",
+        link,
+      })
     )
   );
 

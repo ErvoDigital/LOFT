@@ -68,7 +68,11 @@ export default function Chat() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-ink-800">{c.title}</p>
                   <p className="truncate text-xs text-ink-400">
-                    {c.lastMessage ? c.lastMessage.content : c.isGroup ? "Group chat" : "Say hello"}
+                    {c.lastMessage
+                      ? c.lastMessage.content || (c.lastMessage.attachment ? `📎 ${c.lastMessage.attachment.name}` : "")
+                      : c.isGroup
+                      ? "Group chat"
+                      : "Say hello"}
                   </p>
                 </div>
               </button>

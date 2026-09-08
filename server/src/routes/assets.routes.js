@@ -13,6 +13,7 @@ router.use(requireAuth, requireWorkspaceMember());
 
 router.get("/", assetsController.listAssets);
 router.post("/", upload.single("file"), assetsController.uploadAsset);
+router.post("/chat-attachment", upload.single("file"), assetsController.uploadChatAttachment);
 router.post("/:assetId/versions", upload.single("file"), assetsController.uploadVersion);
 router.post("/:assetId/merge", assetsController.mergeAssets);
 router.patch("/:assetId/folder", assetsController.moveAsset);

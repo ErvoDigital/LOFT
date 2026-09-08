@@ -13,6 +13,21 @@ export const uploadAsset = (workspaceId, file, folderId, onProgress) => {
     .then((r) => r.data.asset);
 };
 
+// Uploads a file shared in a chat message — the server resolves the right
+// "chat files" folder for that conversation itself (see
+// uploadChatAttachment in assets.controller.js), so the caller only needs
+// to say which conversation this belongs to.
+export const uploadChatAttachment = (workspaceId, conversationId, file, onProgress) => {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("conversationId", conversationId);
+  return api
+    .post(`/workspaces/${workspaceId}/assets/chat-attachment`, form, {
+      onUploadProgress: onProgress,
+    })
+    .then((r) => r.data.asset);
+};
+
 export const uploadVersion = (workspaceId, assetId, file, onProgress) => {
   const form = new FormData();
   form.append("file", file);

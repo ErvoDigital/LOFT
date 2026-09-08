@@ -4,6 +4,42 @@ import { prisma } from "../db/prisma.js";
 import { setIo } from "./io.js";
 import { registerMeetingHandlers } from "./meeting.socket.js";
 import { registerDocumentHandlers } from "./documents.socket.js";
+import { notify } from "../services/notification.service.js";
+
+// Matches the `@[Name](userId)` tokens the client writes into message
+// content when it recognizes a typed name against the conversation's
+// participant list. Re-extracted here rather than trusted as-is, since
+// content otherwise arrives as untrusted client input — only ids that are
+// actually participants of this conversation get notified.
+const MENTION_RE = /@\[([^\]]{1,80})\]\(([^)]{1,64})\)/g;
+
+function extractMentionedUserIds(content, participantIds, excludeUserId) {
+  const ids = new Set();
+  let match;
+  MENTION_RE.lastIndex = 0;
+  while ((match = MENTION_RE.exec(content))) {
+    if (match[2] !== excludeUserId && participantIds.includes(match[2])) ids.add(match[2]);
+  }
+  return [...ids];
+}
+
+function plainTextPreview(content) {
+  return content.replace(MENTION_RE, "@$1").trim();
+}
+
+function serializeAttachment(asset) {
+  if (!asset) return null;
+  const latest = asset.versions[0];
+  if (!latest) return null;
+  return {
+    assetId: asset.id,
+    versionId: latest.id,
+    name: asset.name,
+    originalName: latest.originalName,
+    mimeType: latest.mimeType,
+    size: latest.size,
+  };
+}
 
 export function initSockets(httpServer, corsOrigin) {
   const io = new Server(httpServer, {
@@ -46,10 +82,10 @@ export function initSockets(httpServer, corsOrigin) {
       socket.leave(`conversation:${conversationId}`);
     });
 
-    socket.on("message:send", async ({ conversationId, content }, ack) => {
+    socket.on("message:send", async ({ conversationId, content, attachmentAssetId }, ack) => {
       try {
         const trimmed = String(content || "").trim();
-        if (!trimmed || !conversationId) return ack?.({ error: "Invalid message" });
+        if ((!trimmed && !attachmentAssetId) || !conversationId) return ack?.({ error: "Invalid message" });
 
         const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
         if (!conversation) return ack?.({ error: "Conversation not found" });
@@ -59,9 +95,27 @@ export function initSockets(httpServer, corsOrigin) {
           return ack?.({ error: "Not part of this conversation" });
         }
 
+        // An attachment must live in this conversation's own chat folder —
+        // that folder is only ever populated via uploadChatAttachment, which
+        // already checked the uploader was a participant here, so this is
+        // both a sanity check and the full access-control story: no separate
+        // folder-visibility check is needed on top of it.
+        if (attachmentAssetId) {
+          const asset = await prisma.asset.findUnique({
+            where: { id: attachmentAssetId },
+            include: { folder: true },
+          });
+          if (!asset || asset.workspaceId !== conversation.workspaceId || asset.folder?.chatConversationId !== conversationId) {
+            return ack?.({ error: "Invalid attachment" });
+          }
+        }
+
         const message = await prisma.message.create({
-          data: { conversationId, senderId: socket.userId, content: trimmed },
-          include: { sender: { select: { id: true, name: true, avatarColor: true, avatarUrl: true } } },
+          data: { conversationId, senderId: socket.userId, content: trimmed, attachmentAssetId: attachmentAssetId || null },
+          include: {
+            sender: { select: { id: true, name: true, avatarColor: true, avatarUrl: true } },
+            attachment: { include: { versions: { orderBy: { version: "desc" }, take: 1 } } },
+          },
         });
 
         const payload = {
@@ -70,6 +124,7 @@ export function initSockets(httpServer, corsOrigin) {
           content: message.content,
           createdAt: message.createdAt,
           sender: message.sender,
+          attachment: serializeAttachment(message.attachment),
         };
 
         io.to(`conversation:${conversationId}`).emit("message:new", payload);
@@ -80,6 +135,19 @@ export function initSockets(httpServer, corsOrigin) {
             ...payload,
           });
         }
+
+        const mentionedIds = extractMentionedUserIds(trimmed, participants.map((p) => p.userId), socket.userId);
+        const link = conversation.workspaceId ? `/workspaces/${conversation.workspaceId}/chat` : "/chat";
+        await Promise.all(
+          mentionedIds.map((userId) =>
+            notify(userId, {
+              type: "MENTION",
+              title: `${message.sender.name} mentioned you`,
+              body: plainTextPreview(trimmed).slice(0, 140) || "Sent an attachment",
+              link,
+            })
+          )
+        );
 
         ack?.({ message: payload });
       } catch (err) {

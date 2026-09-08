@@ -4,6 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { generateStoredName, uploadObject, deleteObject, presignDownloadUrl } from "../utils/uploads.js";
 import { emitToWorkspace } from "../sockets/io.js";
 import { isFolderVisible } from "../services/folderAccess.js";
+import { folderInclude, serializeFolder } from "./folders.controller.js";
 
 function serialize(asset) {
   const versions = [...asset.versions].sort((a, b) => b.version - a.version);
@@ -74,6 +75,94 @@ export async function uploadAsset(req, res) {
     data: {
       workspaceId,
       folderId,
+      name,
+      uploadedById: req.userId,
+      versions: {
+        create: {
+          version: 1,
+          originalName: req.file.originalname,
+          storedName,
+          mimeType: req.file.mimetype,
+          size: req.file.size,
+          uploadedById: req.userId,
+        },
+      },
+    },
+    include: assetInclude,
+  });
+
+  emitToWorkspace(workspaceId, "asset:created", serialize(asset));
+  res.status(201).json({ asset: serialize(asset) });
+}
+
+// Finds (or creates) the one folder that holds every file shared in a given
+// conversation's chat. The default "General" channel's folder stays
+// WORKSPACE-visible like the channel itself; a smaller, hand-picked channel
+// gets a RESTRICTED folder seeded with that channel's own participants, so
+// its shared files don't leak into workspace-wide Storage for members who
+// were never in the channel. `chatConversationId` is unique, so a race
+// between two first-ever uploads in the same conversation is resolved by
+// letting the loser's insert fail and re-reading the winner's row.
+async function getOrCreateChatFolder(conversation, userId) {
+  const existing = await prisma.folder.findUnique({ where: { chatConversationId: conversation.id } });
+  if (existing) return existing;
+
+  const isPickedChannel = conversation.isGroup && !conversation.isDefault;
+  try {
+    const folder = await prisma.folder.create({
+      data: {
+        workspaceId: conversation.workspaceId,
+        name: conversation.isDefault ? "Chat files" : `${conversation.title} (chat files)`,
+        visibility: isPickedChannel ? "RESTRICTED" : "WORKSPACE",
+        createdById: userId,
+        chatConversationId: conversation.id,
+        members: isPickedChannel
+          ? {
+              create: (
+                await prisma.conversationParticipant.findMany({ where: { conversationId: conversation.id } })
+              ).map((p) => ({ userId: p.userId })),
+            }
+          : undefined,
+      },
+      include: folderInclude,
+    });
+    emitToWorkspace(conversation.workspaceId, "folder:created", serializeFolder(folder));
+    return folder;
+  } catch (err) {
+    if (err.code === "P2002") return prisma.folder.findUnique({ where: { chatConversationId: conversation.id } });
+    throw err;
+  }
+}
+
+// A file attached to a chat message. Unlike uploadAsset, the destination
+// folder isn't caller-chosen — it's always that conversation's own chat
+// folder, resolved server-side — so this doubles as the permission check for
+// "can this user share files in this conversation" (only participants get a
+// folder for it in the first place).
+export async function uploadChatAttachment(req, res) {
+  if (!req.file) throw new ApiError(400, "No file uploaded");
+  const workspaceId = req.params.workspaceId;
+  const { conversationId } = req.body;
+  if (!conversationId) throw new ApiError(400, "conversationId is required");
+
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+  if (!conversation || conversation.workspaceId !== workspaceId) throw new ApiError(404, "Conversation not found");
+
+  const participant = await prisma.conversationParticipant.findUnique({
+    where: { conversationId_userId: { conversationId, userId: req.userId } },
+  });
+  if (!participant) throw new ApiError(403, "You are not part of this conversation");
+
+  const folder = await getOrCreateChatFolder(conversation, req.userId);
+
+  const name = (req.body.name || req.file.originalname).slice(0, 160);
+  const storedName = generateStoredName(req.file.originalname);
+  await uploadObject(workspaceId, storedName, req.file.buffer, req.file.mimetype);
+
+  const asset = await prisma.asset.create({
+    data: {
+      workspaceId,
+      folderId: folder.id,
       name,
       uploadedById: req.userId,
       versions: {

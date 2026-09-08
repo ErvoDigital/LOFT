@@ -16,33 +16,33 @@ datasource db {
 }
 
 model User {
-  id                String   @id @default(uuid())
-  name              String
-  email             String   @unique
-  passwordHash      String
-  avatarUrl         String?
-  avatarColor       String   @default("#5B5BD6")
-  resetToken        String?
-  resetTokenExpiry  DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id               String    @id @default(uuid())
+  name             String
+  email            String    @unique
+  passwordHash     String
+  avatarUrl        String?
+  avatarColor      String    @default("#5B5BD6")
+  resetToken       String?
+  resetTokenExpiry DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  ownedWorkspaces   Workspace[]        @relation("WorkspaceOwner")
-  memberships       WorkspaceMember[]
-  createdEvents     Event[]            @relation("EventCreator")
-  eventAttendances  EventAttendee[]
-  createdTasks      Task[]             @relation("TaskCreator")
-  assignedTasks     Task[]             @relation("TaskAssignee")
-  sentMessages      Message[]          @relation("MessageSender")
-  conversations     ConversationParticipant[]
-  createdConversations Conversation[]  @relation("ConversationCreator")
-  notifications     Notification[]
-  uploadedAssets    Asset[]            @relation("AssetUploader")
-  uploadedVersions  AssetVersion[]     @relation("AssetVersionUploader")
-  createdFolders    Folder[]           @relation("FolderCreator")
-  folderMemberships FolderMember[]
-  createdDocuments  Document[]         @relation("DocumentCreator")
-  documentAssignments DocumentAssignee[]
+  ownedWorkspaces      Workspace[]               @relation("WorkspaceOwner")
+  memberships          WorkspaceMember[]
+  createdEvents        Event[]                   @relation("EventCreator")
+  eventAttendances     EventAttendee[]
+  createdTasks         Task[]                    @relation("TaskCreator")
+  assignedTasks        Task[]                    @relation("TaskAssignee")
+  sentMessages         Message[]                 @relation("MessageSender")
+  conversations        ConversationParticipant[]
+  createdConversations Conversation[]            @relation("ConversationCreator")
+  notifications        Notification[]
+  uploadedAssets       Asset[]                   @relation("AssetUploader")
+  uploadedVersions     AssetVersion[]            @relation("AssetVersionUploader")
+  createdFolders       Folder[]                  @relation("FolderCreator")
+  folderMemberships    FolderMember[]
+  createdDocuments     Document[]                @relation("DocumentCreator")
+  documentAssignments  DocumentAssignee[]
 }
 
 model Workspace {
@@ -81,7 +81,7 @@ model WorkspaceMember {
 }
 
 model Event {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   workspaceId String
   title       String
   description String?
@@ -90,8 +90,8 @@ model Event {
   endTime     DateTime
   createdById String
   remindedAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy User            @relation("EventCreator", fields: [createdById], references: [id])
@@ -115,7 +115,7 @@ model Task {
   title       String
   description String?
   priority    String    @default("MEDIUM") // LOW | MEDIUM | HIGH | URGENT
-  status      String    @default("TODO")   // TODO | IN_PROGRESS | COMPLETED
+  status      String    @default("TODO") // TODO | IN_PROGRESS | COMPLETED
   dueDate     DateTime?
   order       Float     @default(0)
   createdById String
@@ -164,10 +164,11 @@ model Conversation {
   createdById String?
   createdAt   DateTime @default(now())
 
-  workspace    Workspace?                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdBy    User?                      @relation("ConversationCreator", fields: [createdById], references: [id])
+  workspace    Workspace?                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy    User?                     @relation("ConversationCreator", fields: [createdById], references: [id])
   participants ConversationParticipant[]
   messages     Message[]
+  chatFolder   Folder?
 }
 
 model ConversationParticipant {
@@ -182,21 +183,29 @@ model ConversationParticipant {
   @@unique([conversationId, userId])
 }
 
+// content may be an empty string when the message is attachment-only.
+// Inline `@[Name](userId)` tokens mark @mentions — written by the client
+// when it recognizes a typed name against the conversation's participant
+// list, and re-validated against that same list server-side (in the
+// message:send handlers) before anything is done with them, since content
+// otherwise arrives as untrusted client input.
 model Message {
-  id             String   @id @default(uuid())
-  conversationId String
-  senderId       String
-  content        String
-  createdAt      DateTime @default(now())
+  id                String   @id @default(uuid())
+  conversationId    String
+  senderId          String
+  content           String
+  attachmentAssetId String?
+  createdAt         DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation("MessageSender", fields: [senderId], references: [id])
+  attachment   Asset?       @relation(fields: [attachmentAssetId], references: [id], onDelete: SetNull)
 }
 
 model Notification {
   id        String   @id @default(uuid())
   userId    String
-  type      String   // TASK_ASSIGNED | EVENT_REMINDER | NEW_MESSAGE | DEADLINE_CONFLICT | WORKSPACE_INVITE | TASK_DUE_SOON
+  type      String // TASK_ASSIGNED | EVENT_REMINDER | NEW_MESSAGE | DEADLINE_CONFLICT | WORKSPACE_INVITE | TASK_DUE_SOON | MENTION | MEETING_STARTED
   title     String
   body      String?
   link      String?
@@ -219,10 +228,11 @@ model Asset {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  workspace  Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  folder     Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  uploadedBy User           @relation("AssetUploader", fields: [uploadedById], references: [id])
-  versions   AssetVersion[]
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  folder       Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  uploadedBy   User           @relation("AssetUploader", fields: [uploadedById], references: [id])
+  versions     AssetVersion[]
+  chatMessages Message[]
 }
 
 // A workspace-scoped folder for organizing Assets. Folders themselves live
@@ -233,22 +243,34 @@ model Asset {
 // means every member can see it, RESTRICTED means only ADMINs, the creator,
 // and members listed in FolderMember can. There is no independent per-file
 // visibility — restricting is a folder-level action only.
+//
+// chatConversationId marks a folder as the auto-created, one-per-conversation
+// home for files shared in that conversation's chat (see uploadChatAttachment
+// in assets.controller.js) — unique so "does this conversation already have
+// one" is a single indexed lookup, and Cascade so deleting the channel drops
+// the folder with it (its assets just fall back to folderId=null, same as
+// any other folder delete). The default "General" channel's folder is
+// WORKSPACE-visible like everything else in it; a hand-picked channel's
+// folder is created RESTRICTED to that channel's own participants, so a
+// smaller channel's shared files don't leak into workspace-wide Storage.
 model Folder {
-  id          String   @id @default(uuid())
-  workspaceId String
-  name        String
-  parentId    String?
-  visibility  String   @default("WORKSPACE") // WORKSPACE | RESTRICTED
-  createdById String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  workspaceId        String
+  name               String
+  parentId           String?
+  visibility         String   @default("WORKSPACE") // WORKSPACE | RESTRICTED
+  createdById        String
+  chatConversationId String?  @unique
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  parent    Folder?        @relation("FolderChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children  Folder[]       @relation("FolderChildren")
-  createdBy User           @relation("FolderCreator", fields: [createdById], references: [id])
-  assets    Asset[]
-  members   FolderMember[]
+  workspace        Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent           Folder?        @relation("FolderChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children         Folder[]       @relation("FolderChildren")
+  createdBy        User           @relation("FolderCreator", fields: [createdById], references: [id])
+  assets           Asset[]
+  members          FolderMember[]
+  chatConversation Conversation?  @relation(fields: [chatConversationId], references: [id], onDelete: Cascade)
 }
 
 model FolderMember {

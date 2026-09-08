@@ -38,6 +38,13 @@ export default function VideoTile({
   const hasVideo = stream && camOn;
   const videoRef = useRef(null);
 
+  // Always muted: this tile is display-only. A remote peer's actual audio
+  // plays through the persistent <audio> elements MeetingContext renders at
+  // the app root (see RemoteAudioTrack there), which — unlike this tile —
+  // keep running after the meeting page unmounts, so leaving the page no
+  // longer cuts off their voice. Muting here avoids doubling that audio
+  // whenever both are mounted at once (i.e. while actually on the call).
+
   // A stable ref (not an inline callback ref) so re-renders — e.g. every
   // pointermove while panning — don't change the ref's identity. A changed
   // callback-ref identity makes React detach-then-reattach it on each render,
@@ -182,7 +189,7 @@ export default function VideoTile({
               ref={videoRef}
               autoPlay
               playsInline
-              muted={isLocal}
+              muted
               className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${
                 zoomable && scale > MIN_SCALE ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""
               }`}
@@ -202,7 +209,7 @@ export default function VideoTile({
             ref={videoRef}
             autoPlay
             playsInline
-            muted={isLocal}
+            muted
             className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${
               mirrored ?? isLocal ? "-scale-x-100" : ""
             } ${zoomable && scale > MIN_SCALE ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""}`}
