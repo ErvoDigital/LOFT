@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useSocket } from "./SocketContext.jsx";
 import { useAuth } from "./AuthContext.jsx";
+import { useSpeakingDetection } from "../hooks/useSpeakingDetection.js";
 
 const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
 
@@ -56,6 +57,7 @@ export function MeetingProvider({ children }) {
   const [participants, setParticipants] = useState({}); // userId -> { name, avatarColor }
   const [remoteStreams, setRemoteStreams] = useState({}); // userId -> camera MediaStream
   const [remoteScreenStreams, setRemoteScreenStreams] = useState({}); // userId -> screen-share MediaStream
+  const [remoteMediaState, setRemoteMediaState] = useState({}); // userId -> { micOn, camOn }, for the per-tile status icons
   const [pipDock, setPipDock] = useState("bottom");
   const [localStream, setLocalStream] = useState(null); // mirrors localStreamRef, for consumers that need to render it (WorkspaceMeeting, MiniCallPlayer)
   const [annotations, setAnnotations] = useState([]); // shapes drawn on the shared screen, synced to every participant
@@ -68,6 +70,8 @@ export function MeetingProvider({ children }) {
   const peerCameraStreamIdRef = useRef(new Map()); // userId -> the MediaStream id of their camera stream, so a later, different stream id is recognized as their screen share
   const annotationsRef = useRef([]); // mirrors `annotations` state, read inside the peer-joined handler below without needing it in that effect's deps
   const sharingScreenRef = useRef(false); // mirrors `sharingScreen` state, same reason
+  const micOnRef = useRef(true); // mirrors `micOn`, read inside the peer-joined handler to answer a new joiner's implicit "what's everyone's state" question
+  const camOnRef = useRef(true); // mirrors `camOn`, same reason
 
   useEffect(() => {
     annotationsRef.current = annotations;
@@ -75,6 +79,17 @@ export function MeetingProvider({ children }) {
   useEffect(() => {
     sharingScreenRef.current = sharingScreen;
   }, [sharingScreen]);
+  useEffect(() => {
+    micOnRef.current = micOn;
+  }, [micOn]);
+  useEffect(() => {
+    camOnRef.current = camOn;
+  }, [camOn]);
+
+  // Local + every peer's camera stream, fed to the speaking-highlight
+  // detector — only while actually in a call, so no AudioContext/analysers
+  // exist during the lobby or when idle.
+  const speakingIds = useSpeakingDetection(joined ? { [user.id]: localStream, ...remoteStreams } : {});
 
   const createPeerConnection = useCallback(
     (peerId, isInitiator) => {
@@ -147,6 +162,11 @@ export function MeetingProvider({ children }) {
       if (sharingScreenRef.current && annotationsRef.current.length > 0) {
         socket.emit("meeting:annotation-sync", { toUserId: peer.userId, shapes: annotationsRef.current });
       }
+      // A new joiner has no other way to learn our current mic/cam state —
+      // media-state is only ever pushed on toggle, never polled — so
+      // re-announce it now. It's a room-wide broadcast, same as the toggle
+      // itself, so every other peer just gets a harmless repeat.
+      socket.emit("meeting:media-state", { micOn: micOnRef.current, camOn: camOnRef.current });
     };
 
     const onPeerLeft = ({ userId }) => {
@@ -165,6 +185,11 @@ export function MeetingProvider({ children }) {
         return next;
       });
       setRemoteScreenStreams((prev) => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+      setRemoteMediaState((prev) => {
         const next = { ...prev };
         delete next[userId];
         return next;
@@ -216,6 +241,9 @@ export function MeetingProvider({ children }) {
       });
     };
 
+    const onMediaState = ({ userId, micOn: peerMicOn, camOn: peerCamOn }) =>
+      setRemoteMediaState((prev) => ({ ...prev, [userId]: { micOn: peerMicOn, camOn: peerCamOn } }));
+
     const onAnnotationAdd = (shape) => setAnnotations((prev) => [...prev, shape]);
     const onAnnotationUndo = (shapeId) => setAnnotations((prev) => prev.filter((s) => s.id !== shapeId));
     const onAnnotationClear = () => setAnnotations([]);
@@ -227,6 +255,7 @@ export function MeetingProvider({ children }) {
     socket.on("meeting:peer-left", onPeerLeft);
     socket.on("meeting:signal", onSignal);
     socket.on("meeting:screen-share", onScreenShare);
+    socket.on("meeting:media-state", onMediaState);
     socket.on("meeting:annotation-add", onAnnotationAdd);
     socket.on("meeting:annotation-undo", onAnnotationUndo);
     socket.on("meeting:annotation-clear", onAnnotationClear);
@@ -237,6 +266,7 @@ export function MeetingProvider({ children }) {
       socket.off("meeting:peer-left", onPeerLeft);
       socket.off("meeting:signal", onSignal);
       socket.off("meeting:screen-share", onScreenShare);
+      socket.off("meeting:media-state", onMediaState);
       socket.off("meeting:annotation-add", onAnnotationAdd);
       socket.off("meeting:annotation-undo", onAnnotationUndo);
       socket.off("meeting:annotation-clear", onAnnotationClear);
@@ -357,6 +387,7 @@ export function MeetingProvider({ children }) {
     setParticipants({});
     setRemoteStreams({});
     setRemoteScreenStreams({});
+    setRemoteMediaState({});
     setJoined(false);
     setActiveWorkspaceId(null);
     setAnnotations([]);
@@ -397,6 +428,7 @@ export function MeetingProvider({ children }) {
     setParticipants({});
     setRemoteStreams({});
     setRemoteScreenStreams({});
+    setRemoteMediaState({});
     setJoined(false);
     setLobbyOpen(false);
     setPendingWorkspaceId(null);
@@ -412,12 +444,14 @@ export function MeetingProvider({ children }) {
     const next = !micOn;
     localStreamRef.current?.getAudioTracks().forEach((t) => (t.enabled = next));
     setMicOn(next);
+    if (joined) socket.emit("meeting:media-state", { micOn: next, camOn: camOnRef.current });
   }
 
   function toggleCam() {
     const next = !camOn;
     localStreamRef.current?.getVideoTracks().forEach((t) => (t.enabled = next));
     setCamOn(next);
+    if (joined) socket.emit("meeting:media-state", { micOn: micOnRef.current, camOn: next });
   }
 
   // Clicking the mic control when it was never requested (the "Use camera"
@@ -461,6 +495,7 @@ export function MeetingProvider({ children }) {
 
       setMicAvailable(true);
       setMicOn(true);
+      socket.emit("meeting:media-state", { micOn: true, camOn: camOnRef.current });
     } catch (err) {
       setError("Couldn't access your microphone. Check your browser permissions and try again.");
     }
@@ -558,6 +593,8 @@ export function MeetingProvider({ children }) {
     participants,
     remoteStreams,
     remoteScreenStreams,
+    remoteMediaState,
+    speakingIds,
     pipDock,
     setPipDock,
     localStream,

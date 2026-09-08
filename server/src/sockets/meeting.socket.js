@@ -92,6 +92,17 @@ export function registerMeetingHandlers(io, socket) {
     socket.to(`meeting:${workspaceId}`).emit("meeting:screen-share", { userId: socket.userId, sharing: !!sharing });
   });
 
+  // Tells peers whether this user's mic/camera is currently on, for the
+  // per-tile status icons — same plain relay as screen-share above. Also
+  // re-sent (by the client, not requested here) whenever someone new joins,
+  // since a peer who joins mid-call has no other way to learn everyone
+  // else's current state.
+  socket.on("meeting:media-state", ({ micOn, camOn }) => {
+    const workspaceId = socket.data.meetingWorkspaceId;
+    if (!workspaceId) return;
+    socket.to(`meeting:${workspaceId}`).emit("meeting:media-state", { userId: socket.userId, micOn: !!micOn, camOn: !!camOn });
+  });
+
   // Presenter's screen-share annotations (drawn shapes) — plain relay, same
   // trust model as signaling: the server doesn't police who "should" be
   // presenting, it just fans the shape out to the rest of the room.

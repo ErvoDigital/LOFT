@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ZoomIn, ZoomOut } from "lucide-react";
+import { ZoomIn, ZoomOut, Mic, MicOff, Video, VideoOff } from "lucide-react";
 import Avatar from "../common/Avatar.jsx";
 import AnnotationLayer from "./AnnotationLayer.jsx";
 import AnnotationToolbar from "./AnnotationToolbar.jsx";
@@ -19,6 +19,9 @@ export default function VideoTile({
   avatarColor,
   isLocal,
   camOn = true,
+  micOn = true,
+  speaking = false, // highlights the tile border — this person's audio is currently above the threshold
+  showStatus = false, // adds mic/camera icons next to the name badge; off for the screen-share content tile, which isn't a person
   connecting = false,
   mirrored,
   large = false,
@@ -172,9 +175,9 @@ export default function VideoTile({
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden rounded-2xl border border-ink-800 bg-ink-800 shadow-panel ${
-        large ? "h-full w-full" : "aspect-video"
-      }`}
+      className={`relative overflow-hidden rounded-2xl border bg-ink-800 shadow-panel transition-colors ${
+        speaking ? "border-brand-400 ring-2 ring-brand-400" : "border-ink-800"
+      } ${large ? "h-full w-full" : "aspect-video"}`}
       onWheel={zoomable ? handleWheel : undefined}
       onPointerDown={zoomable ? handlePointerDown : undefined}
       onPointerMove={zoomable ? handlePointerMove : undefined}
@@ -226,8 +229,16 @@ export default function VideoTile({
           Connecting…
         </div>
       )}
-      <div className="absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate rounded-md bg-ink-900/70 px-2 py-0.5 text-xs font-medium text-white">
-        {name} {isLocal && "(you)"}
+      <div className="absolute bottom-2 left-2 flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-md bg-ink-900/70 px-2 py-0.5">
+        <span className="truncate text-xs font-medium text-white">
+          {name} {isLocal && "(you)"}
+        </span>
+        {showStatus && (
+          <span className="flex shrink-0 items-center gap-1">
+            {micOn ? <Mic className="h-3 w-3 text-white/70" /> : <MicOff className="h-3 w-3 text-red-400" />}
+            {camOn ? <Video className="h-3 w-3 text-white/70" /> : <VideoOff className="h-3 w-3 text-red-400" />}
+          </span>
+        )}
       </div>
       {canDraw && hasVideo && (
         <AnnotationToolbar

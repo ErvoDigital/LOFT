@@ -506,6 +506,9 @@ async function dispatch(conn, event, data) {
     case "meeting:screen-share":
       handleMeetingRoomRelay(conn, "meeting:screen-share", { userId: conn.userId, sharing: !!data?.sharing });
       return;
+    case "meeting:media-state":
+      handleMeetingRoomRelay(conn, "meeting:media-state", { userId: conn.userId, micOn: !!data?.micOn, camOn: !!data?.camOn });
+      return;
     case "meeting:annotation-add":
       handleMeetingRoomRelay(conn, "meeting:annotation-add", data);
       return;

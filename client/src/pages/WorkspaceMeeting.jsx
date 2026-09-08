@@ -1,11 +1,27 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Video, Mic, MicOff, VideoOff, PhoneOff, ScreenShare, ScreenShareOff, PanelTop, PanelBottom, PanelLeft, PanelRight } from "lucide-react";
+import {
+  Video,
+  Mic,
+  MicOff,
+  VideoOff,
+  PhoneOff,
+  ScreenShare,
+  ScreenShareOff,
+  PanelTop,
+  PanelBottom,
+  PanelLeft,
+  PanelRight,
+  MessageSquare,
+  X,
+} from "lucide-react";
 import { useSocket } from "../context/SocketContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMeeting } from "../context/MeetingContext.jsx";
 import { useWorkspaces } from "../context/WorkspaceContext.jsx";
+import * as conversationsApi from "../api/conversations.js";
 import VideoTile from "../components/meeting/VideoTile.jsx";
+import ChatThread from "../components/chat/ChatThread.jsx";
 import Modal from "../components/common/Modal.jsx";
 
 // Camera grid density scales with headcount — more participants, smaller tiles.
@@ -92,6 +108,8 @@ export default function WorkspaceMeeting() {
     participants,
     remoteStreams,
     remoteScreenStreams,
+    remoteMediaState,
+    speakingIds,
     pipDock,
     setPipDock,
     localStream,
@@ -118,11 +136,24 @@ export default function WorkspaceMeeting() {
   } = useMeeting();
 
   const [preJoinCount, setPreJoinCount] = useState(0);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatConversation, setChatConversation] = useState(null);
 
   const inThisWorkspacesCall = joined && activeWorkspaceId === workspaceId;
   const inAnotherWorkspacesCall = joined && activeWorkspaceId !== workspaceId;
   const lobbyForThisWorkspace = lobbyOpen && pendingWorkspaceId === workspaceId;
   const confirmForThisWorkspace = confirmWorkspaceId === workspaceId;
+
+  // The in-call chat panel rides on the workspace's own "General" channel
+  // (the same one WorkspaceChat shows) rather than a call-scoped thread, so
+  // anything said during the meeting is just... the workspace's chat history,
+  // visible to everyone whether or not they were on the call.
+  useEffect(() => {
+    if (!inThisWorkspacesCall) return;
+    conversationsApi.listWorkspaceConversations(workspaceId).then((convos) => {
+      setChatConversation(convos.find((c) => c.isDefault) || convos[0] || null);
+    });
+  }, [inThisWorkspacesCall, workspaceId]);
 
   // "How many are already here" for the pre-join screen — page-scoped to
   // whichever workspace is currently being viewed, independent of whatever
@@ -255,115 +286,179 @@ export default function WorkspaceMeeting() {
     : null;
 
   return (
-    <div className="flex h-full flex-col bg-ink-900 p-4">
-      {primaryScreen ? (
-        <div
-          className={`flex min-h-0 flex-1 gap-3 ${
-            pipDock === "bottom"
-              ? "flex-col"
-              : pipDock === "top"
-              ? "flex-col-reverse"
-              : pipDock === "left"
-              ? "flex-row-reverse"
-              : "flex-row"
-          }`}
-        >
-          <div className="relative min-h-0 flex-1">
-            <VideoTile
-              stream={primaryScreen.stream}
-              name={primaryScreen.label}
-              mirrored={false}
-              large
-              fit="contain"
-              zoomable
-              annotatable
-              canDraw={sharingScreen}
-              annotations={annotations}
-              onAddAnnotation={addAnnotation}
-              onUndoAnnotation={undoAnnotation}
-              onUpdateAnnotation={updateAnnotation}
-              onClearAnnotations={clearAnnotations}
-            />
-            <div className="absolute right-3 top-3 z-10 flex gap-1 rounded-lg bg-ink-900/60 p-1">
-              {[
-                { side: "top", Icon: PanelTop },
-                { side: "bottom", Icon: PanelBottom },
-                { side: "left", Icon: PanelLeft },
-                { side: "right", Icon: PanelRight },
-              ].map(({ side, Icon }) => (
-                <button
-                  key={side}
-                  onClick={() => setPipDock(side)}
-                  title={`Move camera strip to the ${side}`}
-                  className={`rounded p-1 ${pipDock === side ? "bg-white/20 text-white" : "text-white/50 hover:text-white"}`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                </button>
+    <div className="flex h-full">
+      <div className="flex h-full min-w-0 flex-1 flex-col bg-ink-900 p-4">
+        {primaryScreen ? (
+          <div
+            className={`flex min-h-0 flex-1 gap-3 ${
+              pipDock === "bottom"
+                ? "flex-col"
+                : pipDock === "top"
+                ? "flex-col-reverse"
+                : pipDock === "left"
+                ? "flex-row-reverse"
+                : "flex-row"
+            }`}
+          >
+            <div className="relative min-h-0 flex-1">
+              <VideoTile
+                stream={primaryScreen.stream}
+                name={primaryScreen.label}
+                mirrored={false}
+                large
+                fit="contain"
+                zoomable
+                annotatable
+                canDraw={sharingScreen}
+                annotations={annotations}
+                onAddAnnotation={addAnnotation}
+                onUndoAnnotation={undoAnnotation}
+                onUpdateAnnotation={updateAnnotation}
+                onClearAnnotations={clearAnnotations}
+              />
+              <div className="absolute right-3 top-3 z-10 flex gap-1 rounded-lg bg-ink-900/60 p-1">
+                {[
+                  { side: "top", Icon: PanelTop },
+                  { side: "bottom", Icon: PanelBottom },
+                  { side: "left", Icon: PanelLeft },
+                  { side: "right", Icon: PanelRight },
+                ].map(({ side, Icon }) => (
+                  <button
+                    key={side}
+                    onClick={() => setPipDock(side)}
+                    title={`Move camera strip to the ${side}`}
+                    className={`rounded p-1 ${pipDock === side ? "bg-white/20 text-white" : "text-white/50 hover:text-white"}`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className={`flex shrink-0 gap-2 ${pipDock === "left" || pipDock === "right" ? "flex-col items-center" : "flex-row justify-center"}`}>
+              <div className={pipDock === "left" || pipDock === "right" ? "w-28 shrink-0" : "w-32 shrink-0"}>
+                <VideoTile
+                  stream={localStream}
+                  name={user.name}
+                  avatarColor={user.avatarColor}
+                  isLocal
+                  camOn={camOn}
+                  micOn={micOn}
+                  showStatus
+                  speaking={speakingIds.has(user.id)}
+                />
+              </div>
+              {remoteIds.map((id) => (
+                <div className={pipDock === "left" || pipDock === "right" ? "w-28 shrink-0" : "w-32 shrink-0"} key={id}>
+                  <VideoTile
+                    stream={remoteStreams[id]}
+                    name={participants[id]?.name || "Guest"}
+                    avatarColor={participants[id]?.avatarColor}
+                    camOn={remoteMediaState[id]?.camOn ?? true}
+                    micOn={remoteMediaState[id]?.micOn ?? true}
+                    showStatus
+                    speaking={speakingIds.has(id)}
+                    connecting={!remoteStreams[id]}
+                  />
+                </div>
               ))}
             </div>
           </div>
-
-          <div className={`flex shrink-0 gap-2 ${pipDock === "left" || pipDock === "right" ? "flex-col items-center" : "flex-row justify-center"}`}>
-            <div className={pipDock === "left" || pipDock === "right" ? "w-28 shrink-0" : "w-32 shrink-0"}>
-              <VideoTile stream={localStream} name={user.name} avatarColor={user.avatarColor} isLocal camOn={camOn} />
+        ) : totalCameraTiles === 1 ? (
+          <div className="flex min-h-0 flex-1 items-center justify-center">
+            <div className="w-full max-w-4xl">
+              <VideoTile
+                stream={localStream}
+                name={user.name}
+                avatarColor={user.avatarColor}
+                isLocal
+                camOn={camOn}
+                micOn={micOn}
+                showStatus
+                speaking={speakingIds.has(user.id)}
+              />
             </div>
+          </div>
+        ) : (
+          <div className={`grid min-h-0 flex-1 auto-rows-fr gap-4 overflow-y-auto ${gridClass(totalCameraTiles)}`}>
+            <VideoTile
+              stream={localStream}
+              name={user.name}
+              avatarColor={user.avatarColor}
+              isLocal
+              camOn={camOn}
+              micOn={micOn}
+              showStatus
+              speaking={speakingIds.has(user.id)}
+            />
             {remoteIds.map((id) => (
-              <div className={pipDock === "left" || pipDock === "right" ? "w-28 shrink-0" : "w-32 shrink-0"} key={id}>
-                <VideoTile
-                  stream={remoteStreams[id]}
-                  name={participants[id]?.name || "Guest"}
-                  avatarColor={participants[id]?.avatarColor}
-                  connecting={!remoteStreams[id]}
-                />
-              </div>
+              <VideoTile
+                key={id}
+                stream={remoteStreams[id]}
+                name={participants[id]?.name || "Guest"}
+                avatarColor={participants[id]?.avatarColor}
+                camOn={remoteMediaState[id]?.camOn ?? true}
+                micOn={remoteMediaState[id]?.micOn ?? true}
+                showStatus
+                speaking={speakingIds.has(id)}
+                connecting={!remoteStreams[id]}
+              />
             ))}
           </div>
-        </div>
-      ) : totalCameraTiles === 1 ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center">
-          <div className="w-full max-w-4xl">
-            <VideoTile stream={localStream} name={user.name} avatarColor={user.avatarColor} isLocal camOn={camOn} />
-          </div>
-        </div>
-      ) : (
-        <div className={`grid min-h-0 flex-1 auto-rows-fr gap-4 overflow-y-auto ${gridClass(totalCameraTiles)}`}>
-          <VideoTile stream={localStream} name={user.name} avatarColor={user.avatarColor} isLocal camOn={camOn} />
-          {remoteIds.map((id) => (
-            <VideoTile
-              key={id}
-              stream={remoteStreams[id]}
-              name={participants[id]?.name || "Guest"}
-              avatarColor={participants[id]?.avatarColor}
-              connecting={!remoteStreams[id]}
-            />
-          ))}
-        </div>
-      )}
+        )}
 
-      <div className="mt-4 flex items-center justify-center gap-3">
-        <ControlButton
-          onClick={micAvailable ? toggleMic : promptEnableMic}
-          variant={!micAvailable ? "off" : micOn ? "default" : "off"}
-          title={!micAvailable ? "Turn on your microphone" : micOn ? "Mute" : "Unmute"}
-        >
-          {!micAvailable || !micOn ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-        </ControlButton>
-        <ControlButton onClick={toggleCam} variant={camOn ? "default" : "off"} title={camOn ? "Turn off camera" : "Turn on camera"}>
-          {camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-        </ControlButton>
-        <ControlButton
-          onClick={sharingScreen ? stopScreenShare : startScreenShare}
-          variant={sharingScreen ? "active" : "default"}
-          title={sharingScreen ? "Stop sharing" : "Share screen"}
-        >
-          {sharingScreen ? <ScreenShareOff className="h-5 w-5" /> : <ScreenShare className="h-5 w-5" />}
-        </ControlButton>
-        <ControlButton onClick={leaveMeeting} variant="danger" wide title="Leave meeting">
-          <PhoneOff className="h-5 w-5" />
-        </ControlButton>
+        <div className="mt-4 flex items-center justify-center gap-3">
+          <ControlButton
+            onClick={micAvailable ? toggleMic : promptEnableMic}
+            variant={!micAvailable ? "off" : micOn ? "default" : "off"}
+            title={!micAvailable ? "Turn on your microphone" : micOn ? "Mute" : "Unmute"}
+          >
+            {!micAvailable || !micOn ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+          </ControlButton>
+          <ControlButton onClick={toggleCam} variant={camOn ? "default" : "off"} title={camOn ? "Turn off camera" : "Turn on camera"}>
+            {camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+          </ControlButton>
+          <ControlButton
+            onClick={sharingScreen ? stopScreenShare : startScreenShare}
+            variant={sharingScreen ? "active" : "default"}
+            title={sharingScreen ? "Stop sharing" : "Share screen"}
+          >
+            {sharingScreen ? <ScreenShareOff className="h-5 w-5" /> : <ScreenShare className="h-5 w-5" />}
+          </ControlButton>
+          <ControlButton
+            onClick={() => setChatOpen((o) => !o)}
+            variant={chatOpen ? "active" : "default"}
+            title={chatOpen ? "Hide chat" : "Show chat"}
+          >
+            <MessageSquare className="h-5 w-5" />
+          </ControlButton>
+          <ControlButton onClick={leaveMeeting} variant="danger" wide title="Leave meeting">
+            <PhoneOff className="h-5 w-5" />
+          </ControlButton>
+        </div>
+
+        <MicRequestModal open={micRequestOpen} onCancel={cancelMicRequest} onConfirm={confirmEnableMic} />
       </div>
 
-      <MicRequestModal open={micRequestOpen} onCancel={cancelMicRequest} onConfirm={confirmEnableMic} />
+      {chatOpen && (
+        <div className="flex w-80 shrink-0 flex-col border-l border-ink-200 bg-white">
+          <div className="flex items-center justify-between border-b border-ink-200 px-4 py-3">
+            <p className="text-sm font-semibold text-ink-800">Chat</p>
+            <button
+              onClick={() => setChatOpen(false)}
+              className="rounded-lg p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-600"
+              aria-label="Close chat"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {chatConversation ? (
+            <ChatThread conversation={chatConversation} />
+          ) : (
+            <div className="flex flex-1 items-center justify-center text-sm text-ink-400">Loading chat…</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
