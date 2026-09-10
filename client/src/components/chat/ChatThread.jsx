@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import {
   MessageCircle,
+  MessageSquare,
   Paperclip,
+  Smile,
   X,
   File as FileIcon,
   Film,
@@ -19,6 +21,7 @@ import EmptyState from "../common/EmptyState.jsx";
 import Spinner from "../common/Spinner.jsx";
 import PreviewModal from "../storage/PreviewModal.jsx";
 import UploadProgressPanel from "../storage/UploadProgressPanel.jsx";
+import EmojiPicker from "./EmojiPicker.jsx";
 
 const DOCUMENT_MIME_TYPES = new Set([
   "application/pdf",
@@ -112,6 +115,7 @@ export default function ChatThread({ conversation, headerExtra }) {
   const [attachmentUpload, setAttachmentUpload] = useState(null); // { name, size, progress } | null
   const [attachError, setAttachError] = useState("");
   const [previewing, setPreviewing] = useState(null); // { assetId, version } | null
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -198,7 +202,22 @@ export default function ChatThread({ conversation, headerExtra }) {
     setDraft("");
     setPendingAttachment(null);
     setMentionState(null);
+    setEmojiPickerOpen(false);
     socket.emit("typing", { conversationId, isTyping: false });
+  }
+
+  function insertEmoji(emoji) {
+    const el = inputRef.current;
+    const start = el?.selectionStart ?? draft.length;
+    const end = el?.selectionEnd ?? draft.length;
+    const nextValue = draft.slice(0, start) + emoji + draft.slice(end);
+    setDraft(nextValue);
+    setEmojiPickerOpen(false);
+    const pos = start + emoji.length;
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(pos, pos);
+    });
   }
 
   function handleDraftChange(e) {
@@ -268,12 +287,16 @@ export default function ChatThread({ conversation, headerExtra }) {
   }
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col bg-ink-50">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-ink-50">
       <div className="flex items-center gap-2.5 border-b border-ink-200 bg-white px-5 py-3">
-        {conversation.isGroup ? (
+        {conversation.isMeetingChat ? (
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-white">
+            <MessageSquare className="h-4 w-4" />
+          </div>
+        ) : conversation.isGroup ? (
           <div
-            style={{ backgroundColor: conversation.color }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold text-white"
+            style={{ backgroundColor: conversation.color || "#4F46E5" }}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold text-white"
           >
             {conversation.title.slice(0, 2).toUpperCase()}
           </div>
@@ -300,9 +323,9 @@ export default function ChatThread({ conversation, headerExtra }) {
             const showAvatar = !mine && (i === 0 || messages[i - 1].sender.id !== m.sender.id);
             return (
               <div key={m.id} className={`flex items-end gap-2 ${mine ? "flex-row-reverse" : ""}`}>
-                <div className="w-7">{showAvatar && <Avatar name={m.sender.name} color={m.sender.avatarColor} size={28} />}</div>
+                {!mine && <div className="w-7">{showAvatar && <Avatar name={m.sender.name} color={m.sender.avatarColor} size={28} />}</div>}
                 <div
-                  className={`max-w-md rounded-2xl px-3.5 py-2 text-sm shadow-soft ${
+                  className={`min-w-0 max-w-md rounded-2xl px-3.5 py-2 text-sm shadow-soft ${
                     mine ? "brand-mark rounded-br-sm text-white" : "rounded-bl-sm border border-ink-200 bg-white text-ink-800"
                   }`}
                 >
@@ -399,6 +422,17 @@ export default function ChatThread({ conversation, headerExtra }) {
               e.target.value = "";
             }}
           />
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setEmojiPickerOpen((o) => !o)}
+              title="Add emoji"
+              className="btn-ghost !px-2.5 !py-2"
+            >
+              <Smile className="h-4 w-4" />
+            </button>
+            {emojiPickerOpen && <EmojiPicker onSelect={insertEmoji} onClose={() => setEmojiPickerOpen(false)} />}
+          </div>
           <input
             ref={inputRef}
             className="input"

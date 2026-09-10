@@ -8,6 +8,7 @@ import Register from "./pages/Register.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import MyPlan from "./pages/MyPlan.jsx";
 import WorkspaceCalendar from "./pages/WorkspaceCalendar.jsx";
 import WorkspaceTasks from "./pages/WorkspaceTasks.jsx";
 import WorkspaceChat from "./pages/WorkspaceChat.jsx";
@@ -42,6 +43,7 @@ export default function App() {
         }
       >
         <Route path="/" element={<Dashboard />} />
+        <Route path="/plan" element={<MyPlan />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/workspaces/:workspaceId/calendar" element={<WorkspaceCalendar />} />

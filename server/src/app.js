@@ -11,6 +11,7 @@ import taskStatusesRoutes from "./routes/taskStatuses.routes.js";
 import messagesRoutes from "./routes/messages.routes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
+import planRoutes from "./routes/plan.routes.js";
 import assetsRoutes from "./routes/assets.routes.js";
 import foldersRoutes from "./routes/folders.routes.js";
 import conversationsRoutes from "./routes/conversations.routes.js";
@@ -40,6 +41,7 @@ export function createApp() {
   app.use("/api/messages", messagesRoutes);
   app.use("/api/notifications", notificationsRoutes);
   app.use("/api/dashboard", dashboardRoutes);
+  app.use("/api/plan", planRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

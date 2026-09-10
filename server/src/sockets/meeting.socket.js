@@ -158,6 +158,16 @@ export function registerMeetingHandlers(io, socket) {
     socket.to(`meeting:${workspaceId}`).emit("meeting:peer-left", { userId: socket.userId });
     io.to(`workspace:${workspaceId}`).emit("meeting:activity", { workspaceId, active: remaining > 0, count: remaining });
     socket.data.meetingWorkspaceId = null;
+
+    // The meeting just fully ended — close out its chat (if one was ever
+    // opened) so the next meeting's first "open chat" click starts a fresh
+    // conversation instead of picking up this one's history. See
+    // getOrCreateMeetingChat in conversations.controller.js.
+    if (remaining === 0) {
+      prisma.conversation
+        .updateMany({ where: { workspaceId, isMeetingChat: true, meetingEndedAt: null }, data: { meetingEndedAt: new Date() } })
+        .catch((err) => console.error("failed to close meeting chat", err));
+    }
   }
 
   socket.on("meeting:leave", leaveMeeting);

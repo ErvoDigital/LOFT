@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, useParams } from "react-router-dom";
-import { Home, MessageSquare, Calendar, CheckSquare, Video, FolderOpen, FileText, Settings, Plus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Home, MessageSquare, Calendar, CheckSquare, Video, FolderOpen, FileText, Settings, Plus, PanelLeftClose, PanelLeftOpen, CalendarCheck } from "lucide-react";
 import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
 import WorkspaceModal from "./WorkspaceModal.jsx";
 
@@ -85,6 +85,9 @@ export default function Sidebar() {
         </div>
         <NavLink to="/" end title="Dashboard" className={({ isActive }) => navItemClass({ isActive }) + " !px-0 !py-0 h-10 w-10 justify-center"}>
           <Home className="h-[18px] w-[18px]" />
+        </NavLink>
+        <NavLink to="/plan" title="My Plan" className={({ isActive }) => navItemClass({ isActive }) + " !px-0 !py-0 h-10 w-10 justify-center"}>
+          <CalendarCheck className="h-[18px] w-[18px]" />
         </NavLink>
         <NavLink to="/chat" title="Messages" className={({ isActive }) => navItemClass({ isActive }) + " !px-0 !py-0 h-10 w-10 justify-center"}>
           <MessageSquare className="h-[18px] w-[18px]" />

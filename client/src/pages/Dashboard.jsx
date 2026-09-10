@@ -116,7 +116,9 @@ export default function Dashboard() {
         <section className="card p-5">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-ink-800">Your pending tasks</h3>
-            <span className="text-xs text-ink-400">Across all workspaces</span>
+            <Link to="/plan" className="text-xs font-medium text-brand-600 hover:text-brand-700">
+              View my plan →
+            </Link>
           </div>
           <PendingTasksPanel tasks={data?.pendingTasks} />
         </section>

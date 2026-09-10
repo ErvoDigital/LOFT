@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { CheckCircle2 } from "lucide-react";
 import EmptyState from "../common/EmptyState.jsx";
-import { PriorityBadge } from "../common/Badges.jsx";
+import { TierBadge } from "../common/Badges.jsx";
 
 function formatDue(dueDate) {
   if (!dueDate) return "No due date";
@@ -41,7 +41,7 @@ export default function PendingTasksPanel({ tasks }) {
               <p className="truncate text-xs text-ink-400">{t.workspaceName}</p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
-              <PriorityBadge priority={t.priority} />
+              <TierBadge tier={t.tier} compact />
               <span className={`text-xs font-medium ${overdue ? "text-red-500" : "text-ink-400"}`}>{formatDue(t.dueDate)}</span>
             </div>
           </Link>

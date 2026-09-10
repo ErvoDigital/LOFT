@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ZoomIn, ZoomOut, Mic, MicOff, Video, VideoOff } from "lucide-react";
+import { ZoomIn, ZoomOut, Mic, MicOff, Video, VideoOff, VolumeX } from "lucide-react";
 import Avatar from "../common/Avatar.jsx";
 import AnnotationLayer from "./AnnotationLayer.jsx";
 import AnnotationToolbar from "./AnnotationToolbar.jsx";
@@ -50,12 +50,31 @@ export default function VideoTile({
   // at once (i.e. while actually on the call). The screen-share tile further
   // down has its own, different muting rule — see the note on its <video>.
 
+  // True once an unmuted autoplay attempt on the screen-share tile below got
+  // rejected by the browser's autoplay policy and we fell back to muted
+  // playback so the picture actually shows up — see that effect below.
+  const [audioBlocked, setAudioBlocked] = useState(false);
+
   // A stable ref (not an inline callback ref) so re-renders — e.g. every
   // pointermove while panning — don't change the ref's identity. A changed
   // callback-ref identity makes React detach-then-reattach it on each render,
   // which briefly nulls srcObject and flickers the video during a drag.
   useEffect(() => {
-    if (videoRef.current) videoRef.current.srcObject = stream || null;
+    const video = videoRef.current;
+    if (!video) return;
+    video.srcObject = stream || null;
+    if (!stream) return;
+    // A live MediaStream never paints a frame until playback actually
+    // starts, so a rejected play() leaves the tile blank, not just silent.
+    // The screen-share tile plays unmuted for remote viewers (see its own
+    // note below), which browsers block without a fresh user gesture — fall
+    // back to muted (always allowed) so the picture shows up at least.
+    video.play()?.catch(() => {
+      if (video.muted) return;
+      video.muted = true;
+      setAudioBlocked(true);
+      video.play()?.catch(() => {});
+    });
   }, [stream, hasVideo]);
 
   const [scale, setScale] = useState(1);
@@ -198,13 +217,26 @@ export default function VideoTile({
               // share can carry audio (tab/system sound), and — unlike
               // camera audio — nothing else plays it back, so a remote
               // presenter's shared audio needs this element unmuted to be
-              // heard at all. Muted only for our own share, so we don't
-              // hear our own shared tab audio doubled back at us.
-              muted={isLocal}
+              // heard at all. Muted only for our own share (so we don't hear
+              // our own shared tab audio doubled back at us) or if the
+              // browser rejected unmuted autoplay (see the effect above).
+              muted={isLocal || audioBlocked}
               className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${
                 zoomable && scale > MIN_SCALE ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""
               }`}
             />
+            {!isLocal && audioBlocked && (
+              <button
+                onClick={() => {
+                  if (videoRef.current) videoRef.current.muted = false;
+                  setAudioBlocked(false);
+                }}
+                title="Unmute presenter's audio"
+                className="absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-lg bg-ink-900/70 px-2 py-1 text-xs font-medium text-white hover:bg-ink-900/90"
+              >
+                <VolumeX className="h-3.5 w-3.5" /> Tap to unmute
+              </button>
+            )}
             <AnnotationLayer
               rect={contentRect}
               shapes={annotations}

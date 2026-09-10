@@ -64,7 +64,7 @@ export async function getDashboard(req, res) {
     workspaceId: t.workspaceId,
     workspaceName: t.workspace.name,
     dueDate: t.dueDate,
-    priority: t.priority,
+    tier: t.tier,
     status: t.status,
   }));
   const conflicts = detectConflicts({ events: eventsForConflicts, tasks: tasksForConflicts });
@@ -84,7 +84,7 @@ export async function getDashboard(req, res) {
       workspaceId: t.workspaceId,
       workspaceName: t.workspace.name,
       workspaceColor: t.workspace.color,
-      priority: t.priority,
+      tier: t.tier,
       status: t.status,
       dueDate: t.dueDate,
     })),

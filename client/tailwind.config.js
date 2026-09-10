@@ -50,6 +50,22 @@ export default {
         xl: "0.625rem",
         "2xl": "0.875rem",
       },
+      keyframes: {
+        "toast-in": {
+          "0%": { opacity: "0", transform: "translateX(16px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        "toast-shrink": {
+          "0%": { width: "100%" },
+          "100%": { width: "0%" },
+        },
+      },
+      animation: {
+        "toast-in": "toast-in 0.2s ease-out",
+        // Duration must match TOAST_SECONDS in MentionToasts.jsx — this bar
+        // is the visual half of the countdown, the numeral is the other half.
+        "toast-shrink": "toast-shrink 6s linear forwards",
+      },
     },
   },
   plugins: [],

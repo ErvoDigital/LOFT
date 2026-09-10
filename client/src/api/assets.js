@@ -38,6 +38,22 @@ export const uploadVersion = (workspaceId, assetId, file, onProgress) => {
     .then((r) => r.data.asset);
 };
 
+export const listTaskAttachments = (workspaceId, taskId) =>
+  api.get(`/workspaces/${workspaceId}/tasks/${taskId}/attachments`).then((r) => r.data.assets);
+
+export const uploadTaskAttachment = (workspaceId, taskId, file, onProgress) => {
+  const form = new FormData();
+  form.append("file", file);
+  return api
+    .post(`/workspaces/${workspaceId}/tasks/${taskId}/attachments`, form, {
+      onUploadProgress: onProgress,
+    })
+    .then((r) => r.data.asset);
+};
+
+export const deleteTaskAttachment = (workspaceId, taskId, assetId) =>
+  api.delete(`/workspaces/${workspaceId}/tasks/${taskId}/attachments/${assetId}`).then((r) => r.data);
+
 export const mergeAssets = (workspaceId, targetAssetId, sourceAssetId) =>
   api.post(`/workspaces/${workspaceId}/assets/${targetAssetId}/merge`, { sourceAssetId }).then((r) => r.data.asset);
 

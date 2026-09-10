@@ -5,14 +5,17 @@ import { notify } from "../services/notification.service.js";
 import { emitToWorkspace } from "../sockets/io.js";
 import { assertValidStatus, ensureWorkspaceStatuses } from "./taskStatuses.controller.js";
 
-const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+const TIERS = ["TIER_1", "TIER_2", "TIER_3", "TIER_4"];
 
 const taskSchema = z.object({
   title: z.string().min(1).max(160),
   description: z.string().max(2000).optional(),
-  priority: z.enum(PRIORITIES).default("MEDIUM"),
+  tier: z.enum(TIERS).default("TIER_3"),
   status: z.string().min(1).optional(),
   dueDate: z.coerce.date().optional().nullable(),
+  estimatedMinutes: z.coerce.number().int().min(5).max(1440).default(30),
+  isPinned: z.boolean().optional(),
+  isSnoozed: z.boolean().optional(),
   assigneeId: z.string().optional().nullable(),
   order: z.number().optional(),
 });
@@ -25,7 +28,10 @@ function serialize(task) {
     workspaceColor: task.workspace?.color,
     title: task.title,
     description: task.description,
-    priority: task.priority,
+    tier: task.tier,
+    estimatedMinutes: task.estimatedMinutes,
+    isPinned: task.isPinned,
+    isSnoozed: task.isSnoozed,
     status: task.status,
     dueDate: task.dueDate,
     order: task.order,

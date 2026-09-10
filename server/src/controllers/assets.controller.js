@@ -12,6 +12,7 @@ function serialize(asset) {
     id: asset.id,
     workspaceId: asset.workspaceId,
     folderId: asset.folderId,
+    taskId: asset.taskId,
     name: asset.name,
     uploadedBy: asset.uploadedBy,
     createdAt: asset.createdAt,
@@ -92,6 +93,53 @@ export async function uploadAsset(req, res) {
   });
 
   emitToWorkspace(workspaceId, "asset:created", serialize(asset));
+  res.status(201).json({ asset: serialize(asset) });
+}
+
+// Files attached directly to a task (shown in its details panel). Unlike
+// uploadAsset these skip Storage's folder system entirely — Asset.taskId is
+// the only home a task attachment needs — so they never show up in the
+// workspace's general file browser, only on the task itself.
+export async function listTaskAttachments(req, res) {
+  const { workspaceId, taskId } = req.params;
+  const task = await prisma.task.findUnique({ where: { id: taskId } });
+  if (!task || task.workspaceId !== workspaceId) throw new ApiError(404, "Task not found");
+
+  const assets = await prisma.asset.findMany({ where: { taskId }, include: assetInclude, orderBy: { createdAt: "asc" } });
+  res.json({ assets: assets.map(serialize) });
+}
+
+export async function uploadTaskAttachment(req, res) {
+  if (!req.file) throw new ApiError(400, "No file uploaded");
+  const { workspaceId, taskId } = req.params;
+  const task = await prisma.task.findUnique({ where: { id: taskId } });
+  if (!task || task.workspaceId !== workspaceId) throw new ApiError(404, "Task not found");
+
+  const name = (req.body.name || req.file.originalname).slice(0, 160);
+  const storedName = generateStoredName(req.file.originalname);
+  await uploadObject(workspaceId, storedName, req.file.buffer, req.file.mimetype);
+
+  const asset = await prisma.asset.create({
+    data: {
+      workspaceId,
+      taskId,
+      name,
+      uploadedById: req.userId,
+      versions: {
+        create: {
+          version: 1,
+          originalName: req.file.originalname,
+          storedName,
+          mimeType: req.file.mimetype,
+          size: req.file.size,
+          uploadedById: req.userId,
+        },
+      },
+    },
+    include: assetInclude,
+  });
+
+  emitToWorkspace(workspaceId, "task:attachment:created", { taskId, asset: serialize(asset) });
   res.status(201).json({ asset: serialize(asset) });
 }
 

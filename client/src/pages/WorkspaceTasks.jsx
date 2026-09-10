@@ -6,6 +6,7 @@ import * as taskStatusesApi from "../api/taskStatuses.js";
 import { useSocket } from "../context/SocketContext.jsx";
 import TaskCard from "../components/tasks/TaskCard.jsx";
 import TaskModal from "../components/tasks/TaskModal.jsx";
+import TaskDetailsPanel from "../components/tasks/TaskDetailsPanel.jsx";
 import TaskStatusManagerModal from "../components/tasks/TaskStatusManagerModal.jsx";
 import Spinner from "../components/common/Spinner.jsx";
 
@@ -20,6 +21,8 @@ export default function WorkspaceTasks() {
   const [modalOpen, setModalOpen] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsTaskId, setDetailsTaskId] = useState(null);
   const [draggedId, setDraggedId] = useState(null);
   const [dropIndicator, setDropIndicator] = useState(null); // { status, index }
   const suppressReload = useRef(false);
@@ -60,6 +63,8 @@ export default function WorkspaceTasks() {
     events.forEach((e) => socket.on(e, handler));
     return () => events.forEach((e) => socket.off(e, handler));
   }, [socket, load]);
+
+  const detailsTask = detailsTaskId ? tasks.find((t) => t.id === detailsTaskId) : null;
 
   function columnTasks(status) {
     return tasks.filter((t) => t.status === status).sort((a, b) => a.order - b.order);
@@ -128,75 +133,81 @@ export default function WorkspaceTasks() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-ink-900">Tasks</h2>
-        <div className="flex items-center gap-2">
-          {isAdmin && (
-            <button className="btn-secondary" onClick={() => setStatusModalOpen(true)}>
-              Customize statuses
-            </button>
-          )}
-          <button
-            className="btn-primary"
-            onClick={() => {
-              setEditingTask(null);
-              setModalOpen(true);
-            }}
-          >
-            + New task
-          </button>
-        </div>
-      </div>
-
-      <div className="flex gap-4 overflow-x-auto pb-2">
-        {columns.map((col) => {
-          const colTasks = columnTasks(col.id);
-          const showIndicator = dropIndicator?.status === col.id;
-
-          return (
-            <div
-              key={col.id}
-              onDragOver={(e) => handleColumnDragOver(e, col.id)}
-              onDrop={(e) => handleDrop(e, col.id)}
-              className="min-w-[240px] flex-1 rounded-xl border border-ink-200 bg-ink-50 p-3"
+    <>
+      <div className="mx-auto max-w-6xl space-y-4 p-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-ink-900">Tasks</h2>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button className="btn-secondary" onClick={() => setStatusModalOpen(true)}>
+                Customize statuses
+              </button>
+            )}
+            <button
+              className="btn-primary"
+              onClick={() => {
+                setEditingTask(null);
+                setModalOpen(true);
+              }}
             >
-              <div className="mb-3 flex items-center justify-between px-1">
-                <h3 className="flex items-center gap-1.5 text-sm font-semibold text-ink-700">
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: col.color }} />
-                  {col.label}
-                </h3>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-ink-500 border border-ink-200">{colTasks.length}</span>
-              </div>
-              <div className="space-y-2">
-                {colTasks.map((t, i) => (
-                  <div key={t.id}>
-                    {showIndicator && dropIndicator.index === i && <DropLine />}
-                    <div onDragOver={(e) => handleCardDragOver(e, col.id, i)}>
-                      <TaskCard
-                        task={t}
-                        dragging={draggedId === t.id}
-                        isDoneColumn={col.isDone}
-                        onClick={() => {
-                          setEditingTask(t);
-                          setModalOpen(true);
-                        }}
-                        dragHandlers={{
-                          onDragStart: (e) => handleDragStart(e, t),
-                          onDragEnd: handleDragEnd,
-                        }}
-                      />
+              + New task
+            </button>
+          </div>
+        </div>
+
+        <div className="flex gap-4 overflow-x-auto pb-2">
+          {columns.map((col) => {
+            const colTasks = columnTasks(col.id);
+            const showIndicator = dropIndicator?.status === col.id;
+
+            return (
+              <div
+                key={col.id}
+                onDragOver={(e) => handleColumnDragOver(e, col.id)}
+                onDrop={(e) => handleDrop(e, col.id)}
+                className="min-w-[240px] flex-1 rounded-xl border border-ink-200 bg-ink-50 p-3"
+              >
+                <div className="mb-3 flex items-center justify-between px-1">
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold text-ink-700">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: col.color }} />
+                    {col.label}
+                  </h3>
+                  <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-ink-500 border border-ink-200">{colTasks.length}</span>
+                </div>
+                <div className="space-y-2">
+                  {colTasks.map((t, i) => (
+                    <div key={t.id}>
+                      {showIndicator && dropIndicator.index === i && <DropLine />}
+                      <div onDragOver={(e) => handleCardDragOver(e, col.id, i)}>
+                        <TaskCard
+                          task={t}
+                          dragging={draggedId === t.id}
+                          isDoneColumn={col.isDone}
+                          onClick={() => {
+                            setDetailsTaskId(t.id);
+                            setDetailsOpen(true);
+                          }}
+                          onEdit={() => {
+                            setEditingTask(t);
+                            setModalOpen(true);
+                          }}
+                          dragHandlers={{
+                            onDragStart: (e) => handleDragStart(e, t),
+                            onDragEnd: handleDragEnd,
+                          }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {showIndicator && dropIndicator.index === colTasks.length && <DropLine />}
-                {colTasks.length === 0 && !showIndicator && (
-                  <p className="px-1 py-4 text-center text-xs text-ink-300">Drop tasks here</p>
-                )}
+                  ))}
+                  {showIndicator && dropIndicator.index === colTasks.length && <DropLine />}
+                  {colTasks.length === 0 && !showIndicator && (
+                    <p className="px-1 py-4 text-center text-xs text-ink-300">Drop tasks here</p>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       <TaskModal
@@ -212,7 +223,22 @@ export default function WorkspaceTasks() {
             return exists ? prev.map((t) => (t.id === saved.id ? saved : t)) : [...prev, saved];
           });
         }}
-        onDeleted={(id) => setTasks((prev) => prev.filter((t) => t.id !== id))}
+        onDeleted={(id) => {
+          setTasks((prev) => prev.filter((t) => t.id !== id));
+          if (detailsTaskId === id) setDetailsOpen(false);
+        }}
+      />
+
+      <TaskDetailsPanel
+        open={detailsOpen}
+        task={detailsTask}
+        workspaceId={workspaceId}
+        statuses={columns}
+        onClose={() => setDetailsOpen(false)}
+        onEdit={() => {
+          setEditingTask(detailsTask);
+          setModalOpen(true);
+        }}
       />
 
       {isAdmin && (
@@ -224,7 +250,7 @@ export default function WorkspaceTasks() {
           onChanged={setColumns}
         />
       )}
-    </div>
+    </>
   );
 }
 

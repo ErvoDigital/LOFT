@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import * as notificationsApi from "../api/notifications.js";
 import { useAuth } from "./AuthContext.jsx";
 import { useSocket } from "./SocketContext.jsx";
+import MentionToasts from "../components/notifications/MentionToasts.jsx";
 
 const NotificationsContext = createContext(null);
 
@@ -10,6 +11,7 @@ export function NotificationsProvider({ children }) {
   const { socket } = useSocket();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [toasts, setToasts] = useState([]);
 
   const refresh = useCallback(async () => {
     if (!user) return;
@@ -31,10 +33,19 @@ export function NotificationsProvider({ children }) {
     const onNew = (notification) => {
       setNotifications((prev) => [notification, ...prev].slice(0, 50));
       setUnreadCount((c) => c + 1);
+      // Mentions also pop an instant top-right toast (MentionToasts.jsx) on
+      // top of the bell entry — every other notification type only shows there.
+      if (notification.type === "MENTION") {
+        setToasts((prev) => [...prev, notification].slice(-4));
+      }
     };
     socket.on("notification:new", onNew);
     return () => socket.off("notification:new", onNew);
   }, [socket]);
+
+  const dismissToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   const markRead = useCallback(async (id) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
@@ -49,8 +60,11 @@ export function NotificationsProvider({ children }) {
   }, []);
 
   return (
-    <NotificationsContext.Provider value={{ notifications, unreadCount, refresh, markRead, markAllRead }}>
+    <NotificationsContext.Provider
+      value={{ notifications, unreadCount, refresh, markRead, markAllRead, toasts, dismissToast }}
+    >
       {children}
+      <MentionToasts />
     </NotificationsContext.Provider>
   );
 }

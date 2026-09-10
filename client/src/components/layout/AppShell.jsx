@@ -11,6 +11,7 @@ function useTitle() {
   const workspace = workspaces.find((w) => w.id === workspaceId);
 
   if (location.pathname === "/") return "Dashboard";
+  if (location.pathname.startsWith("/plan")) return "My Plan";
   if (location.pathname.startsWith("/chat")) return "Messages";
   if (location.pathname.startsWith("/profile")) return "Profile";
   if (workspace) {
@@ -33,7 +34,7 @@ export default function AppShell() {
       <Sidebar />
       <div className="relative flex min-w-0 flex-1 flex-col">
         <Topbar title={title} />
-        <main className="flex-1 overflow-y-auto print:overflow-visible">
+        <main className="relative flex-1 overflow-y-auto print:overflow-visible">
           <Outlet />
         </main>
         <MiniCallPlayer />

@@ -15,7 +15,7 @@ function overlaps(aStart, aEnd, bStart, bEnd) {
 }
 
 // events: [{ id, title, workspaceId, workspaceName, startTime, endTime }]
-// tasks:  [{ id, title, workspaceId, workspaceName, dueDate, priority }] — callers
+// tasks:  [{ id, title, workspaceId, workspaceName, dueDate, tier }] — callers
 // are expected to have already excluded tasks in a "done" status.
 export function detectConflicts({ events, tasks }) {
   const conflicts = [];
@@ -48,7 +48,7 @@ export function detectConflicts({ events, tasks }) {
       if (sameDay(new Date(a.dueDate), new Date(b.dueDate))) {
         conflicts.push({
           type: "DEADLINE_CLASH",
-          severity: a.priority === "URGENT" || b.priority === "URGENT" ? "high" : "medium",
+          severity: a.tier === "TIER_1" || b.tier === "TIER_1" ? "high" : "medium",
           message: `"${a.title}" (${a.workspaceName}) and "${b.title}" (${b.workspaceName}) are both due ${new Date(a.dueDate).toDateString()}`,
           items: [
             { kind: "task", id: a.id, title: a.title, workspaceId: a.workspaceId, workspaceName: a.workspaceName, time: a.dueDate },

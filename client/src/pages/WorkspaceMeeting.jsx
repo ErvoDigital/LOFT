@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   Video,
@@ -24,19 +24,79 @@ import VideoTile from "../components/meeting/VideoTile.jsx";
 import ChatThread from "../components/chat/ChatThread.jsx";
 import Modal from "../components/common/Modal.jsx";
 
-// Camera grid density scales with headcount — more participants, smaller tiles.
-// A single participant is handled separately (one big centered tile). 3 gets
-// its own case rather than falling into the <=4 bucket: a 2-column grid holding
-// 3 tiles leaves the last cell completely empty (a big dead rectangle next to
-// whoever landed alone in the second row) — a full row of 3 instead fills the
-// space evenly.
-function gridClass(count) {
-  if (count <= 2) return "grid-cols-1 sm:grid-cols-2";
-  if (count === 3) return "grid-cols-1 sm:grid-cols-3";
-  if (count <= 4) return "grid-cols-2";
-  if (count <= 6) return "grid-cols-2 sm:grid-cols-3";
-  if (count <= 9) return "grid-cols-3";
-  return "grid-cols-3 lg:grid-cols-4";
+const GRID_GAP = 16; // px — must match the camera grid's gap-4
+const TILE_ASPECT_RATIO = 16 / 9;
+const MIN_TILE_WIDTH = 96; // px floor so tiles stay legible with a lot of participants
+
+// The width/height a tile gets if the grid is forced to exactly this many
+// columns: as large as fits without breaking the 16:9 aspect ratio.
+function tileSizeForColumns(cols, count, width, height) {
+  const rows = Math.ceil(count / cols);
+  const maxTileWidth = (width - GRID_GAP * (cols - 1)) / cols;
+  const maxTileHeight = (height - GRID_GAP * (rows - 1)) / rows;
+  let tileWidth = maxTileWidth;
+  let tileHeight = tileWidth / TILE_ASPECT_RATIO;
+  if (tileHeight > maxTileHeight) {
+    tileHeight = maxTileHeight;
+    tileWidth = tileHeight * TILE_ASPECT_RATIO;
+  }
+  return { cols, rows, tileWidth, tileHeight, area: tileWidth * tileHeight };
+}
+
+// 2, 3 and 4 people get a fixed column count — 2 always splits evenly
+// left/right, and 3 and 4 both go two-per-row (3 leaves its odd tile alone
+// on the second row, centered by the wrapping flexbox below rather than
+// stranded next to a dead cell). Above 4, every column count from 1..N is
+// tried and whichever yields the biggest tile area wins, so the grid keeps
+// adapting sensibly — and never leaves an unfilled gap, since a half-empty
+// last row just centers itself — as more people join.
+function computeGridLayout(count, width, height) {
+  if (count <= 0 || width <= 0 || height <= 0) return { tileWidth: 0, tileHeight: 0, cols: 1, rows: 1 };
+
+  let best;
+  if (count === 1) {
+    best = tileSizeForColumns(1, count, width, height);
+  } else if (count <= 4) {
+    best = tileSizeForColumns(2, count, width, height);
+  } else {
+    for (let cols = 1; cols <= count; cols++) {
+      const candidate = tileSizeForColumns(cols, count, width, height);
+      if (candidate.tileWidth <= 0 || candidate.tileHeight <= 0) continue;
+      if (!best || candidate.area > best.area) best = candidate;
+    }
+  }
+
+  if (!best || best.tileWidth <= 0) {
+    return { tileWidth: MIN_TILE_WIDTH, tileHeight: MIN_TILE_WIDTH / TILE_ASPECT_RATIO, cols: 1, rows: count };
+  }
+  return {
+    ...best,
+    tileWidth: Math.max(best.tileWidth, MIN_TILE_WIDTH),
+    tileHeight: Math.max(best.tileHeight, MIN_TILE_WIDTH / TILE_ASPECT_RATIO),
+  };
+}
+
+// Measures an element's content box live via ResizeObserver — a callback ref
+// (not a plain useRef) so the observer re-attaches whenever the node itself
+// changes, e.g. the grid mounting fresh after the view was on the single-tile
+// or screen-share branch, where the grid container didn't exist yet.
+function useElementSize() {
+  const [node, setNode] = useState(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const ref = useCallback((el) => setNode(el), []);
+
+  useEffect(() => {
+    if (!node) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      setSize({ width, height });
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [node]);
+
+  return [ref, size];
 }
 
 // Google Meet-style circular icon buttons for the call bar — same layout/format,
@@ -174,6 +234,13 @@ export default function WorkspaceMeeting() {
     return () => socket.off("meeting:activity", onActivity);
   }, [socket, workspaceId, inThisWorkspacesCall]);
 
+  const cameraCount = 1 + Object.keys(participants).length;
+  const [gridRef, gridSize] = useElementSize();
+  const gridLayout = useMemo(
+    () => computeGridLayout(cameraCount, gridSize.width, gridSize.height),
+    [cameraCount, gridSize.width, gridSize.height]
+  );
+
   if (inAnotherWorkspacesCall) {
     const otherName = workspaces.find((w) => w.id === activeWorkspaceId)?.name || "another workspace";
     return (
@@ -282,7 +349,6 @@ export default function WorkspaceMeeting() {
   }
 
   const remoteIds = Object.keys(participants);
-  const totalCameraTiles = 1 + remoteIds.length;
   const remoteScreenIds = Object.keys(remoteScreenStreams);
 
   const primaryScreen = sharingScreen
@@ -371,7 +437,7 @@ export default function WorkspaceMeeting() {
               ))}
             </div>
           </div>
-        ) : totalCameraTiles === 1 ? (
+        ) : cameraCount === 1 ? (
           <div className="flex min-h-0 flex-1 items-center justify-center">
             <div className="w-full max-w-4xl">
               <VideoTile
@@ -387,29 +453,34 @@ export default function WorkspaceMeeting() {
             </div>
           </div>
         ) : (
-          <div className={`grid min-h-0 flex-1 auto-rows-fr gap-4 overflow-y-auto ${gridClass(totalCameraTiles)}`}>
-            <VideoTile
-              stream={localStream}
-              name={user.name}
-              avatarColor={user.avatarColor}
-              isLocal
-              camOn={camOn}
-              micOn={micOn}
-              showStatus
-              speaking={speakingIds.has(user.id)}
-            />
-            {remoteIds.map((id) => (
+          <div ref={gridRef} className="flex min-h-0 flex-1 flex-wrap content-center justify-center gap-4 overflow-y-auto">
+            <div style={{ width: gridLayout.tileWidth || 320, height: gridLayout.tileHeight || 180 }}>
               <VideoTile
-                key={id}
-                stream={remoteStreams[id]}
-                name={participants[id]?.name || "Guest"}
-                avatarColor={participants[id]?.avatarColor}
-                camOn={remoteMediaState[id]?.camOn ?? true}
-                micOn={remoteMediaState[id]?.micOn ?? true}
+                stream={localStream}
+                name={user.name}
+                avatarColor={user.avatarColor}
+                isLocal
+                camOn={camOn}
+                micOn={micOn}
                 showStatus
-                speaking={speakingIds.has(id)}
-                connecting={!remoteStreams[id]}
+                speaking={speakingIds.has(user.id)}
+                large
               />
+            </div>
+            {remoteIds.map((id) => (
+              <div key={id} style={{ width: gridLayout.tileWidth || 320, height: gridLayout.tileHeight || 180 }}>
+                <VideoTile
+                  stream={remoteStreams[id]}
+                  name={participants[id]?.name || "Guest"}
+                  avatarColor={participants[id]?.avatarColor}
+                  camOn={remoteMediaState[id]?.camOn ?? true}
+                  micOn={remoteMediaState[id]?.micOn ?? true}
+                  showStatus
+                  speaking={speakingIds.has(id)}
+                  connecting={!remoteStreams[id]}
+                  large
+                />
+              </div>
             ))}
           </div>
         )}
@@ -448,21 +519,34 @@ export default function WorkspaceMeeting() {
       </div>
 
       {chatOpen && (
-        <div className="flex w-80 shrink-0 flex-col border-l border-ink-200 bg-white">
-          <div className="flex items-center justify-between border-b border-ink-200 px-4 py-3">
-            <p className="text-sm font-semibold text-ink-800">Chat</p>
-            <button
-              onClick={() => setChatOpen(false)}
-              className="rounded-lg p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-600"
-              aria-label="Close chat"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+        <div className="flex h-full min-h-0 w-80 shrink-0 flex-col border-l border-ink-200 bg-white">
           {chatConversation ? (
-            <ChatThread conversation={chatConversation} />
+            <ChatThread
+              conversation={chatConversation}
+              headerExtra={
+                <button
+                  onClick={() => setChatOpen(false)}
+                  className="shrink-0 rounded-lg p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-600"
+                  aria-label="Close chat"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              }
+            />
           ) : (
-            <div className="flex flex-1 items-center justify-center text-sm text-ink-400">Loading chat…</div>
+            <>
+              <div className="flex items-center justify-between border-b border-ink-200 px-4 py-3">
+                <p className="text-sm font-semibold text-ink-800">Chat</p>
+                <button
+                  onClick={() => setChatOpen(false)}
+                  className="rounded-lg p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-600"
+                  aria-label="Close chat"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex flex-1 items-center justify-center text-sm text-ink-400">Loading chat…</div>
+            </>
           )}
         </div>
       )}

@@ -12,6 +12,7 @@ function serialize(conversation, lastMessage) {
     workspaceId: conversation.workspaceId,
     isGroup: conversation.isGroup,
     isDefault: conversation.isDefault,
+    isMeetingChat: conversation.isMeetingChat,
     title: conversation.title,
     createdById: conversation.createdById,
     participants: conversation.participants?.map((p) => p.user),
@@ -23,9 +24,13 @@ function serialize(conversation, lastMessage) {
 
 // Only this workspace's own channels — never mixed with any other
 // workspace's chats, and only channels the caller actually belongs to.
+// Meeting chats are excluded: with one created per meeting (see
+// getOrCreateMeetingChat), listing them here would pile up an ever-growing
+// stack of identically-titled "Meeting Chat" rows — they're only ever
+// reached from the meeting page itself.
 export async function listWorkspaceConversations(req, res) {
   const conversations = await prisma.conversation.findMany({
-    where: { workspaceId: req.params.workspaceId, participants: { some: { userId: req.userId } } },
+    where: { workspaceId: req.params.workspaceId, isMeetingChat: false, participants: { some: { userId: req.userId } } },
     include: { participants: { include: { user: participantSelect } } },
     orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
   });
@@ -93,17 +98,23 @@ export async function createWorkspaceConversation(req, res) {
   res.status(201).json({ conversation: serialize(conversation) });
 }
 
-// Finds (or creates, on first-ever use in this workspace) the one channel
-// the meeting page's chat panel reads/writes — kept separate from the
-// isDefault "General" channel so meeting chatter doesn't mix into regular
-// workspace chat history. Unlike General, membership here isn't granted to
-// the whole workspace roster up front; it's added lazily, one caller at a
-// time, only for whoever actually opens the panel.
+// Finds (or creates, on first use since the current meeting started) the
+// channel the meeting page's chat panel reads/writes — kept separate from
+// the isDefault "General" channel so meeting chatter doesn't mix into
+// regular workspace chat history. Unlike General, membership here isn't
+// granted to the whole workspace roster up front; it's added lazily, one
+// caller at a time, only for whoever actually opens the panel.
+//
+// Scoped to meetingEndedAt: null so each meeting gets its own chat rather
+// than piling onto one channel's history forever — meeting.socket.js's
+// leaveMeeting() stamps meetingEndedAt the moment a meeting's room empties
+// out, so the next meeting (even in the same workspace) finds no active row
+// here and starts fresh.
 export async function getOrCreateMeetingChat(req, res) {
   const { workspaceId } = req.params;
 
   let conversation = await prisma.conversation.findFirst({
-    where: { workspaceId, isMeetingChat: true },
+    where: { workspaceId, isMeetingChat: true, meetingEndedAt: null },
     include: { participants: { include: { user: participantSelect } } },
   });
 

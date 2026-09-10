@@ -114,9 +114,12 @@ model Task {
   workspaceId String
   title       String
   description String?
-  priority    String    @default("MEDIUM") // LOW | MEDIUM | HIGH | URGENT
+  tier        String    @default("TIER_3") // TIER_1 (critical) | TIER_2 (time-sensitive) | TIER_3 (flexible) | TIER_4 (backlog) — replaces the old LOW/MEDIUM/HIGH/URGENT priority; see services/priority.service.js for the scoring engine this feeds
   status      String    @default("TODO") // TODO | IN_PROGRESS | COMPLETED
   dueDate     DateTime?
+  estimatedMinutes Int  @default(30) // effort estimate used by My Plan to schedule work into daily capacity
+  isPinned    Boolean   @default(false) // forces the task to the top of My Plan regardless of score
+  isSnoozed   Boolean   @default(false) // pushes the task to the bottom of My Plan regardless of score
   order       Float     @default(0)
   createdById String
   assigneeId  String?
@@ -127,6 +130,7 @@ model Task {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy User      @relation("TaskCreator", fields: [createdById], references: [id])
   assignee  User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  attachments Asset[]
 }
 
 // A workspace's kanban columns — fully admin-customizable (labels, colors,
@@ -156,10 +160,10 @@ model TaskStatus {
 // workspaceId null). Access is always via an explicit ConversationParticipant
 // row, so channels never leak into workspaces their members aren't in.
 model Conversation {
-  id            String   @id @default(uuid())
-  workspaceId   String?
-  isGroup       Boolean  @default(false)
-  isDefault     Boolean  @default(false)
+  id             String    @id @default(uuid())
+  workspaceId    String?
+  isGroup        Boolean   @default(false)
+  isDefault      Boolean   @default(false)
   // The one channel a workspace's meeting page reads/writes, kept separate
   // from isDefault's "General" channel so meeting chatter doesn't mix into
   // regular workspace chat history. Lazily created (getOrCreateMeetingChat
@@ -167,10 +171,18 @@ model Conversation {
   // in-meeting chat panel, rather than eagerly on workspace creation —
   // unlike General, membership isn't auto-granted to every workspace member,
   // only to whoever actually opens it.
-  isMeetingChat Boolean  @default(false)
-  title         String?
-  createdById   String?
-  createdAt     DateTime @default(now())
+  isMeetingChat  Boolean   @default(false)
+  // Set (in meeting.socket.js's leaveMeeting) the moment the meeting room
+  // this chat belongs to empties out — null means "this is the current
+  // meeting's chat". getOrCreateMeetingChat only reuses a row where this is
+  // still null; once set, the next person to open the panel after a new
+  // meeting starts gets a brand-new conversation instead of the old one's
+  // history. Left in place (never deleted) so past meetings' chats still
+  // exist if ever needed, just no longer surfaced as "the" meeting chat.
+  meetingEndedAt DateTime?
+  title          String?
+  createdById    String?
+  createdAt      DateTime  @default(now())
 
   workspace    Workspace?                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy    User?                     @relation("ConversationCreator", fields: [createdById], references: [id])
@@ -231,6 +243,7 @@ model Asset {
   id           String   @id @default(uuid())
   workspaceId  String
   folderId     String?
+  taskId       String?
   name         String
   uploadedById String
   createdAt    DateTime @default(now())
@@ -238,6 +251,7 @@ model Asset {
 
   workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   folder       Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  task         Task?          @relation(fields: [taskId], references: [id], onDelete: Cascade)
   uploadedBy   User           @relation("AssetUploader", fields: [uploadedById], references: [id])
   versions     AssetVersion[]
   chatMessages Message[]
