@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AtSign, X } from "lucide-react";
+import { AtSign, Bell, X } from "lucide-react";
 import { useNotifications } from "../../context/NotificationsContext.jsx";
 
 // Keep in sync with the `toast-shrink` animation duration in tailwind.config.js.
 const TOAST_SECONDS = 6;
 
-function MentionToast({ toast, onDismiss }) {
+function NotificationToast({ toast, onDismiss }) {
   const navigate = useNavigate();
   const { markRead } = useNotifications();
   const [remaining, setRemaining] = useState(TOAST_SECONDS);
@@ -20,6 +20,8 @@ function MentionToast({ toast, onDismiss }) {
     if (remaining <= 0) onDismiss(toast.id);
   }, [remaining, toast.id, onDismiss]);
 
+  const Icon = toast.type === "MENTION" ? AtSign : Bell;
+
   return (
     <div
       role="alert"
@@ -31,7 +33,7 @@ function MentionToast({ toast, onDismiss }) {
       className="animate-toast-in relative flex w-80 cursor-pointer items-start gap-2.5 overflow-hidden rounded-xl border border-ink-200 bg-white p-3 pb-3.5 shadow-panel"
     >
       <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-600">
-        <AtSign className="h-4 w-4" />
+        <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-ink-800">{toast.title}</p>
@@ -56,18 +58,20 @@ function MentionToast({ toast, onDismiss }) {
   );
 }
 
-// Instant top-right pop-up for @mentions, on top of the persistent bell
-// entry NotificationsBell.jsx already renders. Mounted once in
+// Instant pop-up for every notification, anchored below the bell + profile
+// icons in Topbar.jsx (rather than the page's top-right corner) so it reads
+// as coming from them, on top of the persistent bell entry
+// NotificationsBell.jsx already renders. Mounted once in
 // NotificationsProvider so it's live on every authenticated route.
-export default function MentionToasts() {
+export default function NotificationToasts() {
   const { toasts, dismissToast } = useNotifications();
 
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed right-4 top-4 z-50 flex w-80 flex-col gap-2">
+    <div className="fixed right-6 top-16 z-50 flex w-80 flex-col gap-2">
       {toasts.map((t) => (
-        <MentionToast key={t.id} toast={t} onDismiss={dismissToast} />
+        <NotificationToast key={t.id} toast={t} onDismiss={dismissToast} />
       ))}
     </div>
   );

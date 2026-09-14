@@ -34,13 +34,20 @@ export function AuthProvider({ children }) {
     return user;
   }, []);
 
+  const loginWithGoogle = useCallback(async (credential) => {
+    const { token, user } = await authApi.googleLogin(credential);
+    localStorage.setItem("loft_token", token);
+    setUser(user);
+    return user;
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem("loft_token");
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, setUser, loading, login, register, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -19,11 +19,18 @@ model User {
   id               String    @id @default(uuid())
   name             String
   email            String    @unique
-  passwordHash     String
+  passwordHash     String?
+  googleId         String?   @unique
   avatarUrl        String?
   avatarColor      String    @default("#5B5BD6")
   resetToken       String?
   resetTokenExpiry DateTime?
+  // Separate from resetToken/resetTokenExpiry on purpose: this is a short,
+  // low-entropy 6-digit code, and resetPassword looks resetToken up across
+  // all users (by value alone, no email/user scoping) — sharing the column
+  // would let a guessed 6-digit code be tried against that endpoint too.
+  passwordChangeCode       String?
+  passwordChangeCodeExpiry DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

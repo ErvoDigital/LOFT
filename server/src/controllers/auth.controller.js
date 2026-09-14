@@ -4,6 +4,8 @@ import { prisma } from "../db/prisma.js";
 import { hashPassword, comparePassword } from "../utils/password.js";
 import { signToken } from "../utils/jwt.js";
 import { ApiError } from "../utils/ApiError.js";
+import { verifyGoogleCredential } from "../utils/googleAuth.js";
+import { publicUser } from "../utils/publicUser.js";
 
 const registerSchema = z.object({
   name: z.string().min(2).max(80),
@@ -16,17 +18,14 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const googleSchema = z.object({ credential: z.string().min(1) });
+
 const forgotSchema = z.object({ email: z.string().email() });
 
 const resetSchema = z.object({
   token: z.string().min(1),
   password: z.string().min(8).max(200),
 });
-
-function publicUser(user) {
-  const { passwordHash, resetToken, resetTokenExpiry, ...rest } = user;
-  return rest;
-}
 
 export async function register(req, res) {
   const { name, email, password } = registerSchema.parse(req.body);
@@ -55,8 +54,46 @@ export async function login(req, res) {
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
   if (!user) throw new ApiError(401, "Invalid email or password");
 
+  if (!user.passwordHash) {
+    throw new ApiError(400, "This account uses Google sign-in. Continue with Google instead.");
+  }
+
   const valid = await comparePassword(password, user.passwordHash);
   if (!valid) throw new ApiError(401, "Invalid email or password");
+
+  const token = signToken({ sub: user.id });
+  res.json({ token, user: publicUser(user) });
+}
+
+export async function googleAuth(req, res) {
+  const { credential } = googleSchema.parse(req.body);
+  const payload = await verifyGoogleCredential(credential);
+  const email = payload.email.toLowerCase();
+
+  let user = await prisma.user.findUnique({ where: { googleId: payload.sub } });
+
+  if (!user && payload.email_verified) {
+    user = await prisma.user.findUnique({ where: { email } });
+    if (user) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { googleId: payload.sub, avatarUrl: user.avatarUrl || payload.picture || null },
+      });
+    }
+  }
+
+  if (!user) {
+    const colors = ["#5B5BD6", "#2A9D8F", "#E76F51", "#E9A23B", "#3D8BFD", "#C44569"];
+    user = await prisma.user.create({
+      data: {
+        name: payload.name || email.split("@")[0],
+        email,
+        googleId: payload.sub,
+        avatarUrl: payload.picture || null,
+        avatarColor: colors[Math.floor(Math.random() * colors.length)],
+      },
+    });
+  }
 
   const token = signToken({ sub: user.id });
   res.json({ token, user: publicUser(user) });

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import AuthLayout from "../components/common/AuthLayout.jsx";
+import GoogleSignInButton from "../components/common/GoogleSignInButton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { apiErrorMessage } from "../api/client.js";
 
@@ -9,7 +10,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -48,6 +49,13 @@ export default function Login() {
           {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>
+      <div className="my-5">
+        <GoogleSignInButton
+          onCredential={loginWithGoogle}
+          onSuccess={() => navigate(location.state?.from || "/", { replace: true })}
+          onError={setError}
+        />
+      </div>
       <p className="mt-5 text-center text-sm text-ink-500">
         Don't have an account?{" "}
         <Link to="/register" className="font-medium text-brand-600 hover:underline">

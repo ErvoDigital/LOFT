@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 export default function Modal({ open, onClose, title, children, width = "max-w-md" }) {
@@ -11,7 +12,11 @@ export default function Modal({ open, onClose, title, children, width = "max-w-m
 
   if (!open) return null;
 
-  return (
+  // Portaled to document.body: AppShell's <main> has overflow-y-auto, and a
+  // non-visible overflow on an ancestor clips position:fixed descendants to
+  // its own box in every major browser — without the portal this backdrop
+  // only covered the content pane, leaving the sidebar/topbar undimmed.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-ink-900/50" onClick={onClose} />
       <div className={`relative w-full ${width} card shadow-panel p-6`}>
@@ -23,6 +28,7 @@ export default function Modal({ open, onClose, title, children, width = "max-w-m
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

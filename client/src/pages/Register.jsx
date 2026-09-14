@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/common/AuthLayout.jsx";
+import GoogleSignInButton from "../components/common/GoogleSignInButton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { apiErrorMessage } from "../api/client.js";
 
@@ -10,7 +11,7 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   async function handleSubmit(e) {
@@ -55,6 +56,13 @@ export default function Register() {
           {loading ? "Creating account…" : "Create account"}
         </button>
       </form>
+      <div className="my-5">
+        <GoogleSignInButton
+          onCredential={loginWithGoogle}
+          onSuccess={() => navigate("/", { replace: true })}
+          onError={setError}
+        />
+      </div>
       <p className="mt-5 text-center text-sm text-ink-500">
         Already have an account?{" "}
         <Link to="/login" className="font-medium text-brand-600 hover:underline">

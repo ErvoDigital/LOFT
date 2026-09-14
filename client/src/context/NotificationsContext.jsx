@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import * as notificationsApi from "../api/notifications.js";
 import { useAuth } from "./AuthContext.jsx";
 import { useSocket } from "./SocketContext.jsx";
-import MentionToasts from "../components/notifications/MentionToasts.jsx";
+import NotificationToasts from "../components/notifications/NotificationToasts.jsx";
 
 const NotificationsContext = createContext(null);
 
@@ -33,11 +33,9 @@ export function NotificationsProvider({ children }) {
     const onNew = (notification) => {
       setNotifications((prev) => [notification, ...prev].slice(0, 50));
       setUnreadCount((c) => c + 1);
-      // Mentions also pop an instant top-right toast (MentionToasts.jsx) on
-      // top of the bell entry — every other notification type only shows there.
-      if (notification.type === "MENTION") {
-        setToasts((prev) => [...prev, notification].slice(-4));
-      }
+      // Every notification also pops an instant toast (NotificationToasts.jsx)
+      // below the bell in Topbar.jsx, on top of the persistent bell entry.
+      setToasts((prev) => [...prev, notification].slice(-4));
     };
     socket.on("notification:new", onNew);
     return () => socket.off("notification:new", onNew);
@@ -64,7 +62,7 @@ export function NotificationsProvider({ children }) {
       value={{ notifications, unreadCount, refresh, markRead, markAllRead, toasts, dismissToast }}
     >
       {children}
-      <MentionToasts />
+      <NotificationToasts />
     </NotificationsContext.Provider>
   );
 }
