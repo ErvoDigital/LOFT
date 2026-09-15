@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
-import { generateStoredName, uploadObject, deleteObject, presignDownloadUrl } from "../utils/uploads.js";
+import { generateStoredName, uploadObject, deleteObject, presignDownloadUrl, assertStorageConfigured } from "../utils/uploads.js";
 import { emitToWorkspace } from "../sockets/io.js";
 import { isFolderVisible } from "../services/folderAccess.js";
 import { folderInclude, serializeFolder } from "./folders.controller.js";
@@ -56,6 +56,7 @@ export async function listAssets(req, res) {
 }
 
 export async function uploadAsset(req, res) {
+  assertStorageConfigured();
   if (!req.file) throw new ApiError(400, "No file uploaded");
   const workspaceId = req.params.workspaceId;
   const name = (req.body.name || req.file.originalname).slice(0, 160);
@@ -110,6 +111,7 @@ export async function listTaskAttachments(req, res) {
 }
 
 export async function uploadTaskAttachment(req, res) {
+  assertStorageConfigured();
   if (!req.file) throw new ApiError(400, "No file uploaded");
   const { workspaceId, taskId } = req.params;
   const task = await prisma.task.findUnique({ where: { id: taskId } });
@@ -188,6 +190,7 @@ async function getOrCreateChatFolder(conversation, userId) {
 // "can this user share files in this conversation" (only participants get a
 // folder for it in the first place).
 export async function uploadChatAttachment(req, res) {
+  assertStorageConfigured();
   if (!req.file) throw new ApiError(400, "No file uploaded");
   const workspaceId = req.params.workspaceId;
   const { conversationId } = req.body;
@@ -234,6 +237,7 @@ export async function uploadChatAttachment(req, res) {
 // Adds a new version directly to an existing asset — used when a file is
 // dropped from the OS straight onto an existing card.
 export async function uploadVersion(req, res) {
+  assertStorageConfigured();
   if (!req.file) throw new ApiError(400, "No file uploaded");
   const { workspaceId, assetId } = req.params;
 
@@ -300,6 +304,7 @@ export async function mergeAssets(req, res) {
 }
 
 export async function downloadVersion(req, res) {
+  assertStorageConfigured();
   const { workspaceId, assetId, versionId } = req.params;
   const version = await prisma.assetVersion.findUnique({
     where: { id: versionId },
