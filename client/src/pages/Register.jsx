@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/common/AuthLayout.jsx";
 import GoogleSignInButton from "../components/common/GoogleSignInButton.jsx";
 import PasswordInput from "../components/common/PasswordInput.jsx";
+import TermsModal from "../components/common/TermsModal.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { apiErrorMessage } from "../api/client.js";
 
@@ -14,6 +15,7 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [agreed, setAgreed] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { register, loginWithGoogle } = useAuth();
@@ -73,13 +75,25 @@ export default function Register() {
           <input
             type="checkbox"
             checked={agreed}
-            onChange={(e) => setAgreed(e.target.checked)}
+            onChange={() => {}}
+            onClick={(e) => {
+              e.preventDefault();
+              if (agreed) setAgreed(false);
+              else setTermsOpen(true);
+            }}
             required
             className="mt-0.5 h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500/40"
           />
-          I agree to the <span className="font-medium text-brand-600">Terms</span> and{" "}
-          <span className="font-medium text-brand-600">Privacy Policy</span>
+          I agree to the{" "}
+          <button type="button" onClick={() => setTermsOpen(true)} className="font-medium text-brand-600 hover:underline">
+            Terms
+          </button>{" "}
+          and{" "}
+          <button type="button" onClick={() => setTermsOpen(true)} className="font-medium text-brand-600 hover:underline">
+            Privacy Policy
+          </button>
         </label>
+        <TermsModal open={termsOpen} onClose={() => setTermsOpen(false)} onAgree={() => setAgreed(true)} />
         <button type="submit" disabled={loading} className="btn-primary w-full">
           {loading ? "Creating account…" : "Create account"}
         </button>
