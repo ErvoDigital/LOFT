@@ -108,7 +108,6 @@ export default function Profile() {
           </div>
           <div>
             <p className="text-sm font-medium text-ink-700 dark:text-ink-200">{user?.email}</p>
-            <p className="text-xs text-ink-400">Email cannot be changed</p>
             {user?.avatarUrl && (
               <button
                 type="button"

@@ -22,6 +22,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useMeeting } from "../context/MeetingContext.jsx";
 import { useWorkspaces } from "../context/WorkspaceContext.jsx";
 import * as conversationsApi from "../api/conversations.js";
+import * as eventsApi from "../api/events.js";
 import VideoTile from "../components/meeting/VideoTile.jsx";
 import ChatThread from "../components/chat/ChatThread.jsx";
 import Modal from "../components/common/Modal.jsx";
@@ -208,11 +209,45 @@ export default function WorkspaceMeeting() {
   // The only "meet link" concept LOFT has — this workspace's own meeting
   // room, shareable as a plain URL rather than a separate per-meeting id.
   const meetLink = `${window.location.origin}/workspaces/${workspaceId}/meeting`;
+  // The nearest upcoming/ongoing calendar event that was scheduled as a
+  // meeting (its location is this workspace's meet link) — used purely to
+  // decide whether there's anything worth sharing yet; see meetLinkAvailable.
+  const [scheduledMeeting, setScheduledMeeting] = useState(null);
 
   const inThisWorkspacesCall = joined && activeWorkspaceId === workspaceId;
   const inAnotherWorkspacesCall = joined && activeWorkspaceId !== workspaceId;
   const lobbyForThisWorkspace = lobbyOpen && pendingWorkspaceId === workspaceId;
   const confirmForThisWorkspace = confirmWorkspaceId === workspaceId;
+  // The meeting link only means anything once there's actually a meeting to
+  // join — either it's live right now, or a future one has been scheduled
+  // (which is what stamps the link into an Event's location in the first
+  // place, via ScheduleMeetingModal). Otherwise Settings hides it entirely.
+  const meetingIsLive = inThisWorkspacesCall || preJoinCount > 0;
+  const meetLinkAvailable = meetingIsLive || !!scheduledMeeting;
+
+  const loadScheduledMeeting = useCallback(() => {
+    eventsApi.listWorkspaceEvents(workspaceId).then((events) => {
+      const now = new Date();
+      const upcoming = events
+        .filter((e) => e.location === meetLink && new Date(e.endTime) >= now)
+        .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+      setScheduledMeeting(upcoming[0] || null);
+    });
+  }, [workspaceId, meetLink]);
+
+  useEffect(() => {
+    loadScheduledMeeting();
+  }, [loadScheduledMeeting]);
+
+  // Picks up a meeting scheduled (or cancelled) just now, from this tab or
+  // any other member's, without waiting for a page reload.
+  useEffect(() => {
+    if (!socket) return;
+    const handler = () => loadScheduledMeeting();
+    const socketEvents = ["event:created", "event:updated", "event:cancelled"];
+    socketEvents.forEach((e) => socket.on(e, handler));
+    return () => socketEvents.forEach((e) => socket.off(e, handler));
+  }, [socket, loadScheduledMeeting]);
 
   // A dedicated "Meeting Chat" channel, separate from General, so meeting
   // chatter doesn't mix into regular workspace chat history — created (and/or
@@ -344,7 +379,7 @@ export default function WorkspaceMeeting() {
           </div>
         </div>
 
-        <MeetingSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} meetLink={meetLink} />
+        <MeetingSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} meetLink={meetLinkAvailable ? meetLink : null} />
         <ScheduleMeetingModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} workspaceId={workspaceId} meetLink={meetLink} />
 
         <Modal open={confirmForThisWorkspace} onClose={cancelConfirm} title="" width="max-w-sm">
@@ -548,7 +583,7 @@ export default function WorkspaceMeeting() {
         </div>
 
         <MicRequestModal open={micRequestOpen} onCancel={cancelMicRequest} onConfirm={confirmEnableMic} />
-        <MeetingSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} meetLink={meetLink} />
+        <MeetingSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} meetLink={meetLinkAvailable ? meetLink : null} />
         <ScheduleMeetingModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} workspaceId={workspaceId} meetLink={meetLink} />
       </div>
 
