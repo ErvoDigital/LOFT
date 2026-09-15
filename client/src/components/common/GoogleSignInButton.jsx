@@ -15,7 +15,12 @@ export default function GoogleSignInButton({ onCredential, onSuccess, onError, d
           <div className="h-px flex-1 bg-ink-100" />
         </div>
       )}
-      <div className="w-full [&>div]:!w-full">
+      {/* Google's rendered button (especially its "Sign in as <name>" auto-select
+          chip when a session is already active) doesn't reliably stretch to
+          width="100%" — it renders at its own intrinsic width regardless, so
+          centering has to happen on this wrapper via flexbox rather than by
+          forcing the button itself to fill the row. */}
+      <div className="flex w-full justify-center">
         <GoogleLogin
           onSuccess={async (credentialResponse) => {
             try {
@@ -26,7 +31,6 @@ export default function GoogleSignInButton({ onCredential, onSuccess, onError, d
             }
           }}
           onError={() => onError?.("Google sign-in failed. Please try again.")}
-          width="100%"
           logo_alignment="center"
         />
       </div>
