@@ -10,6 +10,7 @@ import { publicUser } from "../utils/publicUser.js";
 const registerSchema = z.object({
   name: z.string().min(2).max(80),
   email: z.string().email(),
+  phone: z.string().trim().max(30).optional(),
   password: z.string().min(8).max(200),
 });
 
@@ -28,7 +29,7 @@ const resetSchema = z.object({
 });
 
 export async function register(req, res) {
-  const { name, email, password } = registerSchema.parse(req.body);
+  const { name, email, phone, password } = registerSchema.parse(req.body);
 
   const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
   if (existing) throw new ApiError(409, "An account with this email already exists");
@@ -39,6 +40,7 @@ export async function register(req, res) {
     data: {
       name,
       email: email.toLowerCase(),
+      phone: phone || null,
       passwordHash,
       avatarColor: colors[Math.floor(Math.random() * colors.length)],
     },

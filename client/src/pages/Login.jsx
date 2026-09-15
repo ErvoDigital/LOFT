@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import AuthLayout from "../components/common/AuthLayout.jsx";
 import GoogleSignInButton from "../components/common/GoogleSignInButton.jsx";
+import PasswordInput from "../components/common/PasswordInput.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { apiErrorMessage } from "../api/client.js";
 
@@ -43,7 +44,7 @@ export default function Login() {
               Forgot password?
             </Link>
           </div>
-          <input type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
         <button type="submit" disabled={loading} className="btn-primary w-full">
           {loading ? "Signing in…" : "Sign in"}
