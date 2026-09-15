@@ -42,6 +42,7 @@ model User {
   createdTasks         Task[]                    @relation("TaskCreator")
   assignedTasks        Task[]                    @relation("TaskAssignee")
   sentMessages         Message[]                 @relation("MessageSender")
+  messageReactions     MessageReaction[]
   conversations        ConversationParticipant[]
   createdConversations Conversation[]            @relation("ConversationCreator")
   notifications        Notification[]
@@ -225,9 +226,27 @@ model Message {
   attachmentAssetId String?
   createdAt         DateTime @default(now())
 
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User         @relation("MessageSender", fields: [senderId], references: [id])
-  attachment   Asset?       @relation(fields: [attachmentAssetId], references: [id], onDelete: SetNull)
+  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User              @relation("MessageSender", fields: [senderId], references: [id])
+  attachment   Asset?            @relation(fields: [attachmentAssetId], references: [id], onDelete: SetNull)
+  reactions    MessageReaction[]
+}
+
+// One row per (message, user, emoji) — a user can react to the same message
+// with several different emoji, but not stack the same one twice. Toggled
+// on/off by the reaction handlers in chat.socket.js / realtime's index.js
+// rather than ever updated in place.
+model MessageReaction {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
 }
 
 model Notification {

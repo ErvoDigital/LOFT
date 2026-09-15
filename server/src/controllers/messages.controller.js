@@ -8,6 +8,13 @@ const sendSchema = z.object({
   attachmentAssetId: z.string().optional(),
 });
 
+// A single pictograph, optionally followed by a variation selector, skin-tone
+// modifier, or ZWJ-joined pictographs (covers "👍🏽", "❤️", "👨‍👩‍👧‍👦", and
+// everything in EmojiPicker's own list). Re-validated here rather than
+// trusted as-is since this is an API endpoint, not just a UI constraint.
+const EMOJI_RE = /^\p{Extended_Pictographic}(?:\p{Emoji_Modifier}|️|‍\p{Extended_Pictographic})*$/u;
+const reactSchema = z.object({ emoji: z.string().max(32).regex(EMOJI_RE, "Invalid emoji") });
+
 // See the matching helper in sockets/chat.socket.js — kept in sync there and
 // in realtime/src/index.js (the raw-WebSocket service that actually handles
 // message:send in production; this REST path exists alongside it, not
@@ -45,7 +52,25 @@ function serializeAttachment(asset) {
 const messageInclude = {
   sender: { select: { id: true, name: true, avatarColor: true, avatarUrl: true } },
   attachment: { include: { versions: { orderBy: { version: "desc" }, take: 1 } } },
+  reactions: { include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: "asc" } },
 };
+
+// Groups flat reaction rows into one entry per emoji, in the order each
+// emoji was first used on this message. The client derives count/"mine"
+// from `users` itself rather than trusting a precomputed viewer-specific
+// flag, since this same shape is broadcast unchanged to every participant.
+function serializeReactions(reactions) {
+  const order = [];
+  const byEmoji = new Map();
+  for (const r of reactions) {
+    if (!byEmoji.has(r.emoji)) {
+      byEmoji.set(r.emoji, []);
+      order.push(r.emoji);
+    }
+    byEmoji.get(r.emoji).push({ id: r.user.id, name: r.user.name });
+  }
+  return order.map((emoji) => ({ emoji, users: byEmoji.get(emoji) }));
+}
 
 function serializeMessage(message) {
   return {
@@ -55,6 +80,7 @@ function serializeMessage(message) {
     createdAt: message.createdAt,
     sender: message.sender,
     attachment: serializeAttachment(message.attachment),
+    reactions: message.reactions ? serializeReactions(message.reactions) : [],
   };
 }
 
@@ -168,6 +194,35 @@ export async function sendMessageRest(req, res) {
   );
 
   res.status(201).json({ message: serializeMessage(message) });
+}
+
+// Toggles the caller's own reaction: adding it if they haven't reacted with
+// this emoji yet, removing it if they have. Mirrored in chat.socket.js and
+// realtime/src/index.js, which is what the web client actually calls.
+export async function toggleReaction(req, res) {
+  const { emoji } = reactSchema.parse(req.body);
+  const { conversationId, messageId } = req.params;
+  await assertParticipant(conversationId, req.userId);
+
+  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  if (!message || message.conversationId !== conversationId) throw new ApiError(404, "Message not found");
+
+  const existing = await prisma.messageReaction.findUnique({
+    where: { messageId_userId_emoji: { messageId, userId: req.userId, emoji } },
+  });
+  if (existing) {
+    await prisma.messageReaction.delete({ where: { id: existing.id } });
+  } else {
+    await prisma.messageReaction.create({ data: { messageId, userId: req.userId, emoji } });
+  }
+
+  const reactions = await prisma.messageReaction.findMany({
+    where: { messageId },
+    include: { user: { select: { id: true, name: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+
+  res.json({ messageId, reactions: serializeReactions(reactions) });
 }
 
 export async function startDirectMessage(req, res) {

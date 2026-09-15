@@ -8,6 +8,7 @@ router.use(requireAuth);
 router.get("/conversations", messagesController.listConversations);
 router.get("/conversations/:conversationId/messages", messagesController.getMessages);
 router.post("/conversations/:conversationId/messages", messagesController.sendMessageRest);
+router.post("/conversations/:conversationId/messages/:messageId/reactions", messagesController.toggleReaction);
 router.post("/dm/:userId", messagesController.startDirectMessage);
 
 export default router;

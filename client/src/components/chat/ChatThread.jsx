@@ -116,6 +116,7 @@ export default function ChatThread({ conversation, headerExtra }) {
   const [attachError, setAttachError] = useState("");
   const [previewing, setPreviewing] = useState(null); // { assetId, version } | null
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [reactionPickerFor, setReactionPickerFor] = useState(null); // messageId | null
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -134,6 +135,7 @@ export default function ChatThread({ conversation, headerExtra }) {
     setTypingUser(null);
     setPendingAttachment(null);
     setMentionState(null);
+    setReactionPickerFor(null);
     messagesApi.getMessages(conversationId).then((msgs) => {
       setMessages(msgs);
       setLoadingMessages(false);
@@ -155,11 +157,17 @@ export default function ChatThread({ conversation, headerExtra }) {
       if (cid !== conversationId || userId === user.id) return;
       setTypingUser(isTyping ? userId : null);
     };
+    const onReaction = ({ conversationId: cid, messageId, reactions }) => {
+      if (cid !== conversationId) return;
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reactions } : m)));
+    };
     socket.on("message:new", onMessage);
     socket.on("typing", onTyping);
+    socket.on("message:reaction", onReaction);
     return () => {
       socket.off("message:new", onMessage);
       socket.off("typing", onTyping);
+      socket.off("message:reaction", onReaction);
     };
   }, [socket, conversationId, user.id]);
 
@@ -217,6 +225,14 @@ export default function ChatThread({ conversation, headerExtra }) {
     requestAnimationFrame(() => {
       inputRef.current?.focus();
       inputRef.current?.setSelectionRange(pos, pos);
+    });
+  }
+
+  function toggleReaction(messageId, emoji) {
+    if (!socket) return;
+    setReactionPickerFor(null);
+    socket.emit("message:react", { conversationId, messageId, emoji }, (res) => {
+      if (res?.error) console.error(res.error);
     });
   }
 
@@ -322,43 +338,88 @@ export default function ChatThread({ conversation, headerExtra }) {
             const mine = m.sender.id === user.id;
             const showAvatar = !mine && (i === 0 || messages[i - 1].sender.id !== m.sender.id);
             return (
-              <div key={m.id} className={`flex items-end gap-2 ${mine ? "flex-row-reverse" : ""}`}>
+              <div key={m.id} className={`group flex items-end gap-2 ${mine ? "flex-row-reverse" : ""}`}>
                 {!mine && <div className="w-7">{showAvatar && <Avatar name={m.sender.name} color={m.sender.avatarColor} size={28} />}</div>}
-                <div
-                  className={`min-w-0 max-w-md rounded-2xl px-3.5 py-2 text-sm shadow-soft ${
-                    mine ? "brand-mark rounded-br-sm text-white" : "rounded-bl-sm border border-ink-200 bg-white text-ink-800"
-                  }`}
-                >
-                  {!mine && conversation.isGroup && <p className="mb-0.5 text-xs font-semibold text-brand-600">{m.sender.name}</p>}
-                  {m.content && <p className="whitespace-pre-wrap break-words">{renderContent(m.content, user.id)}</p>}
-                  {m.attachment && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPreviewing({
-                          assetId: m.attachment.assetId,
-                          version: {
-                            id: m.attachment.versionId,
-                            mimeType: m.attachment.mimeType,
-                            originalName: m.attachment.originalName,
-                            size: m.attachment.size,
-                          },
-                        })
-                      }
-                      className={`mt-1.5 flex w-full max-w-[15rem] items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors ${
-                        mine ? "border-white/30 bg-white/10 hover:bg-white/20" : "border-ink-200 bg-ink-50 hover:bg-ink-100"
-                      }`}
-                    >
-                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${mine ? "bg-white/20 text-white" : "bg-white text-ink-500"}`}>
-                        <AttachmentIcon mimeType={m.attachment.mimeType} className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-xs font-medium ${mine ? "text-white" : "text-ink-700"}`}>{m.attachment.name}</span>
-                        <span className={`block text-[11px] ${mine ? "text-white/70" : "text-ink-400"}`}>{formatSize(m.attachment.size)}</span>
-                      </span>
-                    </button>
+                <div className="flex min-w-0 max-w-md flex-col">
+                  <div
+                    className={`relative min-w-0 rounded-2xl px-3.5 py-2 text-sm shadow-soft ${
+                      mine ? "brand-mark rounded-br-sm text-white" : "rounded-bl-sm border border-ink-200 bg-white text-ink-800"
+                    }`}
+                  >
+                    {!mine && conversation.isGroup && <p className="mb-0.5 text-xs font-semibold text-brand-600">{m.sender.name}</p>}
+                    {m.content && <p className="whitespace-pre-wrap break-words">{renderContent(m.content, user.id)}</p>}
+                    {m.attachment && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPreviewing({
+                            assetId: m.attachment.assetId,
+                            version: {
+                              id: m.attachment.versionId,
+                              mimeType: m.attachment.mimeType,
+                              originalName: m.attachment.originalName,
+                              size: m.attachment.size,
+                            },
+                          })
+                        }
+                        className={`mt-1.5 flex w-full max-w-[15rem] items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors ${
+                          mine ? "border-white/30 bg-white/10 hover:bg-white/20" : "border-ink-200 bg-ink-50 hover:bg-ink-100"
+                        }`}
+                      >
+                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${mine ? "bg-white/20 text-white" : "bg-white text-ink-500"}`}>
+                          <AttachmentIcon mimeType={m.attachment.mimeType} className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className={`block truncate text-xs font-medium ${mine ? "text-white" : "text-ink-700"}`}>{m.attachment.name}</span>
+                          <span className={`block text-[11px] ${mine ? "text-white/70" : "text-ink-400"}`}>{formatSize(m.attachment.size)}</span>
+                        </span>
+                      </button>
+                    )}
+                    <p className={`mt-0.5 text-right text-[10px] ${mine ? "text-white/70" : "text-ink-400"}`}>{timeLabel(m.createdAt)}</p>
+
+                    <div className={`absolute top-1 ${mine ? "-left-8" : "-right-8"}`}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmojiPickerOpen(false);
+                          setReactionPickerFor((id) => (id === m.id ? null : m.id));
+                        }}
+                        title="React"
+                        className={`flex h-6 w-6 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-400 shadow-soft transition-opacity hover:text-ink-600 ${
+                          reactionPickerFor === m.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        }`}
+                      >
+                        <Smile className="h-3.5 w-3.5" />
+                      </button>
+                      {reactionPickerFor === m.id && (
+                        <EmojiPicker onSelect={(emoji) => toggleReaction(m.id, emoji)} onClose={() => setReactionPickerFor(null)} />
+                      )}
+                    </div>
+                  </div>
+
+                  {m.reactions?.length > 0 && (
+                    <div className={`mt-1 flex flex-wrap gap-1 ${mine ? "justify-end" : ""}`}>
+                      {m.reactions.map((r) => {
+                        const mineReacted = r.users.some((u) => u.id === user.id);
+                        return (
+                          <button
+                            key={r.emoji}
+                            type="button"
+                            onClick={() => toggleReaction(m.id, r.emoji)}
+                            title={r.users.map((u) => u.name).join(", ")}
+                            className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs leading-none transition-colors ${
+                              mineReacted
+                                ? "border-brand-400 bg-brand-50 text-brand-700"
+                                : "border-ink-200 bg-white text-ink-600 hover:bg-ink-50"
+                            }`}
+                          >
+                            <span>{r.emoji}</span>
+                            <span className="text-[10px] font-medium">{r.users.length}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
-                  <p className={`mt-0.5 text-right text-[10px] ${mine ? "text-white/70" : "text-ink-400"}`}>{timeLabel(m.createdAt)}</p>
                 </div>
               </div>
             );
@@ -425,7 +486,10 @@ export default function ChatThread({ conversation, headerExtra }) {
           <div className="relative">
             <button
               type="button"
-              onClick={() => setEmojiPickerOpen((o) => !o)}
+              onClick={() => {
+                setReactionPickerFor(null);
+                setEmojiPickerOpen((o) => !o);
+              }}
               title="Add emoji"
               className="btn-ghost !px-2.5 !py-2"
             >

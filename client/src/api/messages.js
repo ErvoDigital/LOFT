@@ -5,3 +5,7 @@ export const getMessages = (conversationId) =>
   api.get(`/messages/conversations/${conversationId}/messages`).then((r) => r.data.messages);
 export const startDirectMessage = (userId) =>
   api.post(`/messages/dm/${userId}`).then((r) => r.data.conversationId);
+export const toggleReaction = (conversationId, messageId, emoji) =>
+  api
+    .post(`/messages/conversations/${conversationId}/messages/${messageId}/reactions`, { emoji })
+    .then((r) => r.data.reactions);

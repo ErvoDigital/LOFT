@@ -27,6 +27,23 @@ function plainTextPreview(content) {
   return content.replace(MENTION_RE, "@$1").trim();
 }
 
+// Kept in sync with the identical helper in messages.controller.js and
+// realtime/src/index.js — see the note on EMOJI_RE there for what it allows.
+const EMOJI_RE = /^\p{Extended_Pictographic}(?:\p{Emoji_Modifier}|️|‍\p{Extended_Pictographic})*$/u;
+
+function serializeReactions(reactions) {
+  const order = [];
+  const byEmoji = new Map();
+  for (const r of reactions) {
+    if (!byEmoji.has(r.emoji)) {
+      byEmoji.set(r.emoji, []);
+      order.push(r.emoji);
+    }
+    byEmoji.get(r.emoji).push({ id: r.user.id, name: r.user.name });
+  }
+  return order.map((emoji) => ({ emoji, users: byEmoji.get(emoji) }));
+}
+
 function serializeAttachment(asset) {
   if (!asset) return null;
   const latest = asset.versions[0];
@@ -125,6 +142,7 @@ export function initSockets(httpServer, corsOrigin) {
           createdAt: message.createdAt,
           sender: message.sender,
           attachment: serializeAttachment(message.attachment),
+          reactions: [],
         };
 
         io.to(`conversation:${conversationId}`).emit("message:new", payload);
@@ -153,6 +171,44 @@ export function initSockets(httpServer, corsOrigin) {
       } catch (err) {
         console.error("message:send failed", err);
         ack?.({ error: "Failed to send message" });
+      }
+    });
+
+    socket.on("message:react", async ({ conversationId, messageId, emoji }, ack) => {
+      try {
+        if (!conversationId || !messageId || typeof emoji !== "string" || !EMOJI_RE.test(emoji)) {
+          return ack?.({ error: "Invalid reaction" });
+        }
+
+        const message = await prisma.message.findUnique({ where: { id: messageId } });
+        if (!message || message.conversationId !== conversationId) return ack?.({ error: "Message not found" });
+
+        const participants = await prisma.conversationParticipant.findMany({ where: { conversationId } });
+        if (!participants.some((p) => p.userId === socket.userId)) {
+          return ack?.({ error: "Not part of this conversation" });
+        }
+
+        const existing = await prisma.messageReaction.findUnique({
+          where: { messageId_userId_emoji: { messageId, userId: socket.userId, emoji } },
+        });
+        if (existing) {
+          await prisma.messageReaction.delete({ where: { id: existing.id } });
+        } else {
+          await prisma.messageReaction.create({ data: { messageId, userId: socket.userId, emoji } });
+        }
+
+        const reactions = await prisma.messageReaction.findMany({
+          where: { messageId },
+          include: { user: { select: { id: true, name: true } } },
+          orderBy: { createdAt: "asc" },
+        });
+
+        const payload = { conversationId, messageId, reactions: serializeReactions(reactions) };
+        io.to(`conversation:${conversationId}`).emit("message:reaction", payload);
+        ack?.(payload);
+      } catch (err) {
+        console.error("message:react failed", err);
+        ack?.({ error: "Failed to update reaction" });
       }
     });
 

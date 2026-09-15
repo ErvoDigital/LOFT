@@ -225,6 +225,7 @@ async function handleMessageSend(conn, data) {
     createdAt: insertRes.rows[0].createdAt,
     sender: { id: conn.userId, name: conn.name, avatarColor: conn.avatarColor, avatarUrl: conn.avatarUrl },
     attachment,
+    reactions: [],
   };
 
   await publish(`conversation:${conversationId}`, "message:new", payload);
@@ -248,6 +249,72 @@ async function handleMessageSend(conn, data) {
   );
 
   return { message: payload };
+}
+
+// Kept in sync with the identical helper in server/src/controllers/messages.
+// controller.js and server/src/sockets/chat.socket.js — see the note there
+// for what it allows.
+const EMOJI_RE = /^\p{Extended_Pictographic}(?:\p{Emoji_Modifier}|️|‍\p{Extended_Pictographic})*$/u;
+
+function groupReactions(rows) {
+  const order = [];
+  const byEmoji = new Map();
+  for (const r of rows) {
+    if (!byEmoji.has(r.emoji)) {
+      byEmoji.set(r.emoji, []);
+      order.push(r.emoji);
+    }
+    byEmoji.get(r.emoji).push({ id: r.userId, name: r.name });
+  }
+  return order.map((emoji) => ({ emoji, users: byEmoji.get(emoji) }));
+}
+
+// Toggles conn's own reaction on a message: adds it if absent, removes it if
+// already there. Mirrored in messages.controller.js (REST) and
+// chat.socket.js (socket.io dev path) — this raw-SQL version is what
+// production actually calls.
+async function handleMessageReact(conn, data) {
+  const conversationId = data?.conversationId;
+  const messageId = data?.messageId;
+  const emoji = data?.emoji;
+  if (!conversationId || !messageId || typeof emoji !== "string" || !EMOJI_RE.test(emoji)) {
+    return { error: "Invalid reaction" };
+  }
+
+  const msgRes = await pool.query(`SELECT id, "conversationId" FROM "Message" WHERE id=$1`, [messageId]);
+  const message = msgRes.rows[0];
+  if (!message || message.conversationId !== conversationId) return { error: "Message not found" };
+
+  const partRes = await pool.query(`SELECT "userId" FROM "ConversationParticipant" WHERE "conversationId"=$1`, [
+    conversationId,
+  ]);
+  const participantIds = partRes.rows.map((r) => r.userId);
+  if (!participantIds.includes(conn.userId)) return { error: "Not part of this conversation" };
+
+  const existingRes = await pool.query(
+    `SELECT id FROM "MessageReaction" WHERE "messageId"=$1 AND "userId"=$2 AND emoji=$3`,
+    [messageId, conn.userId, emoji]
+  );
+  if (existingRes.rows[0]) {
+    await pool.query(`DELETE FROM "MessageReaction" WHERE id=$1`, [existingRes.rows[0].id]);
+  } else {
+    await pool.query(
+      `INSERT INTO "MessageReaction" (id, "messageId", "userId", emoji, "createdAt") VALUES ($1,$2,$3,$4,now())`,
+      [crypto.randomUUID(), messageId, conn.userId, emoji]
+    );
+  }
+
+  const rowsRes = await pool.query(
+    `SELECT mr.emoji, u.id AS "userId", u.name
+     FROM "MessageReaction" mr JOIN "User" u ON u.id = mr."userId"
+     WHERE mr."messageId" = $1
+     ORDER BY mr."createdAt" ASC`,
+    [messageId]
+  );
+
+  const payload = { conversationId, messageId, reactions: groupReactions(rowsRes.rows) };
+  await publish(`conversation:${conversationId}`, "message:reaction", payload);
+  return payload;
 }
 
 function handleTyping(conn, data) {
@@ -493,6 +560,8 @@ async function dispatch(conn, event, data) {
       return;
     case "message:send":
       return handleMessageSend(conn, data);
+    case "message:react":
+      return handleMessageReact(conn, data);
     case "typing":
       handleTyping(conn, data);
       return;
