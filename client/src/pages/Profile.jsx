@@ -92,7 +92,7 @@ export default function Profile() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <div className="card p-6">
-        <h2 className="mb-4 text-base font-semibold text-ink-800">Profile</h2>
+        <h2 className="mb-4 text-base font-semibold text-ink-800 dark:text-ink-100">Profile</h2>
         <div className="mb-5 flex items-center gap-4">
           <div className="relative shrink-0">
             <Avatar name={name} color={color} size={56} src={user?.avatarUrl} />
@@ -107,7 +107,7 @@ export default function Profile() {
             </button>
           </div>
           <div>
-            <p className="text-sm font-medium text-ink-700">{user?.email}</p>
+            <p className="text-sm font-medium text-ink-700 dark:text-ink-200">{user?.email}</p>
             <p className="text-xs text-ink-400">Email cannot be changed</p>
             {user?.avatarUrl && (
               <button
@@ -121,16 +121,16 @@ export default function Profile() {
             )}
           </div>
         </div>
-        {avatarError && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{avatarError}</p>}
+        {avatarError && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{avatarError}</p>}
         <form onSubmit={saveProfile} className="space-y-3">
-          {profileMsg && <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">{profileMsg}</p>}
-          {profileError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{profileError}</p>}
+          {profileMsg && <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">{profileMsg}</p>}
+          {profileError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{profileError}</p>}
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Nickname</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Nickname</label>
             <input className="input max-w-sm" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Avatar color</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Avatar color</label>
             <p className="mb-2 text-xs text-ink-400">Used for your initials when you don't have a photo.</p>
             <div className="flex gap-2">
               {COLORS.map((c) => (
@@ -151,11 +151,11 @@ export default function Profile() {
       </div>
 
       <div className="card p-6">
-        <h2 className="mb-4 text-base font-semibold text-ink-800">Sign-in methods</h2>
+        <h2 className="mb-4 text-base font-semibold text-ink-800 dark:text-ink-100">Sign-in methods</h2>
 
-        <div className="mb-5 flex items-center justify-between rounded-lg border border-ink-100 px-4 py-3">
+        <div className="mb-5 flex items-center justify-between rounded-lg border border-ink-100 px-4 py-3 dark:border-ink-700">
           <div>
-            <p className="text-sm font-medium text-ink-700">Google</p>
+            <p className="text-sm font-medium text-ink-700 dark:text-ink-200">Google</p>
             <p className="text-xs text-ink-400">
               {user?.googleLinked ? "Connected — you can sign in with Google." : "Not connected."}
             </p>
@@ -166,7 +166,7 @@ export default function Profile() {
               onClick={disconnectGoogle}
               disabled={unlinking || !user?.hasPassword}
               title={!user?.hasPassword ? "Set a password below first, so you don't lose access" : undefined}
-              className="text-sm font-medium text-red-600 hover:underline disabled:cursor-not-allowed disabled:text-ink-300 disabled:no-underline"
+              className="text-sm font-medium text-red-600 hover:underline disabled:cursor-not-allowed disabled:text-ink-300 disabled:no-underline dark:text-red-400"
             >
               {unlinking ? "Disconnecting…" : "Disconnect"}
             </button>
@@ -182,17 +182,17 @@ export default function Profile() {
             />
           )}
         </div>
-        {googleMsg && <p className="mb-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">{googleMsg}</p>}
-        {googleError && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{googleError}</p>}
+        {googleMsg && <p className="mb-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">{googleMsg}</p>}
+        {googleError && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{googleError}</p>}
 
         <div className="max-w-sm space-y-3">
-          <p className="text-sm font-medium text-ink-700">{user?.hasPassword ? "Password" : "Set a password"}</p>
+          <p className="text-sm font-medium text-ink-700 dark:text-ink-200">{user?.hasPassword ? "Password" : "Set a password"}</p>
           {!user?.hasPassword && (
             <p className="text-xs text-ink-400">
               Your account currently only signs in with Google. Set a password to be able to sign in with your email too.
             </p>
           )}
-          {passwordMsg && <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">{passwordMsg}</p>}
+          {passwordMsg && <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">{passwordMsg}</p>}
           <button type="button" onClick={() => setPasswordModalOpen(true)} className="btn-primary">
             {user?.hasPassword ? "Change password" : "Set a password"}
           </button>

@@ -30,13 +30,13 @@ function NotificationToast({ toast, onDismiss }) {
         onDismiss(toast.id);
         if (toast.link) navigate(toast.link);
       }}
-      className="animate-toast-in relative flex w-80 cursor-pointer items-start gap-2.5 overflow-hidden rounded-xl border border-ink-200 bg-white p-3 pb-3.5 shadow-panel"
+      className="animate-toast-in relative flex w-80 cursor-pointer items-start gap-2.5 overflow-hidden rounded-xl border border-ink-200 bg-white p-3 pb-3.5 shadow-panel dark:border-ink-700 dark:bg-ink-800"
     >
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-600">
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300">
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-ink-800">{toast.title}</p>
+        <p className="truncate text-sm font-semibold text-ink-800 dark:text-ink-100">{toast.title}</p>
         {toast.body && <p className="mt-0.5 line-clamp-2 text-xs text-ink-500">{toast.body}</p>}
       </div>
       <div className="flex shrink-0 flex-col items-center gap-1.5">
@@ -46,7 +46,7 @@ function NotificationToast({ toast, onDismiss }) {
             e.stopPropagation();
             onDismiss(toast.id);
           }}
-          className="rounded p-0.5 text-ink-300 hover:bg-ink-100 hover:text-ink-600"
+          className="rounded p-0.5 text-ink-300 hover:bg-ink-100 hover:text-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-100"
           aria-label="Dismiss"
         >
           <X className="h-3.5 w-3.5" />

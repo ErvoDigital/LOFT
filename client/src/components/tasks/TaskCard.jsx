@@ -27,12 +27,12 @@ export default function TaskCard({ task, onClick, onEdit, dragHandlers, dragging
       }}
       draggable
       {...dragHandlers}
-      className={`group w-full cursor-grab rounded-lg border bg-white p-3 text-left shadow-soft transition-all hover:border-brand-300 hover:shadow-panel focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 active:cursor-grabbing ${
-        task.isPinned ? "border-brand-300 ring-1 ring-brand-100" : "border-ink-200"
+      className={`group w-full cursor-grab rounded-lg border bg-white p-3 text-left shadow-soft transition-all hover:border-brand-300 hover:shadow-panel focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 active:cursor-grabbing dark:bg-ink-800 ${
+        task.isPinned ? "border-brand-300 ring-1 ring-brand-100" : "border-ink-200 dark:border-ink-700"
       } ${dragging ? "opacity-40" : ""} ${task.isSnoozed ? "opacity-60" : ""}`}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <p className="flex min-w-0 items-center gap-1 text-sm font-medium text-ink-800">
+        <p className="flex min-w-0 items-center gap-1 text-sm font-medium text-ink-800 dark:text-ink-100">
           {task.isPinned && <Pin className="h-3 w-3 shrink-0 text-brand-600" />}
           {task.isSnoozed && <Moon className="h-3 w-3 shrink-0 text-ink-400" />}
           <span className="truncate">{task.title}</span>
@@ -47,7 +47,7 @@ export default function TaskCard({ task, onClick, onEdit, dragHandlers, dragging
                 onEdit();
               }}
               title="Edit task"
-              className="rounded-md p-1 text-ink-300 opacity-0 transition-opacity hover:bg-ink-100 hover:text-ink-600 group-hover:opacity-100 focus:opacity-100"
+              className="rounded-md p-1 text-ink-300 opacity-0 transition-opacity hover:bg-ink-100 hover:text-ink-600 group-hover:opacity-100 focus:opacity-100 dark:hover:bg-ink-700 dark:hover:text-ink-100"
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
@@ -70,7 +70,7 @@ export default function TaskCard({ task, onClick, onEdit, dragHandlers, dragging
         {task.assignee ? (
           <Avatar name={task.assignee.name} color={task.assignee.avatarColor} size={22} />
         ) : (
-          <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border border-dashed border-ink-200 text-[10px] text-ink-300">
+          <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border border-dashed border-ink-200 text-[10px] text-ink-300 dark:border-ink-700">
             ?
           </span>
         )}

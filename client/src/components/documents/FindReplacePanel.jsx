@@ -91,7 +91,7 @@ export default function FindReplacePanel({ editor, onClose }) {
             if (e.key === "Escape") onClose();
           }}
         />
-        <button onClick={onClose} title="Close" aria-label="Close find and replace" className="shrink-0 rounded-lg p-1.5 text-ink-400 hover:bg-ink-100">
+        <button onClick={onClose} title="Close" aria-label="Close find and replace" className="shrink-0 rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 dark:hover:bg-ink-700">
           <X className="h-4 w-4" />
         </button>
       </div>

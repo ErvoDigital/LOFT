@@ -44,20 +44,20 @@ export default function NewChannelModal({ open, onClose, workspaceId, members, o
   return (
     <Modal open={open} onClose={onClose} title="New group chat">
       <form onSubmit={handleSubmit} className="space-y-3">
-        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-600">Channel name</label>
+          <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Channel name</label>
           <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Design, Announcements" required autoFocus />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-600">Members</label>
-          <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-ink-200 bg-ink-50 p-1.5">
+          <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Members</label>
+          <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-ink-200 bg-ink-50 p-1.5 dark:border-ink-700 dark:bg-ink-900">
             {others.length === 0 && <p className="px-2 py-2 text-xs text-ink-400">No other members in this workspace yet.</p>}
             {others.map((m) => (
-              <label key={m.user.id} className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-white">
+              <label key={m.user.id} className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-white dark:hover:bg-ink-700">
                 <input type="checkbox" checked={memberIds.includes(m.user.id)} onChange={() => toggle(m.user.id)} className="accent-brand-600" />
                 <Avatar name={m.user.name} color={m.user.avatarColor} src={m.user.avatarUrl} size={26} />
-                <span className="text-sm text-ink-700">{m.user.name}</span>
+                <span className="text-sm text-ink-700 dark:text-ink-200">{m.user.name}</span>
               </label>
             ))}
           </div>

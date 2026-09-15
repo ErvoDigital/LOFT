@@ -29,8 +29,8 @@ export default function ActivityFeed({ activity }) {
         <div key={a.id} className="flex items-start gap-3">
           <Avatar name={a.sender?.name} color={a.sender?.avatarColor} size={28} />
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-ink-600">
-              <span className="font-medium text-ink-800">{a.sender?.name}</span> in{" "}
+            <p className="text-sm text-ink-600 dark:text-ink-300">
+              <span className="font-medium text-ink-800 dark:text-ink-100">{a.sender?.name}</span> in{" "}
               <span className="text-ink-500">{a.workspaceName}</span>
             </p>
             <p className="truncate text-sm text-ink-500">{a.content}</p>

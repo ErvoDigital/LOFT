@@ -3,9 +3,9 @@ import { CheckCircle2 } from "lucide-react";
 import EmptyState from "../common/EmptyState.jsx";
 
 const SEVERITY_STYLES = {
-  high: { border: "border-red-200", bg: "bg-red-50", dot: "bg-red-500", text: "text-red-700" },
-  medium: { border: "border-accent-200", bg: "bg-accent-50", dot: "bg-accent-500", text: "text-accent-700" },
-  low: { border: "border-ink-200", bg: "bg-ink-50", dot: "bg-ink-400", text: "text-ink-600" },
+  high: { border: "border-red-200", bg: "bg-red-50 dark:bg-red-500/10", dot: "bg-red-500", text: "text-red-700 dark:text-red-400" },
+  medium: { border: "border-accent-200", bg: "bg-accent-50 dark:bg-accent-500/15", dot: "bg-accent-500", text: "text-accent-700 dark:text-accent-400" },
+  low: { border: "border-ink-200 dark:border-ink-700", bg: "bg-ink-50 dark:bg-ink-900", dot: "bg-ink-400", text: "text-ink-600 dark:text-ink-300" },
 };
 
 function ConflictItemLink({ item }) {
@@ -14,7 +14,7 @@ function ConflictItemLink({ item }) {
   return (
     <Link
       to={to}
-      className="inline-flex items-center gap-1 rounded-md border border-ink-200 bg-white px-2 py-1 text-xs font-medium text-ink-600 hover:border-ink-300"
+      className="inline-flex items-center gap-1 rounded-md border border-ink-200 bg-white px-2 py-1 text-xs font-medium text-ink-600 hover:border-ink-300 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600"
     >
       <span className="truncate max-w-[10rem]">{item.title}</span>
       <span className="text-ink-400">· {item.workspaceName}</span>
@@ -25,11 +25,11 @@ function ConflictItemLink({ item }) {
 export default function ConflictsPanel({ conflicts }) {
   if (!conflicts || conflicts.length === 0) {
     return (
-      <div className="card flex items-center gap-3 border-brand-200 bg-brand-50 p-4">
+      <div className="card flex items-center gap-3 border-brand-200 bg-brand-50 p-4 dark:bg-brand-500/15">
         <CheckCircle2 className="h-5 w-5 shrink-0 text-brand-600" />
         <div>
-          <p className="text-sm font-medium text-brand-800">No conflicts across your workspaces</p>
-          <p className="text-xs text-brand-700/80">LOFT is watching every deadline and meeting for overlaps — you're clear for the next two weeks.</p>
+          <p className="text-sm font-medium text-brand-800 dark:text-brand-300">No conflicts across your workspaces</p>
+          <p className="text-xs text-brand-700/80 dark:text-brand-300/80">LOFT is watching every deadline and meeting for overlaps — you're clear for the next two weeks.</p>
         </div>
       </div>
     );

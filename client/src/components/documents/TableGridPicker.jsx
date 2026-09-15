@@ -20,7 +20,7 @@ export default function TableGridPicker({ onInsert }) {
               key={`${row}-${col}`}
               onMouseEnter={() => setHover({ rows: row, cols: col })}
               onClick={() => onInsert(row, col)}
-              className={`h-4 w-4 cursor-pointer border ${active ? "border-brand-500 bg-brand-100" : "border-ink-200 bg-white"}`}
+              className={`h-4 w-4 cursor-pointer border ${active ? "border-brand-500 bg-brand-100" : "border-ink-200 bg-white dark:border-ink-700 dark:bg-ink-800"}`}
             />
           );
         })}

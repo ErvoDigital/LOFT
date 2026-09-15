@@ -33,11 +33,11 @@ export default function UpcomingEvents({ events }) {
         <Link
           key={e.id}
           to={`/workspaces/${e.workspaceId}/calendar`}
-          className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-ink-50"
+          className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-ink-50 dark:hover:bg-ink-700"
         >
           <div className="h-8 w-1 shrink-0 rounded-full" style={{ backgroundColor: e.workspaceColor || "#4F46E5" }} />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-ink-800">{e.title}</p>
+            <p className="truncate text-sm font-medium text-ink-800 dark:text-ink-100">{e.title}</p>
             <p className="truncate text-xs text-ink-400">{e.workspaceName}</p>
           </div>
           <p className="shrink-0 text-xs font-medium text-ink-500">{formatWhen(e.startTime)}</p>

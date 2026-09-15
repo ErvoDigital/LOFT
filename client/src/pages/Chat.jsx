@@ -55,24 +55,24 @@ export default function Chat() {
   return (
     <div className="flex h-full">
       <div
-        className={`flex shrink-0 flex-col border-r border-ink-200 bg-white transition-[width] duration-150 ${
+        className={`flex shrink-0 flex-col border-r border-ink-200 bg-white transition-[width] duration-150 dark:border-ink-700 dark:bg-ink-800 ${
           collapsed ? "w-16 items-center" : "w-72"
         }`}
       >
-        <div className={`flex items-center border-b border-ink-200 p-4 ${collapsed ? "flex-col gap-2" : "justify-between"}`}>
-          {!collapsed && <h2 className="text-sm font-semibold text-ink-800">Messages</h2>}
+        <div className={`flex items-center border-b border-ink-200 p-4 dark:border-ink-700 ${collapsed ? "flex-col gap-2" : "justify-between"}`}>
+          {!collapsed && <h2 className="text-sm font-semibold text-ink-800 dark:text-ink-100">Messages</h2>}
           <div className={`flex items-center gap-1 ${collapsed ? "flex-col" : ""}`}>
             <button
               onClick={() => setDmModalOpen(true)}
               title="New conversation"
-              className={collapsed ? "rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700" : "btn-ghost !px-2 !py-1 text-xs"}
+              className={collapsed ? "rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-700 dark:hover:text-ink-100" : "btn-ghost !px-2 !py-1 text-xs"}
             >
               {collapsed ? <Plus className="h-4 w-4" /> : "+ New"}
             </button>
             <button
               onClick={() => setCollapsed((c) => !c)}
               title={collapsed ? "Expand messages" : "Collapse messages"}
-              className="shrink-0 rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+              className="shrink-0 rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-700 dark:hover:text-ink-100"
             >
               {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </button>
@@ -101,14 +101,14 @@ export default function Chat() {
                   key={c.id}
                   onClick={() => setActiveId(c.id)}
                   title={collapsed ? c.title : undefined}
-                  className={`flex items-center hover:bg-ink-50 ${
+                  className={`flex items-center hover:bg-ink-50 dark:hover:bg-ink-700 ${
                     collapsed ? "h-11 w-11 justify-center rounded-lg" : "w-full gap-2.5 px-4 py-3 text-left"
-                  } ${activeId === c.id ? "bg-brand-50" : ""}`}
+                  } ${activeId === c.id ? "bg-brand-50 dark:bg-brand-500/15" : ""}`}
                 >
                   {avatar}
                   {!collapsed && (
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-ink-800">{c.title}</p>
+                      <p className="truncate text-sm font-medium text-ink-800 dark:text-ink-100">{c.title}</p>
                       <p className="truncate text-xs text-ink-400">
                         {c.lastMessage
                           ? c.lastMessage.content || (c.lastMessage.attachment ? `📎 ${c.lastMessage.attachment.name}` : "")

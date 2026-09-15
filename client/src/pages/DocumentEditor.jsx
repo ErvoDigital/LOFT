@@ -113,12 +113,12 @@ function TiptapEditor({ ydoc, provider, user, onReady, pageless, pageSize, colum
     <>
       {mode === "suggesting" && <SuggestionBar editor={editor} count={editor ? countSuggestions(editor) : 0} />}
       {mode !== "viewing" && <DocumentToolbar editor={editor} />}
-      <div className={`relative flex-1 overflow-y-auto print:overflow-visible print:bg-white ${pageless ? "bg-white" : "bg-ink-100"}`}>
+      <div className={`relative flex-1 overflow-y-auto print:overflow-visible print:bg-white ${pageless ? "bg-white dark:bg-ink-800" : "bg-ink-100 dark:bg-ink-900"}`}>
         {findReplaceOpen && <FindReplacePanel editor={editor} onClose={onCloseFindReplace} />}
         {pageless ? (
           content
         ) : (
-          <div className={`doc-page mx-auto my-8 min-h-[1056px] ${PAGE_WIDTH[pageSize] || PAGE_WIDTH.letter} rounded-sm bg-white shadow-soft`}>
+          <div className={`doc-page mx-auto my-8 min-h-[1056px] ${PAGE_WIDTH[pageSize] || PAGE_WIDTH.letter} rounded-sm bg-white shadow-soft dark:bg-ink-800`}>
             {content}
           </div>
         )}
@@ -304,7 +304,7 @@ export default function DocumentEditor() {
     return (
       <div className="flex h-full items-center justify-center p-6">
         <div className="max-w-sm text-center">
-          <p className="font-medium text-ink-700">Couldn't open this document</p>
+          <p className="font-medium text-ink-700 dark:text-ink-200">Couldn't open this document</p>
           <p className="mt-1 text-sm text-ink-400">{error}</p>
           <button onClick={() => navigate(`/workspaces/${workspaceId}/docs`)} className="btn-secondary mt-4">
             Back to Docs
@@ -315,13 +315,13 @@ export default function DocumentEditor() {
   }
 
   return (
-    <div className={fullscreen ? "fixed inset-0 z-50 flex flex-col bg-white" : "flex h-full flex-col bg-white"}>
-      <div className="flex items-center gap-3 border-b border-ink-200 px-4 py-3 print:hidden">
+    <div className={fullscreen ? "fixed inset-0 z-50 flex flex-col bg-white dark:bg-ink-900" : "flex h-full flex-col bg-white dark:bg-ink-900"}>
+      <div className="flex items-center gap-3 border-b border-ink-200 px-4 py-3 dark:border-ink-700 print:hidden">
         <button
           onClick={() => navigate(`/workspaces/${workspaceId}/docs`)}
           title="Back to Docs"
           aria-label="Back to Docs"
-          className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+          className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-700 dark:hover:text-ink-100"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
@@ -330,7 +330,7 @@ export default function DocumentEditor() {
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder="Untitled document"
-          className="min-w-0 flex-1 truncate border-none bg-transparent text-lg font-semibold text-ink-800 outline-none placeholder:text-ink-300"
+          className="min-w-0 flex-1 truncate border-none bg-transparent text-lg font-semibold text-ink-800 outline-none placeholder:text-ink-300 dark:text-ink-100"
         />
         {meta?.visibility === "ASSIGNED" && (
           <Lock className="h-3.5 w-3.5 shrink-0 text-accent-500" aria-label="Restricted to the assigned person" />

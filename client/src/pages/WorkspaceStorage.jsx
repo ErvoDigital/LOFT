@@ -196,13 +196,13 @@ export default function WorkspaceStorage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-1 text-sm">
-              <button onClick={() => navigate(null)} className="font-semibold text-ink-900 hover:text-brand-600">
+              <button onClick={() => navigate(null)} className="font-semibold text-ink-900 hover:text-brand-600 dark:text-ink-50 dark:hover:text-brand-400">
                 Storage
               </button>
               {breadcrumb.map((f) => (
                 <span key={f.id} className="flex items-center gap-1">
                   <ChevronRight className="h-3.5 w-3.5 text-ink-300" />
-                  <button onClick={() => navigate(f.id)} className="font-semibold text-ink-900 hover:text-brand-600">
+                  <button onClick={() => navigate(f.id)} className="font-semibold text-ink-900 hover:text-brand-600 dark:text-ink-50 dark:hover:text-brand-400">
                     {f.name}
                   </button>
                 </span>
@@ -230,12 +230,12 @@ export default function WorkspaceStorage() {
           />
         </div>
 
-        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
 
         {childAssets.length === 0 && (
           <div
             className={`flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-6 text-center text-sm transition-colors ${
-              dropzoneActive ? "border-brand-400 bg-brand-50 text-brand-700" : "border-ink-200 bg-white text-ink-400"
+              dropzoneActive ? "border-brand-400 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "border-ink-200 bg-white text-ink-400 dark:border-ink-700 dark:bg-ink-800"
             }`}
           >
             <UploadCloud className="h-5 w-5" />
@@ -272,7 +272,7 @@ export default function WorkspaceStorage() {
               </div>
             )}
 
-            {childFolders.length > 0 && childAssets.length > 0 && <hr className="border-ink-200" />}
+            {childFolders.length > 0 && childAssets.length > 0 && <hr className="border-ink-200 dark:border-ink-700" />}
 
             {childAssets.length > 0 && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -334,9 +334,9 @@ export default function WorkspaceStorage() {
           trigger it, since that isn't a valid drop here). */}
       {dropzoneActive && (
         <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center border-4 border-dashed border-brand-400 bg-brand-500/10">
-          <div className="flex items-center gap-2 rounded-xl bg-white px-5 py-3 shadow-panel">
+          <div className="flex items-center gap-2 rounded-xl bg-white px-5 py-3 shadow-panel dark:bg-ink-800">
             <UploadCloud className="h-5 w-5 text-brand-600" />
-            <span className="text-sm font-medium text-brand-700">Drop to upload</span>
+            <span className="text-sm font-medium text-brand-700 dark:text-brand-300">Drop to upload</span>
           </div>
         </div>
       )}

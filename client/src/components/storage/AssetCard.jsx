@@ -77,7 +77,7 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
       onDragLeave={() => setDragState(null)}
       onDrop={handleDrop}
       className={`card relative cursor-grab p-4 transition-colors active:cursor-grabbing ${
-        dragState === "merge" ? "border-brand-400 bg-brand-50" : dragState === "version" ? "border-accent-300 bg-accent-50" : ""
+        dragState === "merge" ? "border-brand-400 bg-brand-50 dark:bg-brand-500/15" : dragState === "version" ? "border-accent-300 bg-accent-50 dark:bg-accent-500/15" : ""
       }`}
     >
       {isMultiVersion && (
@@ -92,11 +92,11 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
         className="mb-2 flex w-full items-start gap-2.5 pr-8 text-left"
         title="Preview"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-ink-500">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-ink-500 dark:bg-ink-700">
           <FileIcon mimeType={latest?.mimeType} className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-ink-800 hover:text-brand-600">{asset.name}</p>
+          <p className="truncate text-sm font-medium text-ink-800 hover:text-brand-600 dark:text-ink-100 dark:hover:text-brand-400">{asset.name}</p>
           <p className="text-xs text-ink-400">
             {latest && formatSize(latest.size)} · {timeAgo(asset.updatedAt)}
           </p>
@@ -109,7 +109,7 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
       </div>
 
       {dragState && (
-        <p className={`mb-2 text-xs font-medium ${dragState === "merge" ? "text-brand-600" : "text-accent-700"}`}>
+        <p className={`mb-2 text-xs font-medium ${dragState === "merge" ? "text-brand-600 dark:text-brand-400" : "text-accent-700 dark:text-accent-300"}`}>
           {dragState === "merge" ? "Drop to merge as a new version" : "Drop to add as a new version"}
         </p>
       )}
@@ -117,7 +117,7 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
       {uploadProgress !== undefined && (
         <div className="mb-2">
           <p className="mb-1 text-xs font-medium text-ink-400">Uploading… {uploadProgress}%</p>
-          <div className="h-1.5 overflow-hidden rounded-full bg-ink-100">
+          <div className="h-1.5 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-700">
             <div
               className="h-full rounded-full bg-accent-500 transition-all duration-200"
               style={{ width: `${uploadProgress}%` }}
@@ -128,7 +128,7 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
 
       <div className="flex items-center justify-between text-xs">
         <div className="flex items-center gap-3">
-          <button onClick={() => onPreview(latest)} className="font-medium text-brand-600 hover:underline">
+          <button onClick={() => onPreview(latest)} className="font-medium text-brand-600 hover:underline dark:text-brand-400">
             Preview
           </button>
           {isMultiVersion && (
@@ -142,7 +142,7 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
             onClick={() => onDownload(latest)}
             title="Download"
             aria-label="Download"
-            className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+            className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
           >
             <Download className="h-3.5 w-3.5" />
           </button>
@@ -152,7 +152,7 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
                 onClick={() => onMove(asset)}
                 title="Move to folder"
                 aria-label="Move to folder"
-                className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+                className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
               >
                 <FolderInput className="h-3.5 w-3.5" />
               </button>
@@ -160,7 +160,7 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
                 onClick={() => onDelete(asset.id)}
                 title="Delete"
                 aria-label="Delete"
-                className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -170,17 +170,17 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
       </div>
 
       {expanded && (
-        <div className="mt-3 space-y-1.5 border-t border-ink-200 pt-2.5">
+        <div className="mt-3 space-y-1.5 border-t border-ink-200 pt-2.5 dark:border-ink-700">
           {asset.versions.map((v) => (
             <div key={v.id} className="flex items-center justify-between text-xs">
-              <span className="font-medium text-ink-600">V{v.version}</span>
+              <span className="font-medium text-ink-600 dark:text-ink-300">V{v.version}</span>
               <span className="truncate px-2 text-ink-400">{formatSize(v.size)} · {timeAgo(v.createdAt)}</span>
               <div className="flex shrink-0 items-center gap-1">
                 <button
                   onClick={() => onPreview(v)}
                   title="Preview"
                   aria-label="Preview"
-                  className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+                  className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
                 >
                   <Eye className="h-3.5 w-3.5" />
                 </button>
@@ -188,7 +188,7 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
                   onClick={() => onDownload(v)}
                   title="Download"
                   aria-label="Download"
-                  className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+                  className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
                 >
                   <Download className="h-3.5 w-3.5" />
                 </button>

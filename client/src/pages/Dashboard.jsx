@@ -84,7 +84,7 @@ export default function Dashboard() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
       <div>
-        <h2 className="text-2xl font-semibold text-ink-900">
+        <h2 className="text-2xl font-semibold text-ink-900 dark:text-ink-50">
           {greeting()}, {user?.name?.split(" ")[0]}
         </h2>
         <p className="text-sm text-ink-500">
@@ -107,7 +107,7 @@ export default function Dashboard() {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-ink-800">Upcoming meetings</h3>
+            <h3 className="text-sm font-semibold text-ink-800 dark:text-ink-100">Upcoming meetings</h3>
             <span className="text-xs text-ink-400">Next 14 days</span>
           </div>
           <UpcomingEvents events={data?.upcomingEvents} />
@@ -115,7 +115,7 @@ export default function Dashboard() {
 
         <section className="card p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-ink-800">Your pending tasks</h3>
+            <h3 className="text-sm font-semibold text-ink-800 dark:text-ink-100">Your pending tasks</h3>
             <Link to="/plan" className="text-xs font-medium text-brand-600 hover:text-brand-700">
               View my plan →
             </Link>
@@ -125,7 +125,7 @@ export default function Dashboard() {
       </div>
 
       <section className="card p-5">
-        <h3 className="mb-3 text-sm font-semibold text-ink-800">Recent activity</h3>
+        <h3 className="mb-3 text-sm font-semibold text-ink-800 dark:text-ink-100">Recent activity</h3>
         <ActivityFeed activity={data?.recentActivity} />
       </section>
 
@@ -141,7 +141,7 @@ export default function Dashboard() {
                 {w.name.slice(0, 2).toUpperCase()}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-ink-800">{w.name}</p>
+                <p className="truncate text-sm font-medium text-ink-800 dark:text-ink-100">{w.name}</p>
                 <p className="text-xs capitalize text-ink-400">{w.memberCount} member{w.memberCount === 1 ? "" : "s"}</p>
               </div>
             </Link>
@@ -155,7 +155,7 @@ export default function Dashboard() {
 function StatChip({ label, value, accent, danger }) {
   return (
     <div className="card p-4">
-      <p className={`text-2xl font-semibold ${accent ? (danger ? "text-red-600" : "text-brand-600") : "text-ink-900"}`}>{value}</p>
+      <p className={`text-2xl font-semibold ${accent ? (danger ? "text-red-600" : "text-brand-600") : "text-ink-900 dark:text-ink-50"}`}>{value}</p>
       <p className="text-xs font-medium text-ink-500">{label}</p>
     </div>
   );

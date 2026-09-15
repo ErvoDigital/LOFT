@@ -44,11 +44,11 @@ export default function NewDmModal({ open, onClose, onStarted }) {
           <button
             key={u.id}
             onClick={() => selectUser(u.id)}
-            className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left hover:bg-ink-50"
+            className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left hover:bg-ink-50 dark:hover:bg-ink-700"
           >
             <Avatar name={u.name} color={u.avatarColor} src={u.avatarUrl} size={30} />
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-ink-700">{u.name}</p>
+              <p className="truncate text-sm font-medium text-ink-700 dark:text-ink-200">{u.name}</p>
               <p className="truncate text-xs text-ink-400">{u.email}</p>
             </div>
           </button>

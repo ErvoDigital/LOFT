@@ -64,19 +64,19 @@ export default function FolderModal({ open, onClose, workspaceId, members, paren
   return (
     <Modal open={open} onClose={onClose} title={isEdit ? "Edit folder" : "New folder"} width="max-w-lg">
       <form onSubmit={handleSubmit} className="space-y-3">
-        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-600">Name</label>
+          <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Name</label>
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} required autoFocus maxLength={120} />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-600">Who can see this folder</label>
+          <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Who can see this folder</label>
           <div className="flex gap-1.5">
             <button
               type="button"
               onClick={() => setVisibility("WORKSPACE")}
               className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                visibility === "WORKSPACE" ? "border-brand-500 bg-brand-50 text-brand-700" : "border-ink-200 text-ink-500 hover:bg-ink-50"
+                visibility === "WORKSPACE" ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "border-ink-200 text-ink-500 hover:bg-ink-50 dark:border-ink-700 dark:hover:bg-ink-700"
               }`}
             >
               Everyone
@@ -85,7 +85,7 @@ export default function FolderModal({ open, onClose, workspaceId, members, paren
               type="button"
               onClick={() => setVisibility("RESTRICTED")}
               className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                visibility === "RESTRICTED" ? "border-brand-500 bg-brand-50 text-brand-700" : "border-ink-200 text-ink-500 hover:bg-ink-50"
+                visibility === "RESTRICTED" ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "border-ink-200 text-ink-500 hover:bg-ink-50 dark:border-ink-700 dark:hover:bg-ink-700"
               }`}
             >
               Restricted
@@ -94,7 +94,7 @@ export default function FolderModal({ open, onClose, workspaceId, members, paren
         </div>
         {visibility === "RESTRICTED" && (
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Who can view/download</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Who can view/download</label>
             <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
               {members.map((m) => (
                 <button
@@ -102,7 +102,7 @@ export default function FolderModal({ open, onClose, workspaceId, members, paren
                   key={m.user.id}
                   onClick={() => toggleMember(m.user.id)}
                   className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                    memberIds.includes(m.user.id) ? "border-brand-500 bg-brand-50 text-brand-700" : "border-ink-200 text-ink-500 hover:bg-ink-50"
+                    memberIds.includes(m.user.id) ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "border-ink-200 text-ink-500 hover:bg-ink-50 dark:border-ink-700 dark:hover:bg-ink-700"
                   }`}
                 >
                   {m.user.name}

@@ -16,15 +16,15 @@ export default function WordCountModal({ open, onClose, editor }) {
         <dl className="space-y-2 text-sm">
           <div className="flex justify-between">
             <dt className="text-ink-500">Words</dt>
-            <dd className="font-medium text-ink-800">{stats.words}</dd>
+            <dd className="font-medium text-ink-800 dark:text-ink-100">{stats.words}</dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-ink-500">Characters</dt>
-            <dd className="font-medium text-ink-800">{stats.characters}</dd>
+            <dd className="font-medium text-ink-800 dark:text-ink-100">{stats.characters}</dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-ink-500">Characters (no spaces)</dt>
-            <dd className="font-medium text-ink-800">{stats.charactersNoSpaces}</dd>
+            <dd className="font-medium text-ink-800 dark:text-ink-100">{stats.charactersNoSpaces}</dd>
           </div>
         </dl>
       )}

@@ -88,7 +88,7 @@ export default function EmojiPicker({ onSelect, onClose }) {
   return (
     <div
       ref={ref}
-      className={`absolute z-10 max-h-64 w-64 overflow-y-auto rounded-lg border border-ink-200 bg-white p-2 shadow-panel ${
+      className={`absolute z-10 max-h-64 w-64 overflow-y-auto rounded-lg border border-ink-200 bg-white p-2 shadow-panel dark:border-ink-700 dark:bg-ink-800 ${
         placement.vertical === "top" ? "bottom-full mb-2" : "top-full mt-2"
       } ${placement.horizontal === "left" ? "left-0" : "right-0"}`}
     >
@@ -101,7 +101,7 @@ export default function EmojiPicker({ onSelect, onClose }) {
                 key={emoji}
                 type="button"
                 onClick={() => onSelect(emoji)}
-                className="flex h-7 w-7 items-center justify-center rounded text-lg hover:bg-ink-100"
+                className="flex h-7 w-7 items-center justify-center rounded text-lg hover:bg-ink-100 dark:hover:bg-ink-700"
               >
                 {emoji}
               </button>

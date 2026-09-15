@@ -16,12 +16,12 @@ export default function PlanDayGroup({ day, statusesByWorkspace, onStatusChange,
   return (
     <div className={`card p-4 ${day.isToday ? "border-brand-300 ring-1 ring-brand-100" : ""}`}>
       <div className="mb-2 flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-ink-800">{formatDayLabel(day.date, day.isToday)}</h4>
+        <h4 className="text-sm font-semibold text-ink-800 dark:text-ink-100">{formatDayLabel(day.date, day.isToday)}</h4>
         <span className={`text-xs font-medium ${overCapacity ? "text-red-500" : "text-ink-400"}`}>
           {day.plannedHours}h / {day.capacityHours}h
         </span>
       </div>
-      <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-ink-100">
+      <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-ink-100 dark:bg-ink-700">
         <div
           className={`h-full rounded-full ${overCapacity ? "bg-red-400" : "bg-brand-400"}`}
           style={{ width: `${Math.min(100, (day.plannedHours / day.capacityHours) * 100)}%` }}

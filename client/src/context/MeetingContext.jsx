@@ -6,17 +6,6 @@ import { useSpeakingDetection } from "../hooks/useSpeakingDetection.js";
 import Modal from "../components/common/Modal.jsx";
 
 const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
-const CONFIRM_LEAVE_KEY = "loft-confirm-before-leaving";
-
-function getInitialConfirmBeforeLeaving() {
-  try {
-    const stored = localStorage.getItem(CONFIRM_LEAVE_KEY);
-    if (stored !== null) return stored === "1";
-  } catch {
-    // localStorage unavailable — default to on.
-  }
-  return true;
-}
 
 // Lives at the app root (see main.jsx) instead of inside the Meeting page, so
 // navigating to another page no longer unmounts it and drops the call — the
@@ -74,10 +63,6 @@ export function MeetingProvider({ children }) {
   const [pipDock, setPipDock] = useState("bottom");
   const [localStream, setLocalStream] = useState(null); // mirrors localStreamRef, for consumers that need to render it (WorkspaceMeeting, MiniCallPlayer)
   const [annotations, setAnnotations] = useState([]); // shapes drawn on the shared screen, synced to every participant
-  // Personal, per-browser preference (not a workspace setting) — whether
-  // clicking "leave" asks for confirmation first. Surfaced in the meeting
-  // page's Settings modal; read here too since it gates requestLeave() below.
-  const [confirmBeforeLeaving, setConfirmBeforeLeavingState] = useState(getInitialConfirmBeforeLeaving);
   // Shown from both the meeting page's End Call button and MiniCallPlayer's —
   // rendered once at the provider level (below) so either trigger reuses the
   // same dialog regardless of which page is currently showing.
@@ -421,25 +406,11 @@ export function MeetingProvider({ children }) {
     setMicRequestOpen(false);
   }
 
-  function setConfirmBeforeLeaving(next) {
-    setConfirmBeforeLeavingState(next);
-    try {
-      localStorage.setItem(CONFIRM_LEAVE_KEY, next ? "1" : "0");
-    } catch {
-      // localStorage unavailable — preference just won't persist.
-    }
-  }
-
-  // What the "leave meeting" buttons actually call — opens the confirmation
-  // dialog first unless the user has turned that preference off, in which
-  // case it hangs up immediately like before.
+  // What the "leave meeting" buttons actually call — always opens the
+  // confirmation dialog first rather than hanging up immediately.
   function requestLeave() {
     if (!joined) return;
-    if (confirmBeforeLeaving) {
-      setLeaveConfirmOpen(true);
-    } else {
-      leaveMeeting();
-    }
+    setLeaveConfirmOpen(true);
   }
 
   function confirmLeave() {
@@ -671,8 +642,6 @@ export function MeetingProvider({ children }) {
     confirmJoin,
     cancelPrepare,
     leaveMeeting,
-    confirmBeforeLeaving,
-    setConfirmBeforeLeaving,
     leaveConfirmOpen,
     requestLeave,
     confirmLeave,

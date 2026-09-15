@@ -32,14 +32,14 @@ export default function Login() {
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to your LOFT workspace">
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-600">Email</label>
+          <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Email</label>
           <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
         </div>
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <label className="block text-sm font-medium text-ink-600">Password</label>
+            <label className="block text-sm font-medium text-ink-600 dark:text-ink-200">Password</label>
             <Link to="/forgot-password" className="text-xs font-medium text-brand-600 hover:underline">
               Forgot password?
             </Link>

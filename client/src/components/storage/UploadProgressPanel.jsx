@@ -20,10 +20,10 @@ export default function UploadProgressPanel({ uploads }) {
         <div key={u.id} className="card p-3 shadow-panel">
           <div className="mb-1.5 flex items-center gap-2">
             <UploadCloud className="h-3.5 w-3.5 shrink-0 text-brand-500" />
-            <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink-700">{u.name}</span>
+            <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink-700 dark:text-ink-200">{u.name}</span>
             <span className="shrink-0 text-xs text-ink-400">{formatSize(u.size)}</span>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-ink-100">
+          <div className="h-1.5 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-700">
             <div
               className="h-full rounded-full bg-brand-500 transition-all duration-200"
               style={{ width: `${u.progress}%` }}

@@ -26,7 +26,7 @@ export default function MoveToFolderModal({ open, onClose, folders, currentFolde
           onClick={() => handlePick(null)}
           disabled={currentFolderId === null}
           className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium ${
-            currentFolderId === null ? "cursor-default text-ink-300" : "text-ink-700 hover:bg-ink-50"
+            currentFolderId === null ? "cursor-default text-ink-300" : "text-ink-700 hover:bg-ink-50 dark:text-ink-200 dark:hover:bg-ink-700"
           }`}
         >
           Workspace root
@@ -38,7 +38,7 @@ export default function MoveToFolderModal({ open, onClose, folders, currentFolde
             disabled={currentFolderId === folder.id}
             style={{ paddingLeft: `${10 + depth * 16}px` }}
             className={`flex w-full items-center gap-2 rounded-lg py-2 pr-2.5 text-left text-sm font-medium ${
-              currentFolderId === folder.id ? "cursor-default text-ink-300" : "text-ink-700 hover:bg-ink-50"
+              currentFolderId === folder.id ? "cursor-default text-ink-300" : "text-ink-700 hover:bg-ink-50 dark:text-ink-200 dark:hover:bg-ink-700"
             }`}
           >
             <FolderIcon className="h-3.5 w-3.5 shrink-0" />

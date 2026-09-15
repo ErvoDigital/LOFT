@@ -31,7 +31,7 @@ export default function NotificationsBell() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100"
+        className="relative flex h-9 w-9 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700"
       >
         <Bell className="h-[18px] w-[18px]" />
         {unreadCount > 0 && (
@@ -44,7 +44,7 @@ export default function NotificationsBell() {
       {open && (
         <div className="absolute right-0 z-20 mt-2 w-80 card shadow-panel p-2">
           <div className="flex items-center justify-between px-2 py-1">
-            <p className="text-sm font-semibold text-ink-800">Notifications</p>
+            <p className="text-sm font-semibold text-ink-800 dark:text-ink-100">Notifications</p>
             {unreadCount > 0 && (
               <button onClick={markAllRead} className="text-xs font-medium text-brand-600 hover:underline">
                 Mark all read
@@ -61,11 +61,11 @@ export default function NotificationsBell() {
                   setOpen(false);
                   if (n.link) navigate(n.link);
                 }}
-                className={`flex w-full flex-col items-start gap-0.5 rounded-lg px-2 py-2 text-left text-sm hover:bg-ink-50 ${!n.isRead ? "bg-brand-50/60" : ""}`}
+                className={`flex w-full flex-col items-start gap-0.5 rounded-lg px-2 py-2 text-left text-sm hover:bg-ink-50 dark:hover:bg-ink-700 ${!n.isRead ? "bg-brand-50/60 dark:bg-brand-500/15" : ""}`}
               >
                 <div className="flex w-full items-center gap-1.5">
                   {!n.isRead && <span className="h-1.5 w-1.5 rounded-full bg-brand-600" />}
-                  <span className="font-medium text-ink-700">{n.title}</span>
+                  <span className="font-medium text-ink-700 dark:text-ink-200">{n.title}</span>
                 </div>
                 {n.body && <span className="text-xs text-ink-400">{n.body}</span>}
                 <span className="text-[11px] text-ink-300">{timeAgo(n.createdAt)}</span>

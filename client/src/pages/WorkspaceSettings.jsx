@@ -83,18 +83,18 @@ export default function WorkspaceSettings() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
-      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-      {message && <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">{message}</p>}
+      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
+      {message && <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">{message}</p>}
 
       <div className="card p-6">
-        <h2 className="mb-4 text-base font-semibold text-ink-800">Workspace details</h2>
+        <h2 className="mb-4 text-base font-semibold text-ink-800 dark:text-ink-100">Workspace details</h2>
         <form onSubmit={saveDetails} className="space-y-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Name</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Name</label>
             <input className="input" value={name} onChange={(e) => setName(e.target.value)} disabled={!isAdmin} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Description</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Description</label>
             <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} disabled={!isAdmin} />
           </div>
           {isAdmin && (
@@ -106,10 +106,10 @@ export default function WorkspaceSettings() {
       </div>
 
       <div className="card p-6">
-        <h2 className="mb-1 text-base font-semibold text-ink-800">Invite people</h2>
+        <h2 className="mb-1 text-base font-semibold text-ink-800 dark:text-ink-100">Invite people</h2>
         <p className="mb-3 text-sm text-ink-400">Share this code so others can join.</p>
         <div className="flex items-center gap-2">
-          <code className="flex-1 rounded-lg border border-dashed border-ink-200 bg-ink-50 px-3 py-2 text-center text-lg font-semibold tracking-widest text-ink-700">
+          <code className="flex-1 rounded-lg border border-dashed border-ink-200 bg-ink-50 px-3 py-2 text-center text-lg font-semibold tracking-widest text-ink-700 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200">
             {workspace.inviteCode}
           </code>
           <button
@@ -126,13 +126,13 @@ export default function WorkspaceSettings() {
       </div>
 
       <div className="card p-6">
-        <h2 className="mb-4 text-base font-semibold text-ink-800">Members ({workspace.members.length})</h2>
+        <h2 className="mb-4 text-base font-semibold text-ink-800 dark:text-ink-100">Members ({workspace.members.length})</h2>
         <div className="space-y-2">
           {workspace.members.map((m) => (
-            <div key={m.id} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-ink-50">
+            <div key={m.id} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-ink-50 dark:hover:bg-ink-700">
               <Avatar name={m.user.name} color={m.user.avatarColor} src={m.user.avatarUrl} size={32} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-ink-700">
+                <p className="truncate text-sm font-medium text-ink-700 dark:text-ink-200">
                   {m.user.name} {m.user.id === user.id && <span className="text-ink-400">(you)</span>}
                 </p>
                 <p className="truncate text-xs text-ink-400">{m.user.email}</p>
@@ -140,7 +140,7 @@ export default function WorkspaceSettings() {
               {isAdmin && m.user.id !== user.id ? (
                 <div className="flex items-center gap-2">
                   <select
-                    className="rounded-md border border-ink-200 bg-white px-2 py-1 text-xs"
+                    className="rounded-md border border-ink-200 bg-white px-2 py-1 text-xs dark:border-ink-700 dark:bg-ink-800"
                     value={m.role}
                     onChange={(e) => changeRole(m.id, e.target.value)}
                   >
@@ -162,7 +162,7 @@ export default function WorkspaceSettings() {
 
       {workspace.ownerId !== user.id && (
         <div className="card border-red-100 p-6">
-          <h2 className="mb-1 text-base font-semibold text-ink-800">Leave workspace</h2>
+          <h2 className="mb-1 text-base font-semibold text-ink-800 dark:text-ink-100">Leave workspace</h2>
           <p className="mb-3 text-sm text-ink-400">You'll lose access to its calendar, tasks, and chat.</p>
           <button onClick={handleLeave} className="btn-danger">
             Leave {workspace.name}

@@ -89,31 +89,31 @@ export default function EventModal({ open, onClose, workspaceId, members, defaul
   return (
     <Modal open={open} onClose={onClose} title={isEdit ? "Edit event" : "New event"} width="max-w-lg">
       <form onSubmit={handleSubmit} className="space-y-3">
-        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-600">Title</label>
+          <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Title</label>
           <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Starts</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Starts</label>
             <input type="datetime-local" className="input" value={startTime} onChange={(e) => setStartTime(e.target.value)} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Ends</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Ends</label>
             <input type="datetime-local" className="input" value={endTime} onChange={(e) => setEndTime(e.target.value)} required />
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-600">Location (optional)</label>
+          <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Location (optional)</label>
           <input className="input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Room, link, or address" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-600">Description (optional)</label>
+          <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Description (optional)</label>
           <textarea className="input" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-600">Attendees</label>
+          <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Attendees</label>
           <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
             {members.map((m) => (
               <button
@@ -121,7 +121,9 @@ export default function EventModal({ open, onClose, workspaceId, members, defaul
                 key={m.user.id}
                 onClick={() => toggleAttendee(m.user.id)}
                 className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                  attendeeIds.includes(m.user.id) ? "border-brand-500 bg-brand-50 text-brand-700" : "border-ink-200 text-ink-500 hover:bg-ink-50"
+                  attendeeIds.includes(m.user.id)
+                    ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
+                    : "border-ink-200 text-ink-500 hover:bg-ink-50 dark:border-ink-700 dark:hover:bg-ink-700"
                 }`}
               >
                 {m.user.name}

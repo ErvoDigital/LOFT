@@ -80,42 +80,42 @@ export default function WorkspaceModal({ open, onClose }) {
       }}
       title="Add a workspace"
     >
-      <div className="mb-4 flex rounded-lg bg-ink-100 p-1 text-sm">
+      <div className="mb-4 flex rounded-lg bg-ink-100 p-1 text-sm dark:bg-ink-700">
         <button
-          className={`flex-1 rounded-md py-1.5 font-medium transition-colors ${tab === "create" ? "bg-white text-ink-800 shadow-soft" : "text-ink-500"}`}
+          className={`flex-1 rounded-md py-1.5 font-medium transition-colors ${tab === "create" ? "bg-white text-ink-800 shadow-soft dark:bg-ink-800 dark:text-ink-100" : "text-ink-500"}`}
           onClick={() => setTab("create")}
         >
           Create new
         </button>
         <button
-          className={`flex-1 rounded-md py-1.5 font-medium transition-colors ${tab === "join" ? "bg-white text-ink-800 shadow-soft" : "text-ink-500"}`}
+          className={`flex-1 rounded-md py-1.5 font-medium transition-colors ${tab === "join" ? "bg-white text-ink-800 shadow-soft dark:bg-ink-800 dark:text-ink-100" : "text-ink-500"}`}
           onClick={() => setTab("join")}
         >
           Join with code
         </button>
       </div>
 
-      {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
 
       {tab === "create" ? (
         <form onSubmit={handleCreate} className="space-y-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Workspace name</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Workspace name</label>
             <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. CS 101, Marketing Team" required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Description (optional)</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Description (optional)</label>
             <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What's this group for?" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Type</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Type</label>
             <div className="flex flex-wrap gap-2">
               {TYPES.map((t) => (
                 <button
                   type="button"
                   key={t.value}
                   onClick={() => setType(t.value)}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium ${type === t.value ? "border-brand-500 bg-brand-50 text-brand-700" : "border-ink-200 text-ink-500 hover:bg-ink-50"}`}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium ${type === t.value ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "border-ink-200 text-ink-500 hover:bg-ink-50 dark:border-ink-700 dark:hover:bg-ink-700"}`}
                 >
                   {t.label}
                 </button>
@@ -123,7 +123,7 @@ export default function WorkspaceModal({ open, onClose }) {
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Color</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Color</label>
             <div className="flex gap-2">
               {COLORS.map((c) => (
                 <button
@@ -143,7 +143,7 @@ export default function WorkspaceModal({ open, onClose }) {
       ) : (
         <form onSubmit={handleJoin} className="space-y-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Invite code</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Invite code</label>
             <input
               className="input uppercase tracking-widest"
               value={inviteCode}

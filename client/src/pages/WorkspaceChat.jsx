@@ -78,23 +78,23 @@ export default function WorkspaceChat() {
 
   return (
     <div className="flex h-full">
-      <div className="flex w-64 shrink-0 flex-col border-r border-ink-200 bg-white">
-        <div className="flex items-center justify-between border-b border-ink-200 p-4">
-          <h2 className="text-sm font-semibold text-ink-800">Channels</h2>
+      <div className="flex w-64 shrink-0 flex-col border-r border-ink-200 bg-white dark:border-ink-700 dark:bg-ink-800">
+        <div className="flex items-center justify-between border-b border-ink-200 p-4 dark:border-ink-700">
+          <h2 className="text-sm font-semibold text-ink-800 dark:text-ink-100">Channels</h2>
           {myRole === "ADMIN" && (
             <button onClick={() => setChannelModalOpen(true)} className="btn-ghost !px-2 !py-1 text-xs">
               + New
             </button>
           )}
         </div>
-        {error && <p className="mx-3 mt-2 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-600">{error}</p>}
+        {error && <p className="mx-3 mt-2 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
         <div className="flex-1 overflow-y-auto py-1">
           {conversations.map((c) => (
             <button
               key={c.id}
               onClick={() => setActiveId(c.id)}
-              className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-ink-50 ${
-                activeId === c.id ? "bg-brand-50 font-medium text-brand-700" : "text-ink-600"
+              className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-ink-50 dark:hover:bg-ink-700 ${
+                activeId === c.id ? "bg-brand-50 font-medium text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "text-ink-600 dark:text-ink-300"
               }`}
             >
               {c.isDefault ? <Hash className="h-3.5 w-3.5 text-ink-400" /> : <Circle className="h-2.5 w-2.5 text-ink-400" />}

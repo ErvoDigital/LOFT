@@ -79,7 +79,7 @@ function renderContent(content, selfId) {
       <span
         key={match.index}
         className={`rounded px-1 font-medium ${
-          match[2] === selfId ? "bg-amber-200/70 text-amber-900" : "bg-brand-100 text-brand-700"
+          match[2] === selfId ? "bg-amber-200/70 text-amber-900 dark:bg-amber-500/15 dark:text-amber-400" : "bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
         }`}
       >
         @{match[1]}
@@ -314,8 +314,8 @@ export default function ChatThread({ conversation, headerExtra }) {
   }
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-ink-50">
-      <div className="flex items-center gap-2.5 border-b border-ink-200 bg-white px-5 py-3">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-ink-50 dark:bg-ink-900">
+      <div className="flex items-center gap-2.5 border-b border-ink-200 bg-white px-5 py-3 dark:border-ink-700 dark:bg-ink-800">
         {conversation.isMeetingChat ? (
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-white">
             <MessageSquare className="h-4 w-4" />
@@ -330,7 +330,7 @@ export default function ChatThread({ conversation, headerExtra }) {
         ) : (
           <Avatar name={conversation.otherUser?.name} color={conversation.otherUser?.avatarColor} size={32} />
         )}
-        <p className="flex-1 text-sm font-semibold text-ink-800">{conversation.title}</p>
+        <p className="flex-1 text-sm font-semibold text-ink-800 dark:text-ink-100">{conversation.title}</p>
         {headerExtra}
       </div>
 
@@ -354,7 +354,7 @@ export default function ChatThread({ conversation, headerExtra }) {
                 <div className="flex min-w-0 max-w-md flex-col">
                   <div
                     className={`relative min-w-0 rounded-2xl px-3.5 py-2 text-sm shadow-soft ${
-                      mine ? "brand-mark rounded-br-sm text-white" : "rounded-bl-sm border border-ink-200 bg-white text-ink-800"
+                      mine ? "brand-mark rounded-br-sm text-white" : "rounded-bl-sm border border-ink-200 bg-white text-ink-800 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-100"
                     }`}
                   >
                     {!mine && conversation.isGroup && <p className="mb-0.5 text-xs font-semibold text-brand-600">{m.sender.name}</p>}
@@ -374,14 +374,14 @@ export default function ChatThread({ conversation, headerExtra }) {
                           })
                         }
                         className={`mt-1.5 flex w-full max-w-[15rem] items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors ${
-                          mine ? "border-white/30 bg-white/10 hover:bg-white/20" : "border-ink-200 bg-ink-50 hover:bg-ink-100"
+                          mine ? "border-white/30 bg-white/10 hover:bg-white/20" : "border-ink-200 bg-ink-50 hover:bg-ink-100 dark:border-ink-700 dark:bg-ink-900 dark:hover:bg-ink-700"
                         }`}
                       >
-                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${mine ? "bg-white/20 text-white" : "bg-white text-ink-500"}`}>
+                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${mine ? "bg-white/20 text-white" : "bg-white text-ink-500 dark:bg-ink-800"}`}>
                           <AttachmentIcon mimeType={m.attachment.mimeType} className="h-4 w-4" />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className={`block truncate text-xs font-medium ${mine ? "text-white" : "text-ink-700"}`}>{m.attachment.name}</span>
+                          <span className={`block truncate text-xs font-medium ${mine ? "text-white" : "text-ink-700 dark:text-ink-200"}`}>{m.attachment.name}</span>
                           <span className={`block text-[11px] ${mine ? "text-white/70" : "text-ink-400"}`}>{formatSize(m.attachment.size)}</span>
                         </span>
                       </button>
@@ -396,7 +396,7 @@ export default function ChatThread({ conversation, headerExtra }) {
                           setReactionPickerFor((id) => (id === m.id ? null : m.id));
                         }}
                         title="React"
-                        className={`flex h-6 w-6 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-400 shadow-soft transition-opacity hover:text-ink-600 ${
+                        className={`flex h-6 w-6 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-400 shadow-soft transition-opacity hover:text-ink-600 dark:border-ink-700 dark:bg-ink-800 dark:hover:text-ink-100 ${
                           reactionPickerFor === m.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                         }`}
                       >
@@ -420,8 +420,8 @@ export default function ChatThread({ conversation, headerExtra }) {
                             title={r.users.map((u) => u.name).join(", ")}
                             className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs leading-none transition-colors ${
                               mineReacted
-                                ? "border-brand-400 bg-brand-50 text-brand-700"
-                                : "border-ink-200 bg-white text-ink-600 hover:bg-ink-50"
+                                ? "border-brand-400 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
+                                : "border-ink-200 bg-white text-ink-600 hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700"
                             }`}
                           >
                             <span>{r.emoji}</span>
@@ -439,35 +439,35 @@ export default function ChatThread({ conversation, headerExtra }) {
         {typingUser && <p className="pl-9 text-xs italic text-ink-400">typing…</p>}
       </div>
 
-      <div className="border-t border-ink-200 bg-white p-4">
-        {attachError && <p className="mb-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs text-red-600">{attachError}</p>}
+      <div className="border-t border-ink-200 bg-white p-4 dark:border-ink-700 dark:bg-ink-800">
+        {attachError && <p className="mb-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{attachError}</p>}
 
         {mentionState && filteredMentions.length > 0 && (
-          <div className="mb-2 max-h-40 overflow-y-auto rounded-lg border border-ink-200 bg-white shadow-panel">
+          <div className="mb-2 max-h-40 overflow-y-auto rounded-lg border border-ink-200 bg-white shadow-panel dark:border-ink-700 dark:bg-ink-800">
             {filteredMentions.map((c, i) => (
               <button
                 key={c.id}
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => selectMention(c)}
-                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${i === mentionHighlight ? "bg-brand-50" : "hover:bg-ink-50"}`}
+                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${i === mentionHighlight ? "bg-brand-50 dark:bg-brand-500/15" : "hover:bg-ink-50 dark:hover:bg-ink-700"}`}
               >
                 <Avatar name={c.name} color={c.avatarColor} src={c.avatarUrl} size={22} />
-                <span className="text-ink-700">{c.name}</span>
+                <span className="text-ink-700 dark:text-ink-200">{c.name}</span>
               </button>
             ))}
           </div>
         )}
 
         {pendingAttachment && (
-          <div className="mb-2 flex items-center gap-2 rounded-lg border border-ink-200 bg-ink-50 px-2.5 py-1.5">
+          <div className="mb-2 flex items-center gap-2 rounded-lg border border-ink-200 bg-ink-50 px-2.5 py-1.5 dark:border-ink-700 dark:bg-ink-900">
             <AttachmentIcon mimeType={pendingAttachment.mimeType} className="h-4 w-4 shrink-0 text-ink-500" />
-            <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink-700">{pendingAttachment.name}</span>
+            <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink-700 dark:text-ink-200">{pendingAttachment.name}</span>
             <span className="shrink-0 text-[11px] text-ink-400">{formatSize(pendingAttachment.size)}</span>
             <button
               type="button"
               onClick={() => setPendingAttachment(null)}
-              className="shrink-0 rounded p-0.5 text-ink-400 hover:bg-ink-200 hover:text-ink-600"
+              className="shrink-0 rounded p-0.5 text-ink-400 hover:bg-ink-200 hover:text-ink-600 dark:hover:bg-ink-600 dark:hover:text-ink-100"
               aria-label="Remove attachment"
             >
               <X className="h-3.5 w-3.5" />

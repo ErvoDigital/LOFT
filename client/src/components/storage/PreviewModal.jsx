@@ -65,21 +65,21 @@ export default function PreviewModal({ open, onClose, workspaceId, assetId, vers
     <Modal open={open} onClose={onClose} title={name} width={isDocx || isPdf ? "max-w-4xl" : "max-w-3xl"}>
       <div className="flex min-h-64 items-center justify-center">
         {loading && <Spinner />}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         {url && isImage && <img src={url} alt={name} className="max-h-[70vh] w-full rounded-lg object-contain" />}
         {url && isVideo && <video src={url} controls className="max-h-[70vh] w-full rounded-lg" />}
         {url && isPdf && (
-          <iframe src={url} title={name} className="h-[75vh] w-full rounded-lg border border-ink-200 bg-white" />
+          <iframe src={url} title={name} className="h-[75vh] w-full rounded-lg border border-ink-200 bg-white dark:border-ink-700 dark:bg-ink-800" />
         )}
         {isDocx && !error && (
           <div
             ref={docxContainerRef}
-            className={`max-h-[75vh] w-full overflow-auto rounded-lg border border-ink-200 bg-ink-100 p-4 ${docxReady ? "" : "hidden"}`}
+            className={`max-h-[75vh] w-full overflow-auto rounded-lg border border-ink-200 bg-ink-100 p-4 dark:border-ink-700 dark:bg-ink-900 ${docxReady ? "" : "hidden"}`}
           />
         )}
         {url && !isImage && !isVideo && !isPdf && !isDocx && (
           <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-ink-100 text-ink-400">
+            <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-ink-100 text-ink-400 dark:bg-ink-700">
               <FileIcon className="h-6 w-6" />
             </span>
             <p className="text-sm text-ink-500">No inline preview for this file type.</p>

@@ -10,9 +10,9 @@ export default function GoogleSignInButton({ onCredential, onSuccess, onError, d
     <div className="flex flex-col items-center gap-4">
       {divider && (
         <div className="flex w-full items-center gap-3 text-xs text-ink-400">
-          <div className="h-px flex-1 bg-ink-100" />
+          <div className="h-px flex-1 bg-ink-100 dark:bg-ink-700" />
           or
-          <div className="h-px flex-1 bg-ink-100" />
+          <div className="h-px flex-1 bg-ink-100 dark:bg-ink-700" />
         </div>
       )}
       {/* Google's rendered button (especially its "Sign in as <name>" auto-select

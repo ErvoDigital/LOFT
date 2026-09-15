@@ -107,17 +107,17 @@ export default function TaskModal({ open, onClose, workspaceId, members, statuse
   return (
     <Modal open={open} onClose={onClose} title={isEdit ? "Edit task" : "New task"} width="max-w-lg">
       <form onSubmit={handleSubmit} className="space-y-3">
-        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-600">Title</label>
+          <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Title</label>
           <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-600">Description (optional)</label>
+          <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Description (optional)</label>
           <textarea className="input" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-600">Priority tier</label>
+          <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Priority tier</label>
           <select className="input" value={tier} onChange={(e) => setTier(e.target.value)}>
             {TIERS.map((t) => (
               <option key={t} value={t}>
@@ -128,7 +128,7 @@ export default function TaskModal({ open, onClose, workspaceId, members, statuse
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Status</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Status</label>
             <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
               {STATUSES.map((s) => (
                 <option key={s.value} value={s.value}>
@@ -138,13 +138,13 @@ export default function TaskModal({ open, onClose, workspaceId, members, statuse
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Due date (optional)</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Due date (optional)</label>
             <input type="date" className="input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Estimated duration (minutes)</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Estimated duration (minutes)</label>
             <input
               type="number"
               min={5}
@@ -157,7 +157,7 @@ export default function TaskModal({ open, onClose, workspaceId, members, statuse
             <p className="mt-1 text-xs text-ink-400">≈ {formatDuration(estimatedMinutes)} — fed into My Plan's daily schedule</p>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Assignee</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Assignee</label>
             <select className="input" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
               <option value="">Unassigned</option>
               {members.map((m) => (
@@ -169,13 +169,15 @@ export default function TaskModal({ open, onClose, workspaceId, members, statuse
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-600">Overrides</label>
+          <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Overrides</label>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setIsPinned((p) => !p)}
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                isPinned ? "border-brand-500 bg-brand-50 text-brand-700" : "border-ink-200 text-ink-500 hover:bg-ink-50"
+                isPinned
+                  ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
+                  : "border-ink-200 text-ink-500 hover:bg-ink-50 dark:border-ink-700 dark:hover:bg-ink-700"
               }`}
             >
               <Pin className="h-3.5 w-3.5" /> Pin to top
@@ -184,7 +186,9 @@ export default function TaskModal({ open, onClose, workspaceId, members, statuse
               type="button"
               onClick={() => setIsSnoozed((s) => !s)}
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                isSnoozed ? "border-ink-400 bg-ink-100 text-ink-600" : "border-ink-200 text-ink-500 hover:bg-ink-50"
+                isSnoozed
+                  ? "border-ink-400 bg-ink-100 text-ink-600 dark:bg-ink-700 dark:text-ink-300"
+                  : "border-ink-200 text-ink-500 hover:bg-ink-50 dark:border-ink-700 dark:hover:bg-ink-700"
               }`}
             >
               <Moon className="h-3.5 w-3.5" /> Snooze

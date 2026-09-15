@@ -78,7 +78,7 @@ export default function ChangePasswordModal({ open, onClose, onDone, email, hasP
 
   return (
     <Modal open={open} onClose={onClose} title={hasPassword ? "Change password" : "Set a password"}>
-      {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
 
       {step === "sending" && <p className="text-sm text-ink-500">Sending a verification code to {email}…</p>}
 
@@ -86,7 +86,7 @@ export default function ChangePasswordModal({ open, onClose, onDone, email, hasP
         <form onSubmit={verifyCode} className="space-y-3">
           <p className="text-sm text-ink-500">Enter the 6-digit code we sent to {email}.</p>
           {devCode && (
-            <p className="rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-700">
+            <p className="rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
               No email provider is configured yet, so here's your code directly: <strong>{devCode}</strong>
             </p>
           )}
@@ -113,7 +113,7 @@ export default function ChangePasswordModal({ open, onClose, onDone, email, hasP
       {step === "reset" && (
         <form onSubmit={submitNewPassword} className="space-y-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">New password</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">New password</label>
             <input
               type="password"
               className="input"
@@ -125,7 +125,7 @@ export default function ChangePasswordModal({ open, onClose, onDone, email, hasP
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600">Confirm password</label>
+            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Confirm password</label>
             <input
               type="password"
               className="input"
@@ -143,7 +143,7 @@ export default function ChangePasswordModal({ open, onClose, onDone, email, hasP
 
       {step === "done" && (
         <div className="space-y-4 text-center">
-          <p className="text-sm text-ink-700">{hasPassword ? "Password updated." : "Password set."}</p>
+          <p className="text-sm text-ink-700 dark:text-ink-200">{hasPassword ? "Password updated." : "Password set."}</p>
           <button type="button" onClick={onClose} className="btn-primary w-full">
             Done
           </button>

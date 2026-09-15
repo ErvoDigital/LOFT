@@ -33,11 +33,11 @@ export default function PendingTasksPanel({ tasks }) {
           <Link
             key={t.id}
             to={`/workspaces/${t.workspaceId}/tasks`}
-            className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-ink-50"
+            className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-ink-50 dark:hover:bg-ink-700"
           >
             <div className="h-8 w-1 shrink-0 rounded-full" style={{ backgroundColor: t.workspaceColor || "#4F46E5" }} />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-ink-800">{t.title}</p>
+              <p className="truncate text-sm font-medium text-ink-800 dark:text-ink-100">{t.title}</p>
               <p className="truncate text-xs text-ink-400">{t.workspaceName}</p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">

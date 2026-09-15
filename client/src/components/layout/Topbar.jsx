@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, User, LogOut } from "lucide-react";
+import { ChevronDown, User, LogOut, Sun, Moon } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useTheme } from "../../context/ThemeContext.jsx";
 import Avatar from "../common/Avatar.jsx";
 import NotificationsBell from "../notifications/NotificationsBell.jsx";
 
@@ -13,6 +14,7 @@ const PAGE_TITLES = {
 
 export default function Topbar({ title }) {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const ref = useRef(null);
   const navigate = useNavigate();
@@ -29,6 +31,14 @@ export default function Topbar({ title }) {
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-ink-200 bg-white px-6 dark:border-ink-700 dark:bg-ink-900 print:hidden">
       <h1 className="text-base font-semibold text-ink-900 dark:text-ink-50">{title}</h1>
       <div className="flex items-center gap-3">
+        <button
+          onClick={toggleTheme}
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 dark:text-ink-300 dark:hover:bg-ink-800"
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
         <NotificationsBell />
         <div className="relative" ref={ref}>
           <button onClick={() => setMenuOpen((o) => !o)} className="flex items-center gap-1.5 rounded-lg px-1.5 py-1 hover:bg-ink-100 dark:hover:bg-ink-800">

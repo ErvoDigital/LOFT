@@ -39,7 +39,7 @@ function ToolButton({ Icon, title, active, disabled, onClick }) {
       title={title}
       aria-label={title}
       className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors disabled:opacity-30 disabled:pointer-events-none ${
-        active ? "bg-brand-50 text-brand-600" : "text-ink-500 hover:bg-ink-100 hover:text-ink-800"
+        active ? "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400" : "text-ink-500 hover:bg-ink-100 hover:text-ink-800 dark:hover:bg-ink-700 dark:hover:text-ink-100"
       }`}
     >
       <Icon className="h-4 w-4" />
@@ -48,7 +48,7 @@ function ToolButton({ Icon, title, active, disabled, onClick }) {
 }
 
 function Divider() {
-  return <div className="mx-1 h-5 w-px shrink-0 bg-ink-200" />;
+  return <div className="mx-1 h-5 w-px shrink-0 bg-ink-200 dark:bg-ink-700" />;
 }
 
 function ColorPickerButton({ Icon, title, colors, activeColor, onPick, onClear }) {
@@ -70,13 +70,13 @@ function ColorPickerButton({ Icon, title, colors, activeColor, onPick, onClear }
         onClick={() => setOpen((o) => !o)}
         title={title}
         aria-label={title}
-        className="flex h-8 w-8 flex-col items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-800"
+        className="flex h-8 w-8 flex-col items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-800 dark:hover:bg-ink-700 dark:hover:text-ink-100"
       >
         <Icon className="h-4 w-4" />
         <span className="mt-0.5 h-0.5 w-4 rounded-full" style={{ backgroundColor: activeColor || "transparent" }} />
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 flex items-center gap-1 rounded-lg border border-ink-200 bg-white p-1.5 shadow-panel">
+        <div className="absolute left-0 top-full z-20 mt-1 flex items-center gap-1 rounded-lg border border-ink-200 bg-white p-1.5 shadow-panel dark:border-ink-700 dark:bg-ink-800">
           {onClear && (
             <button
               onClick={() => {
@@ -85,7 +85,7 @@ function ColorPickerButton({ Icon, title, colors, activeColor, onPick, onClear }
               }}
               title="Clear"
               aria-label="Clear color"
-              className="flex h-5 w-5 items-center justify-center rounded-full border border-ink-300 text-ink-400 hover:border-ink-400"
+              className="flex h-5 w-5 items-center justify-center rounded-full border border-ink-300 text-ink-400 hover:border-ink-400 dark:border-ink-600"
             >
               <span className="h-px w-3 rotate-45 bg-ink-400" />
             </button>
@@ -113,7 +113,7 @@ export default function DocumentToolbar({ editor }) {
   if (!editor) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b border-ink-200 bg-white px-3 py-2 print:hidden">
+    <div className="flex flex-wrap items-center gap-0.5 border-b border-ink-200 bg-white px-3 py-2 dark:border-ink-700 dark:bg-ink-900 print:hidden">
       <ToolButton Icon={Undo2} title="Undo" disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()} />
       <ToolButton Icon={Redo2} title="Redo" disabled={!editor.can().redo()} onClick={() => editor.chain().focus().redo().run()} />
 

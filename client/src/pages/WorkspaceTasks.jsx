@@ -136,7 +136,7 @@ export default function WorkspaceTasks() {
     <>
       <div className="mx-auto max-w-6xl space-y-4 p-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-ink-900">Tasks</h2>
+          <h2 className="text-lg font-semibold text-ink-900 dark:text-ink-50">Tasks</h2>
           <div className="flex items-center gap-2">
             {isAdmin && (
               <button className="btn-secondary" onClick={() => setStatusModalOpen(true)}>
@@ -165,14 +165,14 @@ export default function WorkspaceTasks() {
                 key={col.id}
                 onDragOver={(e) => handleColumnDragOver(e, col.id)}
                 onDrop={(e) => handleDrop(e, col.id)}
-                className="min-w-[240px] flex-1 rounded-xl border border-ink-200 bg-ink-50 p-3"
+                className="min-w-[240px] flex-1 rounded-xl border border-ink-200 bg-ink-50 p-3 dark:border-ink-700 dark:bg-ink-900"
               >
                 <div className="mb-3 flex items-center justify-between px-1">
-                  <h3 className="flex items-center gap-1.5 text-sm font-semibold text-ink-700">
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold text-ink-700 dark:text-ink-200">
                     <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: col.color }} />
                     {col.label}
                   </h3>
-                  <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-ink-500 border border-ink-200">{colTasks.length}</span>
+                  <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-ink-500 border border-ink-200 dark:bg-ink-800 dark:border-ink-700">{colTasks.length}</span>
                 </div>
                 <div className="space-y-2">
                   {colTasks.map((t, i) => (

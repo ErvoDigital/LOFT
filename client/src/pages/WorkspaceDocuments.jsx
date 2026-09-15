@@ -88,7 +88,7 @@ export default function WorkspaceDocuments() {
     <div className="p-6">
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-ink-800">Docs</h1>
+          <h1 className="text-lg font-semibold text-ink-800 dark:text-ink-100">Docs</h1>
           <p className="text-sm text-ink-400">Shared documents everyone in this workspace can co-edit.</p>
         </div>
         <button onClick={createDocument} disabled={creating} className="btn-primary">
@@ -96,7 +96,7 @@ export default function WorkspaceDocuments() {
         </button>
       </div>
 
-      {error && <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
 
       {documents.length === 0 ? (
         <EmptyState
@@ -117,10 +117,10 @@ export default function WorkspaceDocuments() {
               <div
                 key={doc.id}
                 onClick={() => navigate(`/workspaces/${workspaceId}/docs/${doc.id}`)}
-                className="card group flex cursor-pointer flex-col gap-3 p-4 transition-colors hover:border-brand-300"
+                className="card group flex cursor-pointer flex-col gap-3 p-4 transition-colors hover:border-brand-300 dark:hover:border-brand-500"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-ink-500">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-ink-500 dark:bg-ink-700">
                     <FileText className="h-4 w-4" />
                   </span>
                   {canManage && (
@@ -132,7 +132,7 @@ export default function WorkspaceDocuments() {
                         }}
                         title="Document access"
                         aria-label="Document access"
-                        className="rounded-lg p-1.5 text-ink-300 hover:bg-brand-50 hover:text-brand-600"
+                        className="rounded-lg p-1.5 text-ink-300 hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
                       >
                         <Settings className="h-3.5 w-3.5" />
                       </button>
@@ -140,7 +140,7 @@ export default function WorkspaceDocuments() {
                         onClick={(e) => deleteDocument(e, doc.id)}
                         title="Delete document"
                         aria-label="Delete document"
-                        className="rounded-lg p-1.5 text-ink-300 hover:bg-red-50 hover:text-red-500"
+                        className="rounded-lg p-1.5 text-ink-300 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -149,7 +149,7 @@ export default function WorkspaceDocuments() {
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <p className="truncate text-sm font-medium text-ink-800">{doc.title}</p>
+                    <p className="truncate text-sm font-medium text-ink-800 dark:text-ink-100">{doc.title}</p>
                     {doc.visibility === "ASSIGNED" && <Lock className="h-3 w-3 shrink-0 text-accent-500" />}
                   </div>
                   <p className="mt-0.5 text-xs text-ink-400">

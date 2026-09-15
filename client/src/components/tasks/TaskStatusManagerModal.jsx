@@ -119,7 +119,7 @@ export default function TaskStatusManagerModal({ open, onClose, workspaceId, sta
         means "done" so overdue and reminder checks know to skip it.
       </p>
 
-      {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
 
       <div className="mb-4 space-y-1.5">
         {local.map((s, i) => (
@@ -127,7 +127,7 @@ export default function TaskStatusManagerModal({ open, onClose, workspaceId, sta
             key={s.id}
             onDragOver={(e) => handleDragOver(e, i)}
             onDrop={handleDrop}
-            className={`flex items-center gap-2 rounded-lg border border-ink-100 px-2 py-1.5 ${
+            className={`flex items-center gap-2 rounded-lg border border-ink-100 px-2 py-1.5 dark:border-ink-700 ${
               dragIndex === i ? "opacity-40" : ""
             }`}
           >
@@ -142,7 +142,7 @@ export default function TaskStatusManagerModal({ open, onClose, workspaceId, sta
             </span>
             <span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
             <input
-              className="min-w-0 flex-1 rounded-md border-none bg-transparent px-1 py-0.5 text-sm text-ink-700 focus:bg-ink-50 focus:outline-none"
+              className="min-w-0 flex-1 rounded-md border-none bg-transparent px-1 py-0.5 text-sm text-ink-700 focus:bg-ink-50 focus:outline-none dark:text-ink-200 dark:focus:bg-ink-700"
               defaultValue={s.label}
               onBlur={(e) => handleRename(s, e.target.value)}
             />
@@ -158,7 +158,9 @@ export default function TaskStatusManagerModal({ open, onClose, workspaceId, sta
               onClick={() => handleMarkDone(s)}
               disabled={s.isDone}
               className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                s.isDone ? "bg-brand-100 text-brand-700" : "text-ink-300 hover:bg-ink-100 hover:text-ink-500"
+                s.isDone
+                  ? "bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
+                  : "text-ink-300 hover:bg-ink-100 hover:text-ink-500 dark:hover:bg-ink-700"
               }`}
               title={s.isDone ? "This status means done" : "Mark as the done status"}
             >
@@ -174,7 +176,7 @@ export default function TaskStatusManagerModal({ open, onClose, workspaceId, sta
               type="button"
               onClick={() => handleDelete(s)}
               disabled={local.length <= 1}
-              className="shrink-0 rounded p-1 text-xs font-medium text-red-500 hover:bg-red-50 disabled:opacity-30"
+              className="shrink-0 rounded p-1 text-xs font-medium text-red-500 hover:bg-red-50 disabled:opacity-30 dark:hover:bg-red-500/10"
               title={local.length <= 1 ? "A workspace needs at least one status" : "Delete"}
             >
               Delete
@@ -183,8 +185,8 @@ export default function TaskStatusManagerModal({ open, onClose, workspaceId, sta
         ))}
       </div>
 
-      <form onSubmit={handleAdd} className="space-y-2 border-t border-ink-100 pt-3">
-        <label className="block text-sm font-medium text-ink-600">Add a status</label>
+      <form onSubmit={handleAdd} className="space-y-2 border-t border-ink-100 pt-3 dark:border-ink-700">
+        <label className="block text-sm font-medium text-ink-600 dark:text-ink-300">Add a status</label>
         <div className="flex items-center gap-2">
           <input
             className="input flex-1"

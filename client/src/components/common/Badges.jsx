@@ -1,9 +1,9 @@
 import { AlertTriangle, Clock3, CircleDot, Archive } from "lucide-react";
 
 const STATUS_STYLES = {
-  TODO: "bg-ink-100 text-ink-500",
-  IN_PROGRESS: "bg-accent-100 text-accent-600",
-  COMPLETED: "bg-brand-100 text-brand-700",
+  TODO: "bg-ink-100 text-ink-500 dark:bg-ink-700 dark:text-ink-300",
+  IN_PROGRESS: "bg-accent-100 text-accent-600 dark:bg-accent-500/15 dark:text-accent-400",
+  COMPLETED: "bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300",
 };
 
 const STATUS_LABELS = {
@@ -45,7 +45,7 @@ export const TIER_META = {
     short: "T4",
     description: "Backlog / Someday",
     Icon: Archive,
-    className: "border border-ink-300 bg-white text-ink-500",
+    className: "border border-ink-300 bg-white text-ink-500 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-400",
   },
 };
 
@@ -72,9 +72,9 @@ export function StatusBadge({ status }) {
 
 export function RoleBadge({ role }) {
   const styles = {
-    ADMIN: "bg-accent-100 text-accent-600",
-    MANAGER: "bg-brand-50 text-brand-700",
-    MEMBER: "bg-ink-100 text-ink-500",
+    ADMIN: "bg-accent-100 text-accent-600 dark:bg-accent-500/15 dark:text-accent-400",
+    MANAGER: "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300",
+    MEMBER: "bg-ink-100 text-ink-500 dark:bg-ink-700 dark:text-ink-300",
   };
   return <span className={`badge ${styles[role] || styles.MEMBER}`}>{role}</span>;
 }

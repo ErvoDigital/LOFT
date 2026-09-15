@@ -132,10 +132,10 @@ export default function MyPlan() {
       <div className="mx-auto max-w-5xl space-y-6 p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-semibold text-ink-900">My Plan</h2>
+            <h2 className="text-2xl font-semibold text-ink-900 dark:text-ink-50">My Plan</h2>
             <p className="text-sm text-ink-500">Every open task across your workspaces, ranked by Smart Priority into a day-by-day plan.</p>
             {view === "schedule" && (
-              <label className="mt-2 flex items-center gap-2 text-sm text-ink-600">
+              <label className="mt-2 flex items-center gap-2 text-sm text-ink-600 dark:text-ink-300">
                 Hours per day
                 <select className="input !w-auto" value={capacity} onChange={(e) => setCapacity(Number(e.target.value))}>
                   {CAPACITY_OPTIONS.map((h) => (
@@ -148,11 +148,11 @@ export default function MyPlan() {
             )}
           </div>
 
-          <div className="flex shrink-0 items-center gap-1 rounded-lg bg-ink-100 p-1 text-sm">
+          <div className="flex shrink-0 items-center gap-1 rounded-lg bg-ink-100 p-1 text-sm dark:bg-ink-900">
             <button
               onClick={() => setView("schedule")}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors ${
-                view === "schedule" ? "bg-white text-ink-800 shadow-soft" : "text-ink-500"
+                view === "schedule" ? "bg-white text-ink-800 shadow-soft dark:bg-ink-800 dark:text-ink-100" : "text-ink-500"
               }`}
             >
               <ListChecks className="h-4 w-4" /> Schedule
@@ -160,7 +160,7 @@ export default function MyPlan() {
             <button
               onClick={() => setView("calendar")}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors ${
-                view === "calendar" ? "bg-white text-ink-800 shadow-soft" : "text-ink-500"
+                view === "calendar" ? "bg-white text-ink-800 shadow-soft dark:bg-ink-800 dark:text-ink-100" : "text-ink-500"
               }`}
             >
               <CalendarDays className="h-4 w-4" /> Calendar
@@ -216,17 +216,17 @@ export default function MyPlan() {
 
                 {plan.unscheduled.length > 0 && (
                   <section className="card p-4">
-                    <h4 className="mb-2 text-sm font-semibold text-ink-800">Someday</h4>
+                    <h4 className="mb-2 text-sm font-semibold text-ink-800 dark:text-ink-100">Someday</h4>
                     <p className="mb-2 text-xs text-ink-400">No due date, and no room in the next 30 days at this pace.</p>
                     <div className="space-y-1.5">
                       {plan.unscheduled.map((t) => (
                         <button
                           key={t.taskId}
                           onClick={() => openTaskDetail(t)}
-                          className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-ink-50"
+                          className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-ink-50 dark:hover:bg-ink-700"
                         >
                           <TierBadge tier={t.tier} compact />
-                          <p className="truncate text-sm text-ink-600">
+                          <p className="truncate text-sm text-ink-600 dark:text-ink-300">
                             {t.title} <span className="text-ink-400">· {t.workspaceName}</span>
                           </p>
                         </button>
@@ -281,7 +281,7 @@ export default function MyPlan() {
 function StatChip({ label, value, accent, danger }) {
   return (
     <div className="card p-4">
-      <p className={`text-2xl font-semibold ${accent ? (danger ? "text-red-600" : "text-brand-600") : "text-ink-900"}`}>{value}</p>
+      <p className={`text-2xl font-semibold ${accent ? (danger ? "text-red-600" : "text-brand-600") : "text-ink-900 dark:text-ink-50"}`}>{value}</p>
       <p className="text-xs font-medium text-ink-500">{label}</p>
     </div>
   );
