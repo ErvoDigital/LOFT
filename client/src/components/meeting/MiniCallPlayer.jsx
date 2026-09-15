@@ -14,7 +14,7 @@ export default function MiniCallPlayer() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { workspaces } = useWorkspaces();
-  const { activeWorkspaceId, joined, participants, localStream, micOn, camOn, toggleMic, toggleCam, leaveMeeting } = useMeeting();
+  const { activeWorkspaceId, joined, participants, localStream, micOn, camOn, toggleMic, toggleCam, requestLeave } = useMeeting();
 
   if (!joined || !activeWorkspaceId) return null;
 
@@ -68,7 +68,7 @@ export default function MiniCallPlayer() {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              leaveMeeting();
+              requestLeave();
             }}
             title="Leave meeting"
             aria-label="Leave meeting"

@@ -67,6 +67,8 @@ export async function getPlan(req, res) {
     title: e.title,
     workspaceId: e.workspaceId,
     workspaceName: e.workspace.name,
+    workspaceColor: e.workspace.color,
+    location: e.location,
     startTime: e.startTime,
     endTime: e.endTime,
   }));
@@ -91,6 +93,7 @@ export async function getPlan(req, res) {
     })),
     conflicts,
     statusesByWorkspace,
+    events: planEvents,
     ...plan,
   });
 }

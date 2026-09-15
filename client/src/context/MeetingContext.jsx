@@ -1,9 +1,22 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { PhoneOff } from "lucide-react";
 import { useSocket } from "./SocketContext.jsx";
 import { useAuth } from "./AuthContext.jsx";
 import { useSpeakingDetection } from "../hooks/useSpeakingDetection.js";
+import Modal from "../components/common/Modal.jsx";
 
 const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
+const CONFIRM_LEAVE_KEY = "loft-confirm-before-leaving";
+
+function getInitialConfirmBeforeLeaving() {
+  try {
+    const stored = localStorage.getItem(CONFIRM_LEAVE_KEY);
+    if (stored !== null) return stored === "1";
+  } catch {
+    // localStorage unavailable — default to on.
+  }
+  return true;
+}
 
 // Lives at the app root (see main.jsx) instead of inside the Meeting page, so
 // navigating to another page no longer unmounts it and drops the call — the
@@ -61,6 +74,14 @@ export function MeetingProvider({ children }) {
   const [pipDock, setPipDock] = useState("bottom");
   const [localStream, setLocalStream] = useState(null); // mirrors localStreamRef, for consumers that need to render it (WorkspaceMeeting, MiniCallPlayer)
   const [annotations, setAnnotations] = useState([]); // shapes drawn on the shared screen, synced to every participant
+  // Personal, per-browser preference (not a workspace setting) — whether
+  // clicking "leave" asks for confirmation first. Surfaced in the meeting
+  // page's Settings modal; read here too since it gates requestLeave() below.
+  const [confirmBeforeLeaving, setConfirmBeforeLeavingState] = useState(getInitialConfirmBeforeLeaving);
+  // Shown from both the meeting page's End Call button and MiniCallPlayer's —
+  // rendered once at the provider level (below) so either trigger reuses the
+  // same dialog regardless of which page is currently showing.
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
 
   const localStreamRef = useRef(null); // camera + mic — never touched by screen sharing
   const localScreenStreamRef = useRef(null); // the getDisplayMedia stream, while sharing
@@ -400,6 +421,36 @@ export function MeetingProvider({ children }) {
     setMicRequestOpen(false);
   }
 
+  function setConfirmBeforeLeaving(next) {
+    setConfirmBeforeLeavingState(next);
+    try {
+      localStorage.setItem(CONFIRM_LEAVE_KEY, next ? "1" : "0");
+    } catch {
+      // localStorage unavailable — preference just won't persist.
+    }
+  }
+
+  // What the "leave meeting" buttons actually call — opens the confirmation
+  // dialog first unless the user has turned that preference off, in which
+  // case it hangs up immediately like before.
+  function requestLeave() {
+    if (!joined) return;
+    if (confirmBeforeLeaving) {
+      setLeaveConfirmOpen(true);
+    } else {
+      leaveMeeting();
+    }
+  }
+
+  function confirmLeave() {
+    setLeaveConfirmOpen(false);
+    leaveMeeting();
+  }
+
+  function cancelLeave() {
+    setLeaveConfirmOpen(false);
+  }
+
   // Leaves whatever call is currently active and immediately opens the
   // lobby for a different workspace's — used by the "leave & join here"
   // cross-workspace prompt. Skips the confirmation dialog (defaults to
@@ -620,6 +671,12 @@ export function MeetingProvider({ children }) {
     confirmJoin,
     cancelPrepare,
     leaveMeeting,
+    confirmBeforeLeaving,
+    setConfirmBeforeLeaving,
+    leaveConfirmOpen,
+    requestLeave,
+    confirmLeave,
+    cancelLeave,
     switchMeeting,
     toggleMic,
     toggleCam,
@@ -635,6 +692,23 @@ export function MeetingProvider({ children }) {
       {children}
       {joined &&
         Object.entries(remoteStreams).map(([userId, stream]) => <RemoteAudioTrack key={userId} stream={stream} />)}
+      <Modal open={leaveConfirmOpen} onClose={cancelLeave} title="" width="max-w-xs">
+        <div className="text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-500/15 text-red-600">
+            <PhoneOff className="h-6 w-6" />
+          </div>
+          <h2 className="text-base font-semibold text-ink-900 dark:text-ink-50">End the call?</h2>
+          <p className="mt-1 text-sm text-ink-400">You'll be disconnected from this meeting.</p>
+          <div className="mt-4 flex items-center gap-2">
+            <button onClick={cancelLeave} className="btn-secondary flex-1">
+              Cancel
+            </button>
+            <button onClick={confirmLeave} className="btn-danger flex-1">
+              End call
+            </button>
+          </div>
+        </div>
+      </Modal>
     </MeetingContext.Provider>
   );
 }

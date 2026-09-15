@@ -121,6 +121,12 @@ export default function ChatThread({ conversation, headerExtra }) {
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const typingTimeout = useRef(null);
+  // Set right before a `messages` update that should snap the view to the
+  // bottom (a fresh load, a new message arriving) and read/cleared by the
+  // scroll effect below. A reaction update also replaces the `messages`
+  // array, but never sets this — otherwise reacting to a message you'd
+  // scrolled up to read would immediately yank the view back down.
+  const shouldScrollToBottom = useRef(true);
 
   const conversationId = conversation.id;
   const workspaceId = conversation.workspaceId;
@@ -137,6 +143,7 @@ export default function ChatThread({ conversation, headerExtra }) {
     setMentionState(null);
     setReactionPickerFor(null);
     messagesApi.getMessages(conversationId).then((msgs) => {
+      shouldScrollToBottom.current = true;
       setMessages(msgs);
       setLoadingMessages(false);
     });
@@ -145,13 +152,17 @@ export default function ChatThread({ conversation, headerExtra }) {
   }, [conversationId, socket]);
 
   useEffect(() => {
+    if (!shouldScrollToBottom.current) return;
+    shouldScrollToBottom.current = false;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
   useEffect(() => {
     if (!socket) return;
     const onMessage = (msg) => {
-      if (msg.conversationId === conversationId) setMessages((prev) => [...prev, msg]);
+      if (msg.conversationId !== conversationId) return;
+      shouldScrollToBottom.current = true;
+      setMessages((prev) => [...prev, msg]);
     };
     const onTyping = ({ conversationId: cid, userId, isTyping }) => {
       if (cid !== conversationId || userId === user.id) return;

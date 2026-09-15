@@ -43,7 +43,11 @@ const subNavItemClass = (collapsed) =>
   ({ isActive }) =>
     `flex items-center gap-2.5 rounded-lg text-sm font-medium transition-colors ${
       collapsed ? "h-10 w-10 justify-center px-0" : "px-3 py-2"
-    } ${isActive ? "bg-brand-50 text-brand-700" : "text-ink-500 hover:bg-ink-100 hover:text-ink-800"}`;
+    } ${
+      isActive
+        ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"
+        : "text-ink-500 hover:bg-ink-100 hover:text-ink-800 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100"
+    }`;
 
 const SUB_NAV_ITEMS = [
   { to: "calendar", label: "Calendar", Icon: Calendar },
@@ -113,14 +117,14 @@ export default function Sidebar() {
       {/* Contextual panel: sub-nav for the active workspace, collapsible to icon-only */}
       {activeWorkspace && (
         <div
-          className={`flex flex-col border-r border-ink-200 bg-white py-4 transition-[width] duration-150 ${
+          className={`flex flex-col border-r border-ink-200 bg-white py-4 transition-[width] duration-150 dark:border-ink-700 dark:bg-ink-900 ${
             collapsed ? "w-14 items-center px-2" : "w-52 px-3"
           }`}
         >
           <div className={`mb-4 flex w-full items-start px-1 ${collapsed ? "justify-center" : "justify-between gap-2"}`}>
             {!collapsed && (
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-ink-800">{activeWorkspace.name}</p>
+                <p className="truncate text-sm font-semibold text-ink-800 dark:text-ink-100">{activeWorkspace.name}</p>
                 <p className="truncate text-xs text-ink-400 capitalize">
                   {activeWorkspace.type} · {activeWorkspace.memberCount} member{activeWorkspace.memberCount === 1 ? "" : "s"}
                 </p>
@@ -129,7 +133,7 @@ export default function Sidebar() {
             <button
               onClick={() => setCollapsed((c) => !c)}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              className="shrink-0 rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+              className="shrink-0 rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-800 dark:hover:text-ink-100"
             >
               {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </button>

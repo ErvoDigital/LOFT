@@ -211,7 +211,7 @@ export default function MyPlan() {
                     ))}
                   </section>
                 ) : (
-                  <PlanCalendar tasks={plan.tasks} onTaskClick={openTaskDetail} />
+                  <PlanCalendar tasks={plan.tasks} events={plan.events || []} onTaskClick={openTaskDetail} />
                 )}
 
                 {plan.unscheduled.length > 0 && (

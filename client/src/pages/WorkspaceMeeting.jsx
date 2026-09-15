@@ -13,6 +13,8 @@ import {
   PanelLeft,
   PanelRight,
   MessageSquare,
+  Settings,
+  CalendarPlus,
   X,
 } from "lucide-react";
 import { useSocket } from "../context/SocketContext.jsx";
@@ -23,6 +25,8 @@ import * as conversationsApi from "../api/conversations.js";
 import VideoTile from "../components/meeting/VideoTile.jsx";
 import ChatThread from "../components/chat/ChatThread.jsx";
 import Modal from "../components/common/Modal.jsx";
+import MeetingSettingsModal from "../components/meeting/MeetingSettingsModal.jsx";
+import ScheduleMeetingModal from "../components/meeting/ScheduleMeetingModal.jsx";
 
 const GRID_GAP = 16; // px — must match the camera grid's gap-4
 const TILE_ASPECT_RATIO = 16 / 9;
@@ -132,7 +136,7 @@ function MicRequestModal({ open, onCancel, onConfirm }) {
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent-500/15 text-accent-600">
           <Mic className="h-6 w-6" />
         </div>
-        <h2 className="text-base font-semibold text-ink-900">Turn on your microphone?</h2>
+        <h2 className="text-base font-semibold text-ink-900 dark:text-ink-50">Turn on your microphone?</h2>
         <p className="mt-1 text-sm text-ink-400">Others will be able to hear you once you allow access.</p>
         <div className="mt-4 flex items-center gap-2">
           <button onClick={onCancel} className="btn-secondary flex-1">
@@ -184,7 +188,7 @@ export default function WorkspaceMeeting() {
     confirmDevices,
     confirmJoin,
     cancelPrepare,
-    leaveMeeting,
+    requestLeave,
     switchMeeting,
     toggleMic,
     toggleCam,
@@ -198,6 +202,12 @@ export default function WorkspaceMeeting() {
   const [preJoinCount, setPreJoinCount] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatConversation, setChatConversation] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+
+  // The only "meet link" concept LOFT has — this workspace's own meeting
+  // room, shareable as a plain URL rather than a separate per-meeting id.
+  const meetLink = `${window.location.origin}/workspaces/${workspaceId}/meeting`;
 
   const inThisWorkspacesCall = joined && activeWorkspaceId === workspaceId;
   const inAnotherWorkspacesCall = joined && activeWorkspaceId !== workspaceId;
@@ -319,11 +329,27 @@ export default function WorkspaceMeeting() {
           <button onClick={() => promptJoin(workspaceId)} disabled={joining} className="btn-primary mt-5 w-full">
             {joining ? "Requesting access…" : preJoinCount > 0 ? "Join meeting" : "Start meeting"}
           </button>
+          <div className="mt-2 flex items-center gap-2">
+            <button onClick={() => setScheduleOpen(true)} className="btn-secondary w-full justify-center !bg-white/10 !border-white/10 !text-white hover:!bg-white/20">
+              <CalendarPlus className="h-4 w-4" /> Schedule a meeting
+            </button>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              title="Meeting settings"
+              aria-label="Meeting settings"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white hover:bg-white/20"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+          </div>
         </div>
+
+        <MeetingSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} meetLink={meetLink} />
+        <ScheduleMeetingModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} workspaceId={workspaceId} meetLink={meetLink} />
 
         <Modal open={confirmForThisWorkspace} onClose={cancelConfirm} title="" width="max-w-sm">
           <div className="text-center">
-            <div className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-ink-100">
+            <div className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-ink-100 dark:bg-ink-700">
               <Video className="h-9 w-9 text-ink-400" />
               <span className="absolute -right-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full bg-brand-500 text-white shadow-soft">
                 <Video className="h-4 w-4" />
@@ -332,7 +358,7 @@ export default function WorkspaceMeeting() {
                 <Mic className="h-4 w-4" />
               </span>
             </div>
-            <h2 className="text-lg font-semibold text-ink-900">Do you want people to see you in the meeting?</h2>
+            <h2 className="text-lg font-semibold text-ink-900 dark:text-ink-50">Do you want people to see you in the meeting?</h2>
             <p className="mt-1 text-sm text-ink-400">You can still turn off your camera anytime in the meeting.</p>
             <div className="mt-5 flex flex-col gap-2">
               <button onClick={() => confirmDevices(false)} className="btn-primary w-full justify-center">
@@ -510,23 +536,31 @@ export default function WorkspaceMeeting() {
           >
             <MessageSquare className="h-5 w-5" />
           </ControlButton>
-          <ControlButton onClick={leaveMeeting} variant="danger" wide title="Leave meeting">
+          <ControlButton onClick={() => setScheduleOpen(true)} title="Schedule a meeting">
+            <CalendarPlus className="h-5 w-5" />
+          </ControlButton>
+          <ControlButton onClick={() => setSettingsOpen(true)} title="Meeting settings">
+            <Settings className="h-5 w-5" />
+          </ControlButton>
+          <ControlButton onClick={requestLeave} variant="danger" wide title="Leave meeting">
             <PhoneOff className="h-5 w-5" />
           </ControlButton>
         </div>
 
         <MicRequestModal open={micRequestOpen} onCancel={cancelMicRequest} onConfirm={confirmEnableMic} />
+        <MeetingSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} meetLink={meetLink} />
+        <ScheduleMeetingModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} workspaceId={workspaceId} meetLink={meetLink} />
       </div>
 
       {chatOpen && (
-        <div className="flex h-full min-h-0 w-80 shrink-0 flex-col border-l border-ink-200 bg-white">
+        <div className="flex h-full min-h-0 w-80 shrink-0 flex-col border-l border-ink-200 bg-white dark:border-ink-700 dark:bg-ink-800">
           {chatConversation ? (
             <ChatThread
               conversation={chatConversation}
               headerExtra={
                 <button
                   onClick={() => setChatOpen(false)}
-                  className="shrink-0 rounded-lg p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-600"
+                  className="shrink-0 rounded-lg p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-200"
                   aria-label="Close chat"
                 >
                   <X className="h-4 w-4" />
@@ -535,11 +569,11 @@ export default function WorkspaceMeeting() {
             />
           ) : (
             <>
-              <div className="flex items-center justify-between border-b border-ink-200 px-4 py-3">
-                <p className="text-sm font-semibold text-ink-800">Chat</p>
+              <div className="flex items-center justify-between border-b border-ink-200 px-4 py-3 dark:border-ink-700">
+                <p className="text-sm font-semibold text-ink-800 dark:text-ink-100">Chat</p>
                 <button
                   onClick={() => setChatOpen(false)}
-                  className="rounded-lg p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-600"
+                  className="rounded-lg p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-200"
                   aria-label="Close chat"
                 >
                   <X className="h-4 w-4" />

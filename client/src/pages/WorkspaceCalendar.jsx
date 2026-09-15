@@ -58,7 +58,7 @@ export default function WorkspaceCalendar() {
     <div className="mx-auto max-w-6xl space-y-4 p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-ink-800">
+          <h2 className="text-lg font-semibold text-ink-800 dark:text-ink-100">
             {monthDate.toLocaleDateString([], { month: "long", year: "numeric" })}
           </h2>
           <input
@@ -89,7 +89,7 @@ export default function WorkspaceCalendar() {
         <MonthGrid monthDate={monthDate} events={events} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
 
         <div className="card p-4">
-          <h3 className="mb-3 text-sm font-semibold text-ink-700">
+          <h3 className="mb-3 text-sm font-semibold text-ink-700 dark:text-ink-200">
             {selectedDate.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
           </h3>
           {dayEvents.length === 0 ? (
@@ -103,9 +103,9 @@ export default function WorkspaceCalendar() {
                     setEditingEvent(e);
                     setModalOpen(true);
                   }}
-                  className="block w-full rounded-lg border border-ink-200 p-3 text-left hover:border-brand-300 hover:bg-brand-50/40"
+                  className="block w-full rounded-lg border border-ink-200 p-3 text-left hover:border-brand-300 hover:bg-brand-50/40 dark:border-ink-600 dark:hover:border-brand-500 dark:hover:bg-brand-500/10"
                 >
-                  <p className="text-sm font-medium text-ink-700">{e.title}</p>
+                  <p className="text-sm font-medium text-ink-700 dark:text-ink-100">{e.title}</p>
                   <p className="text-xs text-ink-400">
                     {new Date(e.startTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} –{" "}
                     {new Date(e.endTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}

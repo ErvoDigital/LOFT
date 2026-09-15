@@ -49,7 +49,11 @@ export default function MonthGrid({ monthDate, events, selectedDate, onSelectDat
               key={d.toISOString()}
               onClick={() => onSelectDate(d)}
               className={`flex h-20 flex-col items-start rounded-lg p-1.5 text-left transition-colors ${
-                isSelected ? "brand-mark text-white" : inMonth ? "hover:bg-ink-50" : "text-ink-300 hover:bg-ink-50"
+                isSelected
+                  ? "brand-mark text-white"
+                  : inMonth
+                  ? "hover:bg-ink-50 dark:text-ink-100 dark:hover:bg-ink-700"
+                  : "text-ink-300 hover:bg-ink-50 dark:text-ink-600 dark:hover:bg-ink-700"
               }`}
             >
               <span
@@ -63,7 +67,7 @@ export default function MonthGrid({ monthDate, events, selectedDate, onSelectDat
                 {dayEvents.slice(0, 2).map((e) => (
                   <span
                     key={e.id}
-                    className={`truncate rounded px-1 text-[10px] font-medium ${isSelected ? "bg-white/20 text-white" : "text-ink-600"}`}
+                    className={`truncate rounded px-1 text-[10px] font-medium ${isSelected ? "bg-white/20 text-white" : "text-ink-600 dark:text-ink-200"}`}
                     style={!isSelected ? { backgroundColor: (e.workspaceColor || "#4F46E5") + "22" } : {}}
                   >
                     {e.title}
