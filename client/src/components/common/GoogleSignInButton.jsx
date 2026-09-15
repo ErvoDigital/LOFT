@@ -27,6 +27,7 @@ export default function GoogleSignInButton({ onCredential, onSuccess, onError, d
           }}
           onError={() => onError?.("Google sign-in failed. Please try again.")}
           width="100%"
+          logo_alignment="center"
         />
       </div>
     </div>
