@@ -108,6 +108,7 @@ export default function Profile() {
           </div>
           <div>
             <p className="text-sm font-medium text-ink-700 dark:text-ink-200">{user?.email}</p>
+            <p className="text-xs text-ink-400">{name}</p>
             {user?.avatarUrl && (
               <button
                 type="button"
