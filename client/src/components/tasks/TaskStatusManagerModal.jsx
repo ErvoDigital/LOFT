@@ -3,8 +3,9 @@ import { GripVertical, Check } from "lucide-react";
 import Modal from "../common/Modal.jsx";
 import * as taskStatusesApi from "../../api/taskStatuses.js";
 import { apiErrorMessage } from "../../api/client.js";
+import { displayColor } from "../../lib/colors.js";
 
-const COLORS = ["#8a8578", "#C17538", "#4F6B8C", "#8C5A9C", "#B8562F", "#4A8C7A", "#3D8BFD", "#C44569"];
+const COLORS = ["#8a8578", "#C17538", "#0A7862", "#8C5A9C", "#B8562F", "#4A8C7A", "#17BC95", "#C44569"];
 
 export default function TaskStatusManagerModal({ open, onClose, workspaceId, statuses, onChanged }) {
   const [local, setLocal] = useState(statuses);
@@ -140,7 +141,7 @@ export default function TaskStatusManagerModal({ open, onClose, workspaceId, sta
             >
               <GripVertical className="h-4 w-4" />
             </span>
-            <span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
+            <span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: displayColor(s.color) }} />
             <input
               className="min-w-0 flex-1 rounded-md border-none bg-transparent px-1 py-0.5 text-sm text-ink-700 focus:bg-ink-50 focus:outline-none dark:text-ink-200 dark:focus:bg-ink-700"
               defaultValue={s.label}
@@ -148,7 +149,7 @@ export default function TaskStatusManagerModal({ open, onClose, workspaceId, sta
             />
             <input
               type="color"
-              value={s.color}
+              value={displayColor(s.color)}
               onChange={(e) => handleRecolor(s, e.target.value)}
               className="h-6 w-6 shrink-0 cursor-pointer rounded border-none bg-transparent p-0"
               title="Color"

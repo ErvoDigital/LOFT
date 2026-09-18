@@ -1,41 +1,10 @@
 import { useState } from "react";
-import { Download, Eye, File, Film, FolderInput, Image, Music, FileText, Trash2 } from "lucide-react";
+import { Download, Eye, FolderInput, Trash2 } from "lucide-react";
 import Avatar from "../common/Avatar.jsx";
 import { ASSET_DRAG_TYPE } from "./dragTypes.js";
+import { FileIcon, formatSize, timeAgo } from "../../lib/fileIcons.jsx";
 
-const DOCUMENT_MIME_TYPES = new Set([
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-]);
-
-function FileIcon({ mimeType, className }) {
-  if (!mimeType) return <File className={className} />;
-  if (mimeType.startsWith("video/")) return <Film className={className} />;
-  if (mimeType.startsWith("image/")) return <Image className={className} />;
-  if (mimeType.startsWith("audio/")) return <Music className={className} />;
-  if (DOCUMENT_MIME_TYPES.has(mimeType)) return <FileText className={className} />;
-  return <File className={className} />;
-}
-
-function formatSize(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
-
-function timeAgo(date) {
-  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
-export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, onDownload, onPreview, onMove, onDelete, uploadProgress }) {
+export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, onDownload, onPreview, onMove, onDelete, uploadProgress, materializing }) {
   const [expanded, setExpanded] = useState(false);
   const [dragState, setDragState] = useState(null); // "merge" | "version" | null
 
@@ -76,12 +45,16 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
       onDragOver={handleDragOver}
       onDragLeave={() => setDragState(null)}
       onDrop={handleDrop}
-      className={`card relative cursor-grab p-4 transition-colors active:cursor-grabbing ${
-        dragState === "merge" ? "border-brand-400 bg-brand-50 dark:bg-brand-500/15" : dragState === "version" ? "border-accent-300 bg-accent-50 dark:bg-accent-500/15" : ""
-      }`}
+      className={`card card-hover relative cursor-grab p-4 active:cursor-grabbing ${
+        dragState === "merge"
+          ? "border-brand-400 bg-brand-500/10 ring-2 ring-brand-400/40"
+          : dragState === "version"
+            ? "border-accent-300 bg-accent-500/10 ring-2 ring-accent-400/40"
+            : ""
+      } ${materializing ? "animate-slide-fade-in" : ""}`}
     >
       {isMultiVersion && (
-        <span className="absolute right-3 top-3 rounded-full bg-accent-500 px-2 py-0.5 text-[11px] font-semibold text-white shadow-soft">
+        <span className="absolute right-3 top-3 rounded-full bg-gradient-to-br from-brand-300 to-brand-500 px-2 py-0.5 text-[11px] font-semibold text-ink-950 shadow-glow-sm">
           V{latest.version}
         </span>
       )}
@@ -92,7 +65,7 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
         className="mb-2 flex w-full items-start gap-2.5 pr-8 text-left"
         title="Preview"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-ink-500 dark:bg-ink-700">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-300">
           <FileIcon mimeType={latest?.mimeType} className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
@@ -117,7 +90,7 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
       {uploadProgress !== undefined && (
         <div className="mb-2">
           <p className="mb-1 text-xs font-medium text-ink-400">Uploading… {uploadProgress}%</p>
-          <div className="h-1.5 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-700">
+          <div className="h-1.5 overflow-hidden rounded-full bg-ink-900/10 dark:bg-white/10">
             <div
               className="h-full rounded-full bg-accent-500 transition-all duration-200"
               style={{ width: `${uploadProgress}%` }}
@@ -170,7 +143,7 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
       </div>
 
       {expanded && (
-        <div className="mt-3 space-y-1.5 border-t border-ink-200 pt-2.5 dark:border-ink-700">
+        <div className="mt-3 space-y-1.5 border-t border-ink-900/10 pt-2.5 dark:border-white/10">
           {asset.versions.map((v) => (
             <div key={v.id} className="flex items-center justify-between text-xs">
               <span className="font-medium text-ink-600 dark:text-ink-300">V{v.version}</span>

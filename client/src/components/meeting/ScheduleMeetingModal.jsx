@@ -71,7 +71,7 @@ export default function ScheduleMeetingModal({ open, onClose, workspaceId, meetL
     <Modal open={open} onClose={onClose} title="Schedule a meeting" width="max-w-md">
       {done ? (
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-500/15 text-brand-600">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-500/15 text-brand-600 dark:text-brand-400">
             <Video className="h-6 w-6" />
           </div>
           <h2 className="text-base font-semibold text-ink-900 dark:text-ink-50">Meeting scheduled</h2>

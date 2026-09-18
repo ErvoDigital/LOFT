@@ -26,7 +26,7 @@ export default function ConflictsPanel({ conflicts }) {
   if (!conflicts || conflicts.length === 0) {
     return (
       <div className="card flex items-center gap-3 border-brand-200 bg-brand-50 p-4 dark:bg-brand-500/15">
-        <CheckCircle2 className="h-5 w-5 shrink-0 text-brand-600" />
+        <CheckCircle2 className="h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" />
         <div>
           <p className="text-sm font-medium text-brand-800 dark:text-brand-300">No conflicts across your workspaces</p>
           <p className="text-xs text-brand-700/80 dark:text-brand-300/80">LOFT is watching every deadline and meeting for overlaps — you're clear for the next two weeks.</p>

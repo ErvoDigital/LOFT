@@ -2,8 +2,8 @@ import { Sparkles } from "lucide-react";
 
 export default function EmptyState({ icon, title, description, action }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-ink-200 py-12 text-center dark:border-ink-700">
-      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-ink-100 text-ink-400 dark:bg-ink-700">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-ink-300/60 py-12 text-center dark:border-white/10">
+      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500 dark:text-brand-300">
         {icon || <Sparkles className="h-5 w-5" />}
       </div>
       <p className="font-medium text-ink-700 dark:text-ink-200">{title}</p>

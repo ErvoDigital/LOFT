@@ -5,6 +5,7 @@ import { TierBadge } from "../common/Badges.jsx";
 import PreviewModal from "../storage/PreviewModal.jsx";
 import * as assetsApi from "../../api/assets.js";
 import { apiErrorMessage } from "../../api/client.js";
+import { displayColor } from "../../lib/colors.js";
 
 function formatDuration(minutes) {
   const m = Number(minutes) || 0;
@@ -194,7 +195,7 @@ export default function TaskDetailsPanel({ open, task, workspaceId, statuses, on
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-400">Status</p>
                 {statusMeta ? (
                   <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-700 dark:text-ink-200">
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: statusMeta.color }} />
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: displayColor(statusMeta.color) }} />
                     {statusMeta.label}
                   </span>
                 ) : (

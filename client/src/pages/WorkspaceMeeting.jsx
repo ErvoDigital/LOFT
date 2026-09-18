@@ -110,7 +110,7 @@ function ControlButton({ onClick, variant = "default", wide, title, children }) 
   const variants = {
     default: "bg-white/10 text-white hover:bg-white/20",
     off: "bg-white text-ink-900 hover:bg-white/90",
-    active: "bg-brand-500 text-white hover:bg-brand-600",
+    active: "bg-brand-400 text-ink-950 hover:bg-brand-300",
     danger: "bg-red-600 text-white hover:bg-red-700",
   };
   return (
@@ -386,7 +386,7 @@ export default function WorkspaceMeeting() {
           <div className="text-center">
             <div className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-ink-100 dark:bg-ink-700">
               <Video className="h-9 w-9 text-ink-400" />
-              <span className="absolute -right-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full bg-brand-500 text-white shadow-soft">
+              <span className="absolute -right-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full bg-brand-500 text-ink-950 shadow-soft">
                 <Video className="h-4 w-4" />
               </span>
               <span className="absolute -left-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full bg-accent-500 text-white shadow-soft">

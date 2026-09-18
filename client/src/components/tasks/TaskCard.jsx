@@ -11,7 +11,7 @@ function formatDuration(minutes) {
   return `${h}h ${rest}m`;
 }
 
-export default function TaskCard({ task, onClick, onEdit, dragHandlers, dragging, isDoneColumn }) {
+export default function TaskCard({ task, onClick, onEdit, dragHandlers, dragging, isDoneColumn, draggable = true }) {
   const overdue = task.dueDate && new Date(task.dueDate) < new Date() && !isDoneColumn;
 
   return (
@@ -25,15 +25,19 @@ export default function TaskCard({ task, onClick, onEdit, dragHandlers, dragging
           onClick();
         }
       }}
-      draggable
+      draggable={draggable}
       {...dragHandlers}
-      className={`group w-full cursor-grab rounded-lg border bg-white p-3 text-left shadow-soft transition-all hover:border-brand-300 hover:shadow-panel focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 active:cursor-grabbing dark:bg-ink-800 ${
-        task.isPinned ? "border-brand-300 ring-1 ring-brand-100" : "border-ink-200 dark:border-ink-700"
-      } ${dragging ? "opacity-40" : ""} ${task.isSnoozed ? "opacity-60" : ""}`}
+      className={`group w-full rounded-xl border bg-white/70 p-3 text-left shadow-soft transition-all hover:border-brand-400/60 hover:bg-white/90 hover:shadow-glow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] ${
+        draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+      } ${
+        task.isPinned
+          ? "border-brand-400/60 ring-1 ring-brand-400/20"
+          : "border-white/60 dark:border-white/[0.08]"
+      } ${dragging ? "opacity-40 shadow-glow ring-2 ring-brand-400/50" : ""} ${task.isSnoozed ? "opacity-60" : ""}`}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <p className="flex min-w-0 items-center gap-1 text-sm font-medium text-ink-800 dark:text-ink-100">
-          {task.isPinned && <Pin className="h-3 w-3 shrink-0 text-brand-600" />}
+          {task.isPinned && <Pin className="h-3 w-3 shrink-0 text-brand-600 dark:text-brand-400" />}
           {task.isSnoozed && <Moon className="h-3 w-3 shrink-0 text-ink-400" />}
           <span className="truncate">{task.title}</span>
         </p>

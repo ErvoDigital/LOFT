@@ -9,9 +9,12 @@ import ConflictsPanel from "../components/dashboard/ConflictsPanel.jsx";
 import UpcomingEvents from "../components/dashboard/UpcomingEvents.jsx";
 import PendingTasksPanel from "../components/dashboard/PendingTasksPanel.jsx";
 import ActivityFeed from "../components/dashboard/ActivityFeed.jsx";
+import StatCard from "../components/dashboard/StatCard.jsx";
+import RecentFilesPanel from "../components/dashboard/RecentFilesPanel.jsx";
 import Spinner from "../components/common/Spinner.jsx";
 import EmptyState from "../components/common/EmptyState.jsx";
 import WorkspaceModal from "../components/layout/WorkspaceModal.jsx";
+import { displayColor, textOn } from "../lib/colors.js";
 
 function greeting() {
   const h = new Date().getHours();
@@ -81,10 +84,13 @@ export default function Dashboard() {
   const tasksDueToday = data?.pendingTasks?.filter((t) => t.dueDate && new Date(t.dueDate).toDateString() === new Date().toDateString()).length || 0;
   const eventsToday = data?.upcomingEvents?.filter((e) => new Date(e.startTime).toDateString() === new Date().toDateString()).length || 0;
 
+  const pendingCount = data?.pendingTasks?.length || 0;
+  const conflictCount = data?.conflicts?.length || 0;
+
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
       <div>
-        <h2 className="text-2xl font-semibold text-ink-900 dark:text-ink-50">
+        <h2 className="text-2xl font-semibold tracking-tight text-ink-900 dark:text-white">
           {greeting()}, {user?.name?.split(" ")[0]}
         </h2>
         <p className="text-sm text-ink-500">
@@ -93,14 +99,32 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatChip label="Workspaces" value={workspaces.length} />
-        <StatChip label="Tasks due today" value={tasksDueToday} accent={tasksDueToday > 0} />
-        <StatChip label="Meetings today" value={eventsToday} />
-        <StatChip label="Conflicts found" value={data?.conflicts?.length || 0} accent={(data?.conflicts?.length || 0) > 0} danger />
+        <StatCard
+          label="Workspaces"
+          value={workspaces.length}
+          trend={`${data?.recentActivity?.length || 0} recent updates`}
+        />
+        <StatCard
+          label="Tasks due today"
+          value={tasksDueToday}
+          tone={tasksDueToday > 0 ? "brand" : "default"}
+          trend={`${pendingCount} pending overall`}
+        />
+        <StatCard
+          label="Meetings today"
+          value={eventsToday}
+          trend={`${data?.upcomingEvents?.length || 0} in next 14 days`}
+        />
+        <StatCard
+          label="Conflicts found"
+          value={conflictCount}
+          tone={conflictCount > 0 ? "danger" : "positive"}
+          trend={conflictCount > 0 ? "Needs resolving" : "Nothing clashing"}
+        />
       </div>
 
       <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">Cross-workspace conflicts</h3>
+        <h3 className="section-label mb-2">Cross-workspace conflicts</h3>
         <ConflictsPanel conflicts={data?.conflicts} />
       </section>
 
@@ -116,27 +140,34 @@ export default function Dashboard() {
         <section className="card p-5">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-ink-800 dark:text-ink-100">Your pending tasks</h3>
-            <Link to="/plan" className="text-xs font-medium text-brand-600 hover:text-brand-700">
-              View my plan →
+            <Link to="/plan" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-300">
+              View my plan
             </Link>
           </div>
           <PendingTasksPanel tasks={data?.pendingTasks} />
         </section>
       </div>
 
-      <section className="card p-5">
-        <h3 className="mb-3 text-sm font-semibold text-ink-800 dark:text-ink-100">Recent activity</h3>
-        <ActivityFeed activity={data?.recentActivity} />
-      </section>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="card p-5">
+          <h3 className="mb-3 text-sm font-semibold text-ink-800 dark:text-ink-100">Recent activity</h3>
+          <ActivityFeed activity={data?.recentActivity} />
+        </section>
+
+        <section className="card p-5">
+          <h3 className="mb-3 text-sm font-semibold text-ink-800 dark:text-ink-100">Documents &amp; files</h3>
+          <RecentFilesPanel files={data?.recentFiles} />
+        </section>
+      </div>
 
       <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">Your workspaces</h3>
+        <h3 className="section-label mb-2">Your workspaces</h3>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {workspaces.map((w) => (
-            <Link key={w.id} to={`/workspaces/${w.id}/calendar`} className="card flex items-center gap-3 p-3 transition-shadow hover:shadow-panel">
+            <Link key={w.id} to={`/workspaces/${w.id}/dashboard`} className="card card-hover flex items-center gap-3 p-3">
               <div
-                style={{ backgroundColor: w.color }}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-semibold text-white"
+                style={{ backgroundColor: displayColor(w.color), color: textOn(w.color) }}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-semibold"
               >
                 {w.name.slice(0, 2).toUpperCase()}
               </div>
@@ -152,11 +183,3 @@ export default function Dashboard() {
   );
 }
 
-function StatChip({ label, value, accent, danger }) {
-  return (
-    <div className="card p-4">
-      <p className={`text-2xl font-semibold ${accent ? (danger ? "text-red-600" : "text-brand-600") : "text-ink-900 dark:text-ink-50"}`}>{value}</p>
-      <p className="text-xs font-medium text-ink-500">{label}</p>
-    </div>
-  );
-}

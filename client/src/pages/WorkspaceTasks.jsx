@@ -9,6 +9,7 @@ import TaskModal from "../components/tasks/TaskModal.jsx";
 import TaskDetailsPanel from "../components/tasks/TaskDetailsPanel.jsx";
 import TaskStatusManagerModal from "../components/tasks/TaskStatusManagerModal.jsx";
 import Spinner from "../components/common/Spinner.jsx";
+import { displayColor } from "../lib/colors.js";
 
 export default function WorkspaceTasks() {
   const { workspaceId } = useParams();
@@ -136,7 +137,7 @@ export default function WorkspaceTasks() {
     <>
       <div className="mx-auto max-w-6xl space-y-4 p-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-ink-900 dark:text-ink-50">Tasks</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-ink-900 dark:text-white">Tasks</h2>
           <div className="flex items-center gap-2">
             {isAdmin && (
               <button className="btn-secondary" onClick={() => setStatusModalOpen(true)}>
@@ -165,14 +166,14 @@ export default function WorkspaceTasks() {
                 key={col.id}
                 onDragOver={(e) => handleColumnDragOver(e, col.id)}
                 onDrop={(e) => handleDrop(e, col.id)}
-                className="min-w-[240px] flex-1 rounded-xl border border-ink-200 bg-ink-50 p-3 dark:border-ink-700 dark:bg-ink-900"
+                className="min-w-[240px] flex-1 rounded-2xl border border-white/50 bg-white/30 p-3 backdrop-blur-md transition-colors dark:border-white/[0.06] dark:bg-white/[0.02]"
               >
                 <div className="mb-3 flex items-center justify-between px-1">
                   <h3 className="flex items-center gap-1.5 text-sm font-semibold text-ink-700 dark:text-ink-200">
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: col.color }} />
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: displayColor(col.color) }} />
                     {col.label}
                   </h3>
-                  <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-ink-500 border border-ink-200 dark:bg-ink-800 dark:border-ink-700">{colTasks.length}</span>
+                  <span className="chip !px-2 !py-0.5 tabular-nums">{colTasks.length}</span>
                 </div>
                 <div className="space-y-2">
                   {colTasks.map((t, i) => (
@@ -201,7 +202,9 @@ export default function WorkspaceTasks() {
                   ))}
                   {showIndicator && dropIndicator.index === colTasks.length && <DropLine />}
                   {colTasks.length === 0 && !showIndicator && (
-                    <p className="px-1 py-4 text-center text-xs text-ink-300">Drop tasks here</p>
+                    <p className="rounded-xl border border-dashed border-ink-300/50 px-1 py-5 text-center text-xs text-ink-400 dark:border-white/10">
+                      Drop tasks here
+                    </p>
                   )}
                 </div>
               </div>
@@ -255,5 +258,5 @@ export default function WorkspaceTasks() {
 }
 
 function DropLine() {
-  return <div className="h-0.5 rounded-full bg-brand-400" />;
+  return <div className="h-0.5 rounded-full bg-brand-400 shadow-glow" />;
 }

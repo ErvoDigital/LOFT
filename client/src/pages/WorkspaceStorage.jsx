@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { ChevronRight, FolderOpen, FolderPlus, UploadCloud } from "lucide-react";
+import { FolderOpen, FolderPlus, UploadCloud } from "lucide-react";
 import * as assetsApi from "../api/assets.js";
 import * as foldersApi from "../api/folders.js";
 import * as workspacesApi from "../api/workspaces.js";
@@ -40,6 +40,17 @@ export default function WorkspaceStorage() {
   const [previewing, setPreviewing] = useState(null); // { asset, version } | null
   const fileInputRef = useRef(null);
 
+  // Ids currently playing their entrance animation, and the folder (if any)
+  // pulsing because something just landed inside it.
+  const [materializeIds, setMaterializeIds] = useState(() => new Set());
+  const [glowFolderId, setGlowFolderId] = useState(null);
+  const materializeTimers = useRef(new Map());
+  const glowTimer = useRef(null);
+  // Read inside socket handlers so they can tell "arrived in this view" from
+  // "arrived in a subfolder" without resubscribing on every navigation.
+  const foldersRef = useRef([]);
+  const currentFolderIdRef = useRef(null);
+
   const load = useCallback(() => {
     Promise.all([assetsApi.listAssets(workspaceId), foldersApi.listFolders(workspaceId), workspacesApi.getWorkspace(workspaceId)]).then(
       ([a, f, ws]) => {
@@ -57,12 +68,83 @@ export default function WorkspaceStorage() {
     load();
   }, [load]);
 
+  // Held slightly longer than the CSS animations themselves, so an item whose
+  // refetch lands a moment after the socket event still animates in.
+  const markMaterialize = useCallback((id) => {
+    if (!id) return;
+    clearTimeout(materializeTimers.current.get(id));
+    setMaterializeIds((prev) => new Set(prev).add(id));
+    materializeTimers.current.set(
+      id,
+      setTimeout(() => {
+        setMaterializeIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        materializeTimers.current.delete(id);
+      }, 800)
+    );
+  }, []);
+
+  const markGlow = useCallback((folderId) => {
+    if (!folderId) return;
+    clearTimeout(glowTimer.current);
+    setGlowFolderId(folderId);
+    glowTimer.current = setTimeout(() => setGlowFolderId(null), 2400);
+  }, []);
+
+  useEffect(() => {
+    const timers = materializeTimers.current;
+    return () => {
+      timers.forEach(clearTimeout);
+      timers.clear();
+      clearTimeout(glowTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    foldersRef.current = folders;
+  }, [folders]);
+
+  useEffect(() => {
+    currentFolderIdRef.current = currentFolderId;
+  }, [currentFolderId]);
+
   useEffect(() => {
     if (!socket) return;
-    const handler = () => load();
-    [...ASSET_EVENTS, ...FOLDER_EVENTS].forEach((e) => socket.on(e, handler));
-    return () => [...ASSET_EVENTS, ...FOLDER_EVENTS].forEach((e) => socket.off(e, handler));
-  }, [socket, load]);
+    const reload = () => load();
+    // A new file either belongs to the folder being viewed (animate the card
+    // in) or to one of its subfolders (pulse that folder instead, since the
+    // file itself isn't on screen).
+    const onAssetCreated = (asset) => {
+      load();
+      const here = currentFolderIdRef.current ?? null;
+      const assetFolderId = asset?.folderId ?? null;
+      if (assetFolderId === here) {
+        markMaterialize(asset.id);
+        return;
+      }
+      const parent = foldersRef.current.find((f) => f.id === assetFolderId);
+      if (parent && (parent.parentId ?? null) === here) markGlow(parent.id);
+    };
+    const onFolderCreated = (folder) => {
+      load();
+      if ((folder?.parentId ?? null) === (currentFolderIdRef.current ?? null)) markMaterialize(folder.id);
+    };
+    const otherEvents = [...ASSET_EVENTS, ...FOLDER_EVENTS].filter(
+      (e) => e !== "asset:created" && e !== "folder:created"
+    );
+
+    socket.on("asset:created", onAssetCreated);
+    socket.on("folder:created", onFolderCreated);
+    otherEvents.forEach((e) => socket.on(e, reload));
+    return () => {
+      socket.off("asset:created", onAssetCreated);
+      socket.off("folder:created", onFolderCreated);
+      otherEvents.forEach((e) => socket.off(e, reload));
+    };
+  }, [socket, load, markMaterialize, markGlow]);
 
   const currentFolder = currentFolderId ? folders.find((f) => f.id === currentFolderId) : null;
 
@@ -200,8 +282,8 @@ export default function WorkspaceStorage() {
                 Storage
               </button>
               {breadcrumb.map((f) => (
-                <span key={f.id} className="flex items-center gap-1">
-                  <ChevronRight className="h-3.5 w-3.5 text-ink-300" />
+                <span key={f.id} className="flex items-center gap-2">
+                  <span className="h-1 w-1 shrink-0 rounded-full bg-ink-300 dark:bg-ink-600" aria-hidden="true" />
                   <button onClick={() => navigate(f.id)} className="font-semibold text-ink-900 hover:text-brand-600 dark:text-ink-50 dark:hover:text-brand-400">
                     {f.name}
                   </button>
@@ -248,49 +330,66 @@ export default function WorkspaceStorage() {
         ) : (
           <div className="space-y-5">
             {childFolders.length > 0 && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {childFolders.map((f) => (
-                  <FolderCard
-                    key={f.id}
-                    folder={f}
-                    canManage={myRole === "ADMIN" || f.createdBy.id === user.id}
-                    onOpen={navigate}
-                    onEdit={(folder) => setFolderModal({ folder })}
-                    onDelete={async (folderId) => {
-                      if (!confirm("Delete this folder? It must be empty first.")) return;
-                      try {
-                        await foldersApi.deleteFolder(workspaceId, folderId);
-                        load();
-                      } catch (err) {
-                        setError(apiErrorMessage(err));
-                      }
-                    }}
-                    onAssetDrop={moveAssetTo}
-                    onFileDrop={(folderId, file) => uploadNew(file, folderId)}
-                  />
-                ))}
-              </div>
+              <section>
+                <div className="mb-2.5 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-ink-800 dark:text-ink-100">Folders</h3>
+                  <span className="chip !px-2 !py-0.5 text-[11px]">
+                    {childFolders.length} folder{childFolders.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {childFolders.map((f) => (
+                    <FolderCard
+                      key={f.id}
+                      folder={f}
+                      materializing={materializeIds.has(f.id)}
+                      glowing={glowFolderId === f.id}
+                      canManage={myRole === "ADMIN" || f.createdBy.id === user.id}
+                      onOpen={navigate}
+                      onEdit={(folder) => setFolderModal({ folder })}
+                      onDelete={async (folderId) => {
+                        if (!confirm("Delete this folder? It must be empty first.")) return;
+                        try {
+                          await foldersApi.deleteFolder(workspaceId, folderId);
+                          load();
+                        } catch (err) {
+                          setError(apiErrorMessage(err));
+                        }
+                      }}
+                      onAssetDrop={moveAssetTo}
+                      onFileDrop={(folderId, file) => uploadNew(file, folderId)}
+                    />
+                  ))}
+                </div>
+              </section>
             )}
 
-            {childFolders.length > 0 && childAssets.length > 0 && <hr className="border-ink-200 dark:border-ink-700" />}
-
             {childAssets.length > 0 && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {childAssets.map((a) => (
-                  <AssetCard
-                    key={a.id}
-                    asset={a}
-                    canManage={myRole === "ADMIN" || a.uploadedBy.id === user.id}
-                    uploadProgress={versionUploads.get(a.id)}
-                    onDropFile={(file) => uploadVersionFor(a.id, file)}
-                    onMergeDrop={(sourceId) => merge(a.id, sourceId)}
-                    onDownload={(version) => assetsApi.downloadVersion(workspaceId, a.id, version)}
-                    onPreview={(version) => setPreviewing({ asset: a, version })}
-                    onMove={setMovingAsset}
-                    onDelete={remove}
-                  />
-                ))}
-              </div>
+              <section>
+                <div className="mb-2.5 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-ink-800 dark:text-ink-100">Files</h3>
+                  <span className="chip !px-2 !py-0.5 text-[11px]">
+                    {childAssets.length} file{childAssets.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {childAssets.map((a) => (
+                    <AssetCard
+                      key={a.id}
+                      asset={a}
+                      materializing={materializeIds.has(a.id)}
+                      canManage={myRole === "ADMIN" || a.uploadedBy.id === user.id}
+                      uploadProgress={versionUploads.get(a.id)}
+                      onDropFile={(file) => uploadVersionFor(a.id, file)}
+                      onMergeDrop={(sourceId) => merge(a.id, sourceId)}
+                      onDownload={(version) => assetsApi.downloadVersion(workspaceId, a.id, version)}
+                      onPreview={(version) => setPreviewing({ asset: a, version })}
+                      onMove={setMovingAsset}
+                      onDelete={remove}
+                    />
+                  ))}
+                </div>
+              </section>
             )}
           </div>
         )}
@@ -302,7 +401,10 @@ export default function WorkspaceStorage() {
           members={members}
           parentId={folderModal?.parentId ?? folderModal?.folder?.parentId ?? null}
           folder={folderModal?.folder}
-          onSaved={load}
+          onSaved={(saved) => {
+            load();
+            if (!folderModal?.folder) markMaterialize(saved?.id);
+          }}
           onDeleted={(folderId) => {
             if (folderId === currentFolderId) navigate(currentFolder?.parentId || null);
             load();
@@ -335,7 +437,7 @@ export default function WorkspaceStorage() {
       {dropzoneActive && (
         <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center border-4 border-dashed border-brand-400 bg-brand-500/10">
           <div className="flex items-center gap-2 rounded-xl bg-white px-5 py-3 shadow-panel dark:bg-ink-800">
-            <UploadCloud className="h-5 w-5 text-brand-600" />
+            <UploadCloud className="h-5 w-5 text-brand-600 dark:text-brand-400" />
             <span className="text-sm font-medium text-brand-700 dark:text-brand-300">Drop to upload</span>
           </div>
         </div>

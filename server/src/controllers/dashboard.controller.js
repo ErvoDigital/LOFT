@@ -1,5 +1,6 @@
 import { prisma } from "../db/prisma.js";
 import { detectConflicts } from "../services/conflict.service.js";
+import { isFolderVisible } from "../services/folderAccess.js";
 
 // The single aggregated view across every workspace the user belongs to —
 // upcoming events, pending tasks, recent activity, notifications, and any
@@ -19,8 +20,17 @@ export async function getDashboard(req, res) {
   const doneStatuses = await prisma.taskStatus.findMany({ where: { isDone: true }, select: { id: true } });
   const doneStatusIds = doneStatuses.map((s) => s.id);
 
-  const [upcomingEvents, pendingTasks, allOpenTasksWithDates, recentMessages, notifications, unreadCount] =
-    await Promise.all([
+  const [
+    upcomingEvents,
+    pendingTasks,
+    allOpenTasksWithDates,
+    recentMessages,
+    notifications,
+    unreadCount,
+    recentAssets,
+    visibleFolders,
+    memberships,
+  ] = await Promise.all([
       prisma.event.findMany({
         where: { workspaceId: { in: workspaceIds }, startTime: { gte: now, lte: horizon } },
         include: { workspace: { select: { name: true, color: true } } },
@@ -48,7 +58,38 @@ export async function getDashboard(req, res) {
       }),
       prisma.notification.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 10 }),
       prisma.notification.count({ where: { userId, isRead: false } }),
+      // Over-fetched, then narrowed by folder visibility below — the caller's
+      // role differs per workspace, so this can't be filtered in the query.
+      prisma.asset.findMany({
+        where: { workspaceId: { in: workspaceIds } },
+        orderBy: { updatedAt: "desc" },
+        take: 40,
+        include: {
+          workspace: { select: { name: true, color: true } },
+          uploadedBy: { select: { id: true, name: true, avatarColor: true } },
+          versions: { orderBy: { version: "desc" }, take: 1 },
+        },
+      }),
+      prisma.folder.findMany({ where: { workspaceId: { in: workspaceIds } }, include: { members: true } }),
+      prisma.workspaceMember.findMany({ where: { userId, workspaceId: { in: workspaceIds } } }),
     ]);
+
+  const roleByWorkspaceId = new Map(memberships.map((m) => [m.workspaceId, m.role]));
+  const folderById = new Map(visibleFolders.map((f) => [f.id, f]));
+  const recentFiles = recentAssets
+    .filter((a) => !a.folderId || isFolderVisible(userId, roleByWorkspaceId.get(a.workspaceId), folderById.get(a.folderId)))
+    .slice(0, 10)
+    .map((a) => ({
+      id: a.id,
+      name: a.name,
+      workspaceId: a.workspaceId,
+      workspaceName: a.workspace.name,
+      workspaceColor: a.workspace.color,
+      folderId: a.folderId,
+      updatedAt: a.updatedAt,
+      uploadedBy: a.uploadedBy,
+      latestVersion: a.versions[0] || null,
+    }));
 
   const eventsForConflicts = upcomingEvents.map((e) => ({
     id: e.id,
@@ -96,6 +137,7 @@ export async function getDashboard(req, res) {
       workspaceName: m.conversation.workspace?.name || "Direct message",
       createdAt: m.createdAt,
     })),
+    recentFiles,
     notifications,
     unreadCount,
     conflicts,

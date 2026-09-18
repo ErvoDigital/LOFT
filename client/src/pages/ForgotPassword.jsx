@@ -36,7 +36,7 @@ export default function ForgotPassword() {
             <div className="rounded-lg bg-accent-50 px-3 py-2 text-left text-xs text-accent-600 dark:bg-accent-500/15 dark:text-accent-400">
               <p className="mb-1 font-medium">Dev mode — no email service configured:</p>
               <button
-                className="font-medium text-brand-600 hover:underline"
+                className="font-medium text-brand-600 dark:text-brand-400 hover:underline"
                 onClick={() => navigate(`/reset-password?token=${devToken}`)}
               >
                 Click here to continue to reset

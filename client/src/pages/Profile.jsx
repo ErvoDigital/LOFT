@@ -8,13 +8,14 @@ import { resizeImageToDataUrl } from "../lib/avatarImage.js";
 import Avatar from "../components/common/Avatar.jsx";
 import GoogleSignInButton from "../components/common/GoogleSignInButton.jsx";
 import ChangePasswordModal from "../components/profile/ChangePasswordModal.jsx";
+import { displayColor } from "../lib/colors.js";
 
-const COLORS = ["#5B5BD6", "#2A9D8F", "#E76F51", "#E9A23B", "#3D8BFD", "#C44569", "#3F6B52", "#C17538"];
+const COLORS = ["#17BC95", "#2A9D8F", "#E76F51", "#E9A23B", "#0A7862", "#C44569", "#3F6B52", "#C17538"];
 
 export default function Profile() {
   const { user, setUser } = useAuth();
   const [name, setName] = useState(user?.name || "");
-  const [color, setColor] = useState(user?.avatarColor || COLORS[0]);
+  const [color, setColor] = useState(user?.avatarColor ? displayColor(user.avatarColor) : COLORS[0]);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState("");
   const [profileError, setProfileError] = useState("");

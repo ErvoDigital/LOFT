@@ -16,7 +16,7 @@ import TaskItem from "@tiptap/extension-task-item";
 import ImageExtension from "@tiptap/extension-image";
 import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
 import * as Y from "yjs";
-import { ArrowLeft, Lock } from "lucide-react";
+import { X, Lock } from "lucide-react";
 import * as documentsApi from "../api/documents.js";
 import * as workspacesApi from "../api/workspaces.js";
 import { apiErrorMessage } from "../api/client.js";
@@ -319,11 +319,11 @@ export default function DocumentEditor() {
       <div className="flex items-center gap-3 border-b border-ink-200 px-4 py-3 dark:border-ink-700 print:hidden">
         <button
           onClick={() => navigate(`/workspaces/${workspaceId}/docs`)}
-          title="Back to Docs"
-          aria-label="Back to Docs"
-          className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-700 dark:hover:text-ink-100"
+          title="Close document"
+          aria-label="Close document"
+          className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-500/10 hover:text-brand-600 dark:hover:bg-white/[0.08] dark:hover:text-brand-300"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <X className="h-4 w-4" />
         </button>
         <input
           ref={titleInputRef}

@@ -40,7 +40,7 @@ export default function Login() {
         <div>
           <div className="mb-1 flex items-center justify-between">
             <label className="block text-sm font-medium text-ink-600 dark:text-ink-200">Password</label>
-            <Link to="/forgot-password" className="text-xs font-medium text-brand-600 hover:underline">
+            <Link to="/forgot-password" className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline">
               Forgot password?
             </Link>
           </div>
@@ -59,7 +59,7 @@ export default function Login() {
       </div>
       <p className="mt-5 text-center text-sm text-ink-500">
         Don't have an account?{" "}
-        <Link to="/register" className="font-medium text-brand-600 hover:underline">
+        <Link to="/register" className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
           Create one
         </Link>
       </p>

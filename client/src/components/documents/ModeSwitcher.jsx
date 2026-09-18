@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Pencil, MessageSquarePlus, Eye, ChevronDown, Check } from "lucide-react";
+import { Pencil, MessageSquarePlus, Eye, Check } from "lucide-react";
 
 const MODES = [
   { id: "editing", label: "Editing", desc: "Edit document directly", Icon: Pencil },
@@ -36,7 +36,10 @@ export default function ModeSwitcher({ mode, onChange }) {
       >
         <active.Icon className="h-3.5 w-3.5 text-ink-400" />
         {active.label}
-        <ChevronDown className="h-3.5 w-3.5 text-ink-400" />
+        <span
+          className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${open ? "bg-brand-500" : "bg-ink-300 dark:bg-ink-600"}`}
+          aria-hidden="true"
+        />
       </button>
       {open && (
         <div className="absolute right-0 top-full z-30 mt-1 w-64 card p-1.5 shadow-panel">
@@ -56,7 +59,7 @@ export default function ModeSwitcher({ mode, onChange }) {
                 <span className="block text-sm font-medium text-ink-800 dark:text-ink-100">{label}</span>
                 <span className="block text-xs text-ink-400">{desc}</span>
               </span>
-              {mode === id && <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />}
+              {mode === id && <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600 dark:text-brand-400" />}
             </button>
           ))}
         </div>

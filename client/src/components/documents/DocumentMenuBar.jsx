@@ -37,7 +37,6 @@ import {
   ListOrdered,
   ListChecks,
   Check,
-  ChevronRight,
   Columns2,
   Columns3,
   Lock,
@@ -70,7 +69,7 @@ function Item({ Icon, label, shortcut, onClick, disabled, active }) {
       {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-ink-400" /> : <span className="w-3.5 shrink-0" />}
       <span className="flex-1 truncate">{label}</span>
       {shortcut && <span className="shrink-0 text-xs text-ink-300">{shortcut}</span>}
-      {active && !Icon && <Check className="h-3.5 w-3.5 shrink-0 text-brand-600" />}
+      {active && !Icon && <Check className="h-3.5 w-3.5 shrink-0 text-brand-600 dark:text-brand-400" />}
     </button>
   );
 }
@@ -195,7 +194,12 @@ export default function DocumentMenuBar({
           >
             <TableIcon className="h-3.5 w-3.5 shrink-0 text-ink-400" />
             <span className="flex-1">Table</span>
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-ink-300" />
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${
+                tableFlyoutOpen ? "bg-brand-500" : "bg-ink-300 dark:bg-ink-600"
+              }`}
+              aria-hidden="true"
+            />
           </button>
           {tableFlyoutOpen && (
             <div className="absolute left-full top-0 z-40 ml-1 card shadow-panel">

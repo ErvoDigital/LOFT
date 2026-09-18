@@ -100,7 +100,7 @@ export default function ChangePasswordModal({ open, onClose, onDone, email, hasP
             required
           />
           <div className="flex items-center justify-between">
-            <button type="button" onClick={sendCode} disabled={busy} className="text-xs font-medium text-brand-600 hover:underline">
+            <button type="button" onClick={sendCode} disabled={busy} className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline">
               Resend code
             </button>
             <button type="submit" disabled={busy || code.length !== 6} className="btn-primary">

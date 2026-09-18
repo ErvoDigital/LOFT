@@ -4,6 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { notify } from "../services/notification.service.js";
 import { generateInviteCode } from "../utils/inviteCode.js";
 import { ensureWorkspaceStatuses } from "./taskStatuses.controller.js";
+import { isFolderVisible } from "../services/folderAccess.js";
 
 const createSchema = z.object({
   name: z.string().min(2).max(80),
@@ -56,7 +57,7 @@ export async function createWorkspace(req, res) {
   const workspace = await prisma.workspace.create({
     data: {
       ...data,
-      color: data.color || "#5B5BD6",
+      color: data.color || "#17BC95",
       ownerId: req.userId,
       inviteCode: generateInviteCode(),
       members: { create: { userId: req.userId, role: "ADMIN" } },
@@ -102,6 +103,120 @@ export async function getWorkspace(req, res) {
         user: m.user,
       })),
     },
+  });
+}
+
+// The workspace-scoped counterpart to dashboard.controller.js's cross-workspace
+// view: the same kinds of signal (tasks, schedule, activity, files) narrowed to
+// a single workspace, so entering one lands on its own overview.
+export async function getWorkspaceDashboard(req, res) {
+  const workspaceId = req.params.workspaceId;
+  const role = req.membership.role;
+  const now = new Date();
+  const horizon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const endOfToday = new Date(now);
+  endOfToday.setHours(23, 59, 59, 999);
+
+  const doneStatuses = await prisma.taskStatus.findMany({
+    where: { workspaceId, isDone: true },
+    select: { id: true },
+  });
+  const doneStatusIds = doneStatuses.map((s) => s.id);
+
+  const [allTasks, upcomingEvents, recentMessages, assets, folders] = await Promise.all([
+    prisma.task.findMany({
+      where: { workspaceId },
+      include: { assignee: { select: { id: true, name: true, avatarColor: true } } },
+      orderBy: [{ dueDate: "asc" }],
+    }),
+    prisma.event.findMany({
+      where: { workspaceId, startTime: { gte: now, lte: horizon } },
+      orderBy: { startTime: "asc" },
+      take: 20,
+    }),
+    prisma.message.findMany({
+      where: { conversation: { workspaceId } },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      include: { sender: { select: { id: true, name: true, avatarColor: true } } },
+    }),
+    prisma.asset.findMany({
+      where: { workspaceId },
+      orderBy: { updatedAt: "desc" },
+      take: 30,
+      include: {
+        uploadedBy: { select: { id: true, name: true, avatarColor: true } },
+        versions: { orderBy: { version: "desc" }, take: 1 },
+      },
+    }),
+    prisma.folder.findMany({ where: { workspaceId }, include: { members: true } }),
+  ]);
+
+  const folderById = new Map(folders.map((f) => [f.id, f]));
+  const openTasks = allTasks.filter((t) => !doneStatusIds.includes(t.status));
+  // Padded on both sides: the schedule strip buckets tasks into the viewer's
+  // own local days, and this server's idea of "today" can sit a timezone away.
+  const weekWindowStart = new Date(now.getTime() - 36 * 60 * 60 * 1000);
+  const weekWindowEnd = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000);
+
+  res.json({
+    tasksSummary: {
+      total: allTasks.length,
+      done: allTasks.length - openTasks.length,
+      pending: openTasks.length,
+      dueToday: openTasks.filter((t) => t.dueDate && t.dueDate >= now && t.dueDate <= endOfToday).length,
+      overdue: openTasks.filter((t) => t.dueDate && t.dueDate < now).length,
+    },
+    tasksDueSoon: openTasks
+      .filter((t) => t.dueDate)
+      .slice(0, 6)
+      .map((t) => ({
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        tier: t.tier,
+        status: t.status,
+        dueDate: t.dueDate,
+        estimatedMinutes: t.estimatedMinutes,
+        isPinned: t.isPinned,
+        assignee: t.assignee,
+      })),
+    weekTasks: openTasks
+      .filter((t) => t.dueDate && t.dueDate >= weekWindowStart && t.dueDate <= weekWindowEnd)
+      .map((t) => ({
+        id: t.id,
+        title: t.title,
+        tier: t.tier,
+        dueDate: t.dueDate,
+        assignee: t.assignee,
+      })),
+    upcomingEvents: upcomingEvents.map((e) => ({
+      id: e.id,
+      title: e.title,
+      startTime: e.startTime,
+      endTime: e.endTime,
+      location: e.location,
+    })),
+    recentActivity: recentMessages.map((m) => ({
+      id: m.id,
+      type: "message",
+      sender: m.sender,
+      content: m.content,
+      createdAt: m.createdAt,
+    })),
+    // Same folder-visibility rule the storage page enforces — a restricted
+    // folder's filenames must not leak into an overview panel.
+    recentFiles: assets
+      .filter((a) => !a.folderId || isFolderVisible(req.userId, role, folderById.get(a.folderId)))
+      .slice(0, 6)
+      .map((a) => ({
+        id: a.id,
+        name: a.name,
+        folderId: a.folderId,
+        updatedAt: a.updatedAt,
+        uploadedBy: a.uploadedBy,
+        latestVersion: a.versions[0] || null,
+      })),
   });
 }
 

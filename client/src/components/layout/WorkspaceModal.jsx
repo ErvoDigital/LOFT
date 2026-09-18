@@ -13,7 +13,7 @@ const TYPES = [
   { value: "other", label: "Other" },
 ];
 
-const COLORS = ["#4F46E5", "#0EA5E9", "#059669", "#D97706", "#DB2777", "#64748B"];
+const COLORS = ["#17BC95", "#0A7862", "#059669", "#D97706", "#DB2777", "#64748B"];
 
 export default function WorkspaceModal({ open, onClose }) {
   const [tab, setTab] = useState("create");

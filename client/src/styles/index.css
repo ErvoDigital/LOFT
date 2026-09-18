@@ -8,40 +8,90 @@
   }
   body {
     @apply text-ink-800 antialiased dark:text-ink-100;
-    background-color: #F8FAFC;
+    background-color: #EEF3F1;
   }
   .dark body {
-    background-color: #0B1220;
+    background-color: theme("colors.ink.950");
   }
 }
 
 @layer components {
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none;
+  /* The colour wash the frosted panels blur against. Without something
+     varied behind them, backdrop-blur renders as flat translucency and the
+     glass reads as plain grey. Mounted once, fixed, in AppShell. */
+  .app-backdrop {
+    background-image:
+      radial-gradient(60rem 40rem at 12% -10%, rgba(31, 155, 125, 0.14), transparent 60%),
+      radial-gradient(45rem 35rem at 88% 8%, rgba(94, 234, 212, 0.16), transparent 62%),
+      radial-gradient(50rem 45rem at 70% 105%, rgba(19, 74, 60, 0.1), transparent 60%);
   }
-  .btn-primary {
-    @apply btn bg-gradient-to-br from-brand-400 to-brand-700 text-white shadow-sm transition hover:brightness-110 active:brightness-95;
+  .dark .app-backdrop {
+    background-image:
+      radial-gradient(60rem 40rem at 12% -10%, rgba(31, 155, 125, 0.2), transparent 60%),
+      radial-gradient(45rem 35rem at 88% 8%, rgba(94, 234, 212, 0.08), transparent 62%),
+      radial-gradient(50rem 45rem at 70% 105%, rgba(19, 74, 60, 0.5), transparent 60%);
   }
-  .brand-mark {
-    @apply bg-gradient-to-br from-brand-400 to-brand-700;
-  }
-  .btn-secondary {
-    @apply btn border border-ink-200 bg-white text-ink-700 hover:bg-ink-50 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-200 dark:hover:bg-ink-700;
-  }
-  .btn-ghost {
-    @apply btn text-ink-600 hover:bg-ink-100 dark:text-ink-300 dark:hover:bg-ink-700;
-  }
-  .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700;
-  }
-  .input {
-    @apply w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-800 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100 dark:placeholder:text-ink-500;
+
+  /* Base frosted surface. `.card` is the padded, rounded panel nearly every
+     view composes; `.glass-panel` is the same material without the radius
+     commitment, for bars and rails. */
+  .glass-panel {
+    @apply border border-white/60 bg-white/70 backdrop-blur-xl dark:border-white/[0.08] dark:bg-ink-900/80;
   }
   .card {
-    @apply rounded-xl border border-ink-200 bg-white shadow-soft dark:border-ink-700 dark:bg-ink-800;
+    @apply glass-panel rounded-2xl shadow-glass;
+  }
+  /* Menus hanging off the topbar. The header's own backdrop-blur means a
+     nested blur can only sample the header, not the page beneath, so the
+     panel needs a near-opaque fill rather than the translucent glass. */
+  .dropdown-panel {
+    @apply rounded-2xl border border-white/60 bg-white/95 shadow-glass-lg dark:border-white/[0.08] dark:bg-ink-900/95;
+  }
+  .card-hover {
+    @apply transition-all duration-200 hover:border-brand-400/50 hover:bg-white/85 hover:shadow-glass-lg dark:hover:border-brand-400/30 dark:hover:bg-ink-800/90;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-gradient-to-br from-brand-300 to-brand-500 text-ink-950 shadow-glow-sm hover:shadow-glow hover:brightness-110 active:brightness-95;
+  }
+  /* Bright mint fill — pair it with dark text (text-ink-950), not white. */
+  .brand-mark {
+    @apply bg-gradient-to-br from-brand-300 to-brand-500;
+  }
+  .btn-secondary {
+    @apply btn border border-ink-200 bg-white/70 text-ink-700 backdrop-blur-xl hover:border-brand-400/60 hover:bg-white/90 hover:text-brand-700 dark:border-white/[0.1] dark:bg-white/[0.06] dark:text-ink-200 dark:hover:border-brand-400/30 dark:hover:bg-white/[0.1] dark:hover:text-ink-50;
+  }
+  .btn-ghost {
+    @apply btn text-ink-600 hover:bg-ink-900/[0.06] hover:text-ink-900 dark:text-ink-300 dark:hover:bg-white/[0.08] dark:hover:text-ink-50;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white shadow-[0_4px_12px_-3px_rgba(220,38,38,0.5)] hover:bg-red-700;
+  }
+  .input {
+    @apply w-full rounded-xl border border-white/60 bg-white/70 px-3.5 py-2 text-sm text-ink-800 backdrop-blur-xl transition-all placeholder:text-ink-400 focus:border-brand-500/60 focus:bg-white/90 focus:outline-none focus:ring-2 focus:ring-brand-500/25 dark:border-white/[0.1] dark:bg-white/[0.05] dark:text-ink-100 dark:placeholder:text-ink-500 dark:focus:bg-white/[0.08];
   }
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold;
+  }
+  /* Dashboard metric tile — large numeral, quiet label, glass ground. */
+  .stat-card {
+    @apply card card-hover relative overflow-hidden p-4;
+  }
+  .stat-value {
+    @apply text-3xl font-semibold tracking-tight text-ink-900 dark:text-ink-50;
+  }
+  .stat-label {
+    @apply mt-0.5 text-xs font-medium text-ink-500 dark:text-ink-400;
+  }
+  /* Small standalone pill — counts, filters, meta chips. */
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/60 px-2.5 py-1 text-xs font-medium text-ink-600 backdrop-blur-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-ink-300;
+  }
+  .section-label {
+    @apply text-xs font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500;
   }
 }
 

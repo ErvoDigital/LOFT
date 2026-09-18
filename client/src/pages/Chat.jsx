@@ -7,6 +7,7 @@ import EmptyState from "../components/common/EmptyState.jsx";
 import Spinner from "../components/common/Spinner.jsx";
 import NewDmModal from "../components/chat/NewDmModal.jsx";
 import ChatThread from "../components/chat/ChatThread.jsx";
+import { displayColor, textOn } from "../lib/colors.js";
 
 const COLLAPSE_KEY = "loft:messages-list-collapsed";
 
@@ -90,7 +91,7 @@ export default function Chat() {
           ) : (
             conversations.map((c) => {
               const avatar = c.isGroup ? (
-                <div style={{ backgroundColor: c.color }} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-semibold text-white">
+                <div style={{ backgroundColor: displayColor(c.color), color: textOn(c.color) }} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-semibold">
                   {c.title.slice(0, 2).toUpperCase()}
                 </div>
               ) : (

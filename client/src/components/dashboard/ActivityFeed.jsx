@@ -12,7 +12,7 @@ function timeAgo(date) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-export default function ActivityFeed({ activity }) {
+export default function ActivityFeed({ activity, showWorkspace = true }) {
   if (!activity || activity.length === 0) {
     return (
       <EmptyState
@@ -30,8 +30,13 @@ export default function ActivityFeed({ activity }) {
           <Avatar name={a.sender?.name} color={a.sender?.avatarColor} size={28} />
           <div className="min-w-0 flex-1">
             <p className="text-sm text-ink-600 dark:text-ink-300">
-              <span className="font-medium text-ink-800 dark:text-ink-100">{a.sender?.name}</span> in{" "}
-              <span className="text-ink-500">{a.workspaceName}</span>
+              <span className="font-medium text-ink-800 dark:text-ink-100">{a.sender?.name}</span>
+              {showWorkspace && a.workspaceName && (
+                <>
+                  {" in "}
+                  <span className="text-ink-500">{a.workspaceName}</span>
+                </>
+              )}
             </p>
             <p className="truncate text-sm text-ink-500">{a.content}</p>
           </div>

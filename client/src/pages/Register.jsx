@@ -85,11 +85,11 @@ export default function Register() {
             className="mt-0.5 h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500/40 dark:border-ink-600"
           />
           I agree to the{" "}
-          <button type="button" onClick={() => setTermsOpen(true)} className="font-medium text-brand-600 hover:underline">
+          <button type="button" onClick={() => setTermsOpen(true)} className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
             Terms
           </button>{" "}
           and{" "}
-          <button type="button" onClick={() => setTermsOpen(true)} className="font-medium text-brand-600 hover:underline">
+          <button type="button" onClick={() => setTermsOpen(true)} className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
             Privacy Policy
           </button>
         </label>
@@ -100,7 +100,7 @@ export default function Register() {
       </form>
       <p className="mt-5 text-center text-sm text-ink-500">
         Already have an account?{" "}
-        <Link to="/login" className="font-medium text-brand-600 hover:underline">
+        <Link to="/login" className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
           Login
         </Link>
       </p>

@@ -22,6 +22,7 @@ import Spinner from "../common/Spinner.jsx";
 import PreviewModal from "../storage/PreviewModal.jsx";
 import UploadProgressPanel from "../storage/UploadProgressPanel.jsx";
 import EmojiPicker from "./EmojiPicker.jsx";
+import { displayColor, textOn } from "../../lib/colors.js";
 
 const DOCUMENT_MIME_TYPES = new Set([
   "application/pdf",
@@ -317,13 +318,13 @@ export default function ChatThread({ conversation, headerExtra }) {
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-ink-50 dark:bg-ink-900">
       <div className="flex items-center gap-2.5 border-b border-ink-200 bg-white px-5 py-3 dark:border-ink-700 dark:bg-ink-800">
         {conversation.isMeetingChat ? (
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-white">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-ink-950">
             <MessageSquare className="h-4 w-4" />
           </div>
         ) : conversation.isGroup ? (
           <div
-            style={{ backgroundColor: conversation.color || "#4F46E5" }}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold text-white"
+            style={{ backgroundColor: displayColor(conversation.color), color: textOn(conversation.color) }}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold"
           >
             {conversation.title.slice(0, 2).toUpperCase()}
           </div>
@@ -354,10 +355,10 @@ export default function ChatThread({ conversation, headerExtra }) {
                 <div className="flex min-w-0 max-w-md flex-col">
                   <div
                     className={`relative min-w-0 rounded-2xl px-3.5 py-2 text-sm shadow-soft ${
-                      mine ? "brand-mark rounded-br-sm text-white" : "rounded-bl-sm border border-ink-200 bg-white text-ink-800 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-100"
+                      mine ? "rounded-br-sm bg-gradient-to-br from-brand-600 to-brand-800 text-white" : "rounded-bl-sm border border-ink-200 bg-white text-ink-800 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-100"
                     }`}
                   >
-                    {!mine && conversation.isGroup && <p className="mb-0.5 text-xs font-semibold text-brand-600">{m.sender.name}</p>}
+                    {!mine && conversation.isGroup && <p className="mb-0.5 text-xs font-semibold text-brand-600 dark:text-brand-400">{m.sender.name}</p>}
                     {m.content && <p className="whitespace-pre-wrap break-words">{renderContent(m.content, user.id)}</p>}
                     {m.attachment && (
                       <button

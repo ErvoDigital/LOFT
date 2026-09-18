@@ -101,7 +101,7 @@ export async function changePassword(req, res) {
 export async function linkGoogle(req, res) {
   const { credential } = linkGoogleSchema.parse(req.body);
   const payload = await verifyGoogleCredential(credential);
-  if (!payload.email_verified) throw new ApiError(401, "Invalid Google sign-in token");
+  if (!payload.email_verified) throw new ApiError(400, "Invalid Google sign-in token");
 
   const existing = await prisma.user.findUnique({ where: { googleId: payload.sub } });
   if (existing && existing.id !== req.userId) {

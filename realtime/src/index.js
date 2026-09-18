@@ -439,6 +439,19 @@ async function handleMeetingLeave(conn) {
   publish(`workspace:${workspaceId}`, "meeting:activity", { workspaceId, active: remaining > 0, count: remaining });
 }
 
+// ---- Presence ----
+// "Who's online" for workspace member lists. Deliberately stateless here: an
+// in-memory roster would be isolate-local (see `connections`) and wrong
+// whenever a workspace's members are spread across isolates, and a table
+// would need its own cleanup for isolates that die without firing `close`.
+// Instead clients heartbeat and each viewer ages entries out itself, so a
+// vanished connection still resolves to offline within the client's TTL.
+function publishPresence(conn, event) {
+  for (const workspaceId of conn.workspaceIds) {
+    publish(`workspace:${workspaceId}`, event, { userId: conn.userId });
+  }
+}
+
 // ---- Documents (Yjs) ----
 // Binary Yjs updates travel as base64 strings inside the JSON envelope (the
 // client-side provider encodes/decodes); the server never needs the bytes
@@ -607,6 +620,14 @@ async function dispatch(conn, event, data) {
     case "document:leave":
       handleDocumentLeave(conn);
       return;
+    case "presence:heartbeat":
+      publishPresence(conn, "presence:online");
+      return;
+    // A new arrival asking everyone already here to announce now, instead of
+    // waiting out a full heartbeat interval to learn who's online.
+    case "presence:ping":
+      publishPresence(conn, "presence:ping");
+      return;
     default:
       return { error: "Unknown event" };
   }
@@ -675,6 +696,7 @@ export default {
       documentId: null,
     };
     connections.set(connId, conn);
+    publishPresence(conn, "presence:online");
 
     socket.addEventListener("message", (event) => {
       handleMessage(conn, event.data).catch((err) => console.error("message handling failed", err));
@@ -683,6 +705,11 @@ export default {
       handleMeetingLeave(conn).catch((err) => console.error("meeting cleanup on close failed", err));
       handleDocumentLeave(conn);
       connections.delete(connId);
+      // Only this isolate's view: a tab still open on another isolate keeps
+      // heartbeating, so a premature "offline" here corrects itself within one
+      // interval. The client TTL covers the case where no close fires at all.
+      const stillConnectedHere = [...connections.values()].some((c) => c.userId === conn.userId);
+      if (!stillConnectedHere) publishPresence(conn, "presence:offline");
     });
 
     return response;

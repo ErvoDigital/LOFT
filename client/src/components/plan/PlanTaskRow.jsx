@@ -1,12 +1,13 @@
 import { Pin, Moon } from "lucide-react";
 import { TierBadge } from "../common/Badges.jsx";
+import { displayColor } from "../../lib/colors.js";
 
 export default function PlanTaskRow({ item, statuses, onStatusChange, onTogglePin, onToggleSnooze, onTaskClick }) {
   const overdue = item.dueDate && new Date(item.dueDate) < new Date(new Date().toDateString());
 
   return (
     <div className={`flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-ink-50 dark:hover:bg-ink-700 ${item.isSnoozed ? "opacity-60" : ""}`}>
-      <div className="h-8 w-1 shrink-0 rounded-full" style={{ backgroundColor: item.workspaceColor || "#4F46E5" }} />
+      <div className="h-8 w-1 shrink-0 rounded-full" style={{ backgroundColor: displayColor(item.workspaceColor) }} />
       <div className="min-w-0 flex-1">
         <button
           type="button"

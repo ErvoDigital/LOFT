@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { X, ChevronUp, ChevronDown } from "lucide-react";
+import { X } from "lucide-react";
 
 function findMatches(editor, query, caseSensitive) {
   if (!query) return [];
@@ -97,11 +97,23 @@ export default function FindReplacePanel({ editor, onClose }) {
       </div>
       <p className="mt-1 h-4 text-xs text-ink-400">{matches.length ? `${matchIndex + 1} of ${matches.length}` : query ? "No matches" : ""}</p>
       <div className="mt-1 flex items-center gap-1">
-        <button onClick={goPrev} disabled={!matches.length} title="Previous" className="btn-ghost !p-1.5 disabled:opacity-30">
-          <ChevronUp className="h-3.5 w-3.5" />
+        <button
+          onClick={goPrev}
+          disabled={!matches.length}
+          title="Previous match"
+          aria-label="Previous match"
+          className="btn-ghost !px-2 !py-1 text-xs font-semibold disabled:opacity-30"
+        >
+          Prev
         </button>
-        <button onClick={goNext} disabled={!matches.length} title="Next" className="btn-ghost !p-1.5 disabled:opacity-30">
-          <ChevronDown className="h-3.5 w-3.5" />
+        <button
+          onClick={goNext}
+          disabled={!matches.length}
+          title="Next match"
+          aria-label="Next match"
+          className="btn-ghost !px-2 !py-1 text-xs font-semibold disabled:opacity-30"
+        >
+          Next
         </button>
         <label className="ml-2 flex items-center gap-1.5 text-xs text-ink-500">
           <input type="checkbox" checked={caseSensitive} onChange={(e) => setCaseSensitive(e.target.checked)} /> Match case

@@ -7,6 +7,7 @@ import * as taskStatusesApi from "../api/taskStatuses.js";
 import { useSocket } from "../context/SocketContext.jsx";
 import AtRiskPanel from "../components/plan/AtRiskPanel.jsx";
 import ConflictsPanel from "../components/dashboard/ConflictsPanel.jsx";
+import StatCard from "../components/dashboard/StatCard.jsx";
 import PlanDayGroup from "../components/plan/PlanDayGroup.jsx";
 import PlanCalendar from "../components/plan/PlanCalendar.jsx";
 import TaskModal from "../components/tasks/TaskModal.jsx";
@@ -178,16 +179,16 @@ export default function MyPlan() {
           <>
             {hasTasks && (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <StatChip label="Open tasks" value={plan.tasks.length} />
-                <StatChip label="Critical (Tier 1)" value={criticalCount} accent={criticalCount > 0} danger />
-                <StatChip label="Planned today" value={`${today?.plannedHours || 0}h`} />
-                <StatChip label="At risk" value={plan.atRisk.length} accent={plan.atRisk.length > 0} danger />
+                <StatCard label="Open tasks" value={plan.tasks.length} />
+                <StatCard label="Critical (Tier 1)" value={criticalCount} tone={criticalCount > 0 ? "danger" : "default"} />
+                <StatCard label="Planned today" value={`${today?.plannedHours || 0}h`} tone="brand" />
+                <StatCard label="At risk" value={plan.atRisk.length} tone={plan.atRisk.length > 0 ? "danger" : "positive"} />
               </div>
             )}
 
             {hasConflicts && (
               <section>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">Cross-workspace conflicts</h3>
+                <h3 className="section-label mb-2">Cross-workspace conflicts</h3>
                 <ConflictsPanel conflicts={plan.conflicts} />
               </section>
             )}
@@ -278,11 +279,3 @@ export default function MyPlan() {
   );
 }
 
-function StatChip({ label, value, accent, danger }) {
-  return (
-    <div className="card p-4">
-      <p className={`text-2xl font-semibold ${accent ? (danger ? "text-red-600" : "text-brand-600") : "text-ink-900 dark:text-ink-50"}`}>{value}</p>
-      <p className="text-xs font-medium text-ink-500">{label}</p>
-    </div>
-  );
-}

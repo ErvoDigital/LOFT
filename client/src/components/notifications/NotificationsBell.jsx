@@ -42,11 +42,11 @@ export default function NotificationsBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-80 card shadow-panel p-2">
+        <div className="dropdown-panel absolute right-0 z-20 mt-2 w-80 animate-slide-fade-in p-2">
           <div className="flex items-center justify-between px-2 py-1">
             <p className="text-sm font-semibold text-ink-800 dark:text-ink-100">Notifications</p>
             {unreadCount > 0 && (
-              <button onClick={markAllRead} className="text-xs font-medium text-brand-600 hover:underline">
+              <button onClick={markAllRead} className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline">
                 Mark all read
               </button>
             )}

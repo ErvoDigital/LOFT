@@ -1,4 +1,6 @@
-export default function Avatar({ name, color = "#4F46E5", size = 32, src }) {
+import { displayColor, textOn } from "../../lib/colors.js";
+
+export default function Avatar({ name, color, size = 32, src }) {
   const initials = (name || "?")
     .trim()
     .split(/\s+/)
@@ -19,8 +21,8 @@ export default function Avatar({ name, color = "#4F46E5", size = 32, src }) {
 
   return (
     <div
-      style={{ width: size, height: size, backgroundColor: color, fontSize: size * 0.4 }}
-      className="flex shrink-0 items-center justify-center rounded-full font-semibold text-white"
+      style={{ width: size, height: size, backgroundColor: displayColor(color), color: textOn(color), fontSize: size * 0.4 }}
+      className="flex shrink-0 items-center justify-center rounded-full font-semibold"
     >
       {initials}
     </div>

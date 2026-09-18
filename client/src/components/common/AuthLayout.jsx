@@ -3,7 +3,7 @@ export default function AuthLayout({ title, subtitle, children }) {
     <div className="flex min-h-screen items-center justify-center bg-ink-50 px-4 py-12 dark:bg-ink-900">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center">
-          <div className="brand-mark mb-3 flex h-11 w-11 items-center justify-center rounded-lg text-lg font-bold text-white">
+          <div className="brand-mark mb-3 flex h-11 w-11 items-center justify-center rounded-lg text-lg font-bold text-ink-950">
             L
           </div>
           <h1 className="text-xl font-semibold text-ink-900 dark:text-ink-50">{title}</h1>

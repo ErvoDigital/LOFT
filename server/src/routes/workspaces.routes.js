@@ -10,6 +10,7 @@ router.post("/", workspacesController.createWorkspace);
 router.post("/join", workspacesController.joinWorkspace);
 
 router.get("/:workspaceId", requireWorkspaceMember(), workspacesController.getWorkspace);
+router.get("/:workspaceId/dashboard", requireWorkspaceMember(), workspacesController.getWorkspaceDashboard);
 router.patch("/:workspaceId", requireWorkspaceMember(["ADMIN"]), workspacesController.updateWorkspace);
 router.post("/:workspaceId/leave", requireWorkspaceMember(), workspacesController.leaveWorkspace);
 

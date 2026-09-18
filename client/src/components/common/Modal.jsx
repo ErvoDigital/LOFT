@@ -18,11 +18,11 @@ export default function Modal({ open, onClose, title, children, width = "max-w-m
   // only covered the content pane, leaving the sidebar/topbar undimmed.
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-ink-900/50 dark:bg-black/60" onClick={onClose} />
-      <div className={`relative w-full ${width} card shadow-panel p-6`}>
+      <div className="absolute inset-0 bg-ink-950/50 backdrop-blur-sm dark:bg-ink-950/70" onClick={onClose} />
+      <div className={`relative w-full ${width} card animate-slide-fade-in p-6 shadow-glass-lg`}>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-ink-900 dark:text-ink-50">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-100">
+          <h2 className="text-lg font-semibold tracking-tight text-ink-900 dark:text-white">{title}</h2>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-700 dark:hover:bg-white/[0.08] dark:hover:text-white">
             <X className="h-4 w-4" />
           </button>
         </div>
