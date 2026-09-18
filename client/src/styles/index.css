@@ -32,6 +32,26 @@
       radial-gradient(50rem 45rem at 70% 105%, rgba(19, 74, 60, 0.5), transparent 60%);
   }
 
+  /* Login / sign-up ground: a deep emerald glow falling from the top over the
+     base, with side pools so the glass card has colour to blur against. */
+  .auth-backdrop {
+    background-color: theme("colors.ink.50");
+    background-image:
+      radial-gradient(70rem 36rem at 50% -12%, rgba(31, 155, 125, 0.28), transparent 62%),
+      radial-gradient(34rem 28rem at 8% 30%, rgba(94, 234, 212, 0.22), transparent 65%),
+      radial-gradient(34rem 28rem at 92% 72%, rgba(19, 74, 60, 0.16), transparent 65%),
+      linear-gradient(180deg, #dceee7 0%, #eef3f1 55%, #f4f7f6 100%);
+  }
+  .dark .auth-backdrop {
+    background-color: theme("colors.ink.950");
+    background-image:
+      radial-gradient(70rem 36rem at 50% -12%, rgba(31, 155, 125, 0.4), transparent 62%),
+      radial-gradient(34rem 28rem at 8% 30%, rgba(19, 74, 60, 0.7), transparent 65%),
+      radial-gradient(34rem 28rem at 92% 72%, rgba(19, 74, 60, 0.55), transparent 65%),
+      radial-gradient(50rem 24rem at 50% 115%, rgba(94, 234, 212, 0.08), transparent 60%),
+      linear-gradient(180deg, #0f2a23 0%, #0a0f0d 60%);
+  }
+
   /* Base frosted surface. `.card` is the padded, rounded panel nearly every
      view composes; `.glass-panel` is the same material without the radius
      commitment, for bars and rails. */
@@ -55,11 +75,12 @@
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-gradient-to-br from-brand-300 to-brand-500 text-ink-950 shadow-glow-sm hover:shadow-glow hover:brightness-110 active:brightness-95;
+    @apply btn bg-gradient-to-br from-brand-500 to-brand-800 text-white shadow-glow-sm hover:shadow-glow hover:brightness-110 active:brightness-95;
   }
-  /* Bright mint fill — pair it with dark text (text-ink-950), not white. */
+  /* The brand fill: mid teal falling into deep emerald. Pair it with white
+     text. */
   .brand-mark {
-    @apply bg-gradient-to-br from-brand-300 to-brand-500;
+    @apply bg-gradient-to-br from-brand-500 to-brand-800;
   }
   .btn-secondary {
     @apply btn border border-ink-200 bg-white/70 text-ink-700 backdrop-blur-xl hover:border-brand-400/60 hover:bg-white/90 hover:text-brand-700 dark:border-white/[0.1] dark:bg-white/[0.06] dark:text-ink-200 dark:hover:border-brand-400/30 dark:hover:bg-white/[0.1] dark:hover:text-ink-50;

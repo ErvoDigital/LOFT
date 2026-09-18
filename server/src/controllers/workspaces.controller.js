@@ -57,7 +57,7 @@ export async function createWorkspace(req, res) {
   const workspace = await prisma.workspace.create({
     data: {
       ...data,
-      color: data.color || "#17BC95",
+      color: data.color || "#134A3C",
       ownerId: req.userId,
       inviteCode: generateInviteCode(),
       members: { create: { userId: req.userId, role: "ADMIN" } },

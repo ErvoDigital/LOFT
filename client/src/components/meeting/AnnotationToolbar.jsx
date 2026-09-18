@@ -22,7 +22,7 @@ export default function AnnotationToolbar({ tool, onToolChange, color, onColorCh
           title={title}
           aria-label={title}
           className={`flex h-7 w-7 items-center justify-center rounded ${
-            tool === id ? "bg-brand-400 text-ink-950" : "text-white/70 hover:bg-white/10 hover:text-white"
+            tool === id ? "brand-mark text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
           }`}
         >
           <Icon className="h-4 w-4" />

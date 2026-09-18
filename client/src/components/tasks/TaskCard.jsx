@@ -27,7 +27,7 @@ export default function TaskCard({ task, onClick, onEdit, dragHandlers, dragging
       }}
       draggable={draggable}
       {...dragHandlers}
-      className={`group w-full rounded-xl border bg-white/70 p-3 text-left shadow-soft transition-all hover:border-brand-400/60 hover:bg-white/90 hover:shadow-glow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] ${
+      className={`group w-full rounded-xl border bg-white/70 p-3 text-left shadow-soft transition-all hover:border-brand-400/60 hover:bg-white/90 hover:shadow-glow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 dark:bg-ink-900/80 dark:hover:bg-ink-800/90 ${
         draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
       } ${
         task.isPinned

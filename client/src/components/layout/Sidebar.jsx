@@ -66,14 +66,14 @@ function WorkspaceIcon({ workspace, active }) {
 const navItemClass = ({ isActive }) =>
   `flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all ${
     isActive
-      ? "bg-brand-500/20 text-white ring-1 ring-brand-400/40"
+      ? "bg-gradient-to-br from-brand-500/35 to-brand-800/50 text-white ring-1 ring-brand-400/40"
       : "text-ink-400 hover:bg-white/[0.07] hover:text-white"
   }`;
 
 const subNavItemClass = ({ isActive }) =>
   `group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all ${
     isActive
-      ? "bg-brand-500/15 text-brand-700 ring-1 ring-brand-400/30 dark:text-brand-300"
+      ? "bg-gradient-to-r from-brand-500/20 to-brand-500/[0.04] text-brand-700 ring-1 ring-brand-400/30 dark:from-brand-500/25 dark:to-brand-800/10 dark:text-brand-300"
       : "text-ink-500 hover:bg-ink-900/[0.06] hover:text-ink-800 dark:text-ink-400 dark:hover:bg-white/[0.06] dark:hover:text-ink-100"
   }`;
 
@@ -413,7 +413,7 @@ export default function Sidebar() {
               </button>
             </div>
           </div>
-          <div className="brand-mark mb-1 flex h-9 w-9 items-center justify-center rounded-xl font-bold text-ink-950 shadow-glow-sm">
+          <div className="brand-mark mb-1 flex h-9 w-9 items-center justify-center rounded-xl font-bold text-white shadow-glow-sm">
             L
           </div>
         </div>
@@ -446,7 +446,7 @@ export default function Sidebar() {
 
       {/* Contextual panel for the active workspace — shown or fully hidden */}
       {activeWorkspace && !collapsed && (
-        <div className="flex w-60 animate-fade-in flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/60 px-2 py-3 shadow-glass backdrop-blur-xl dark:border-white/[0.07] dark:bg-white/[0.04]">
+        <div className="flex w-60 animate-fade-in flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/60 px-2 py-3 shadow-glass backdrop-blur-xl dark:border-white/[0.07] dark:bg-ink-900/80">
           <div className="mb-2 flex min-w-0 items-center gap-2.5 px-2">
             <div
               style={{ backgroundColor: displayColor(activeWorkspace.color), color: textOn(activeWorkspace.color) }}

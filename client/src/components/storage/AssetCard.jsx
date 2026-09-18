@@ -54,7 +54,7 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
       } ${materializing ? "animate-slide-fade-in" : ""}`}
     >
       {isMultiVersion && (
-        <span className="absolute right-3 top-3 rounded-full bg-gradient-to-br from-brand-300 to-brand-500 px-2 py-0.5 text-[11px] font-semibold text-ink-950 shadow-glow-sm">
+        <span className="absolute right-3 top-3 rounded-full brand-mark px-2 py-0.5 text-[11px] font-semibold text-white shadow-glow-sm">
           V{latest.version}
         </span>
       )}

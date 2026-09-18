@@ -1,7 +1,7 @@
 // Trend is shown as a colored dot plus text rather than an up/down arrow —
 // the design system has no arrow glyphs.
 const TONES = {
-  default: { value: "text-ink-900 dark:text-white", dot: "bg-ink-300 dark:bg-ink-600" },
+  default: { value: "text-ink-900 dark:text-ink-50", dot: "bg-ink-300 dark:bg-ink-600" },
   brand: { value: "text-brand-600 dark:text-brand-300", dot: "bg-brand-500" },
   danger: { value: "text-red-600 dark:text-red-400", dot: "bg-red-500" },
   positive: { value: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500" },

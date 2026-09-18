@@ -21,10 +21,11 @@ export default {
           900: "#102420",
           950: "#0A0F0D",
         },
-        // Brand — 300 is the mint accent (CTAs, icons, glow; keep it off large
-        // fills), 500 the mid teal and 800 the deep emerald that give depth.
-        // Fills from 300–500 take dark text (ink-950); 600–700 are the
-        // light-mode text shades.
+        // Brand — 800 is the deep emerald the brand is built on; solid brand
+        // fills are the 500→800 gradient (`.brand-mark`, `.btn-primary`) with
+        // white text. 300 is the mint accent for icons, glow and dark-mode
+        // text — keep it off large fills. 600–700 are the light-mode text
+        // shades.
         brand: {
           50: "#EDFDF9",
           100: "#D2FAF1",
@@ -60,8 +61,8 @@ export default {
         // tight drop shadow.
         glass: "0 8px 32px -8px rgba(10,15,13,0.45), inset 0 1px 0 0 rgba(255,255,255,0.06)",
         "glass-lg": "0 24px 64px -16px rgba(10,15,13,0.55), inset 0 1px 0 0 rgba(255,255,255,0.08)",
-        glow: "0 8px 24px -6px rgba(94,234,212,0.4)",
-        "glow-sm": "0 4px 12px -3px rgba(94,234,212,0.35)",
+        glow: "0 8px 24px -6px rgba(31,155,125,0.5), inset 0 1px 0 0 rgba(94,234,212,0.25)",
+        "glow-sm": "0 4px 12px -3px rgba(31,155,125,0.45), inset 0 1px 0 0 rgba(94,234,212,0.2)",
       },
       borderRadius: {
         xl: "0.875rem",

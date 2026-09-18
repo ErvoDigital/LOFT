@@ -5,7 +5,7 @@ import * as taskStatusesApi from "../../api/taskStatuses.js";
 import { apiErrorMessage } from "../../api/client.js";
 import { displayColor } from "../../lib/colors.js";
 
-const COLORS = ["#8a8578", "#C17538", "#0A7862", "#8C5A9C", "#B8562F", "#4A8C7A", "#17BC95", "#C44569"];
+const COLORS = ["#8a8578", "#C17538", "#134A3C", "#8C5A9C", "#B8562F", "#4A8C7A", "#1F9B7D", "#C44569"];
 
 export default function TaskStatusManagerModal({ open, onClose, workspaceId, statuses, onChanged }) {
   const [local, setLocal] = useState(statuses);

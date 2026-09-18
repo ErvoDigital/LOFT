@@ -32,7 +32,7 @@ export default function Topbar({ title }) {
   // which comes later in the DOM.
   return (
     <header className="relative z-30 flex h-14 shrink-0 items-center justify-between border-b border-white/50 bg-white/60 px-6 backdrop-blur-xl dark:border-white/[0.06] dark:bg-white/[0.03] print:hidden">
-      <h1 className="text-base font-semibold tracking-tight text-ink-900 dark:text-white">{title}</h1>
+      <h1 className="text-base font-semibold tracking-tight text-ink-900 dark:text-ink-50">{title}</h1>
       <div className="flex items-center gap-3">
         <button
           onClick={toggleTheme}

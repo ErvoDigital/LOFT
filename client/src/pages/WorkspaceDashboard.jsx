@@ -71,7 +71,7 @@ export default function WorkspaceDashboard() {
     <div className="mx-auto max-w-6xl space-y-6 p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate text-2xl font-semibold tracking-tight text-ink-900 dark:text-white">
+          <h2 className="truncate text-2xl font-semibold tracking-tight text-ink-900 dark:text-ink-50">
             {workspace?.name || "Workspace"}
           </h2>
           <p className="text-sm text-ink-500">

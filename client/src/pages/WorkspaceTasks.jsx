@@ -137,7 +137,7 @@ export default function WorkspaceTasks() {
     <>
       <div className="mx-auto max-w-6xl space-y-4 p-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold tracking-tight text-ink-900 dark:text-white">Tasks</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-ink-900 dark:text-ink-50">Tasks</h2>
           <div className="flex items-center gap-2">
             {isAdmin && (
               <button className="btn-secondary" onClick={() => setStatusModalOpen(true)}>

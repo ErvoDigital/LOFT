@@ -90,7 +90,7 @@ export default function Dashboard() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight text-ink-900 dark:text-white">
+        <h2 className="text-2xl font-semibold tracking-tight text-ink-900 dark:text-ink-50">
           {greeting()}, {user?.name?.split(" ")[0]}
         </h2>
         <p className="text-sm text-ink-500">

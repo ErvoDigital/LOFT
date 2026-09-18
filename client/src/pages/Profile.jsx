@@ -10,7 +10,7 @@ import GoogleSignInButton from "../components/common/GoogleSignInButton.jsx";
 import ChangePasswordModal from "../components/profile/ChangePasswordModal.jsx";
 import { displayColor } from "../lib/colors.js";
 
-const COLORS = ["#17BC95", "#2A9D8F", "#E76F51", "#E9A23B", "#0A7862", "#C44569", "#3F6B52", "#C17538"];
+const COLORS = ["#134A3C", "#1F9B7D", "#E76F51", "#E9A23B", "#5EEAD4", "#C44569", "#3F6B52", "#C17538"];
 
 export default function Profile() {
   const { user, setUser } = useAuth();

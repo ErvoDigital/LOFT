@@ -35,7 +35,7 @@ export async function register(req, res) {
   if (existing) throw new ApiError(409, "An account with this email already exists");
 
   const passwordHash = await hashPassword(password);
-  const colors = ["#17BC95", "#2A9D8F", "#E76F51", "#E9A23B", "#0A7862", "#C44569"];
+  const colors = ["#134A3C", "#1F9B7D", "#E76F51", "#E9A23B", "#5EEAD4", "#C44569"];
   const user = await prisma.user.create({
     data: {
       name,
@@ -85,7 +85,7 @@ export async function googleAuth(req, res) {
   }
 
   if (!user) {
-    const colors = ["#17BC95", "#2A9D8F", "#E76F51", "#E9A23B", "#0A7862", "#C44569"];
+    const colors = ["#134A3C", "#1F9B7D", "#E76F51", "#E9A23B", "#5EEAD4", "#C44569"];
     user = await prisma.user.create({
       data: {
         name: payload.name || email.split("@")[0],

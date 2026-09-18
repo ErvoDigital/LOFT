@@ -318,7 +318,7 @@ export default function ChatThread({ conversation, headerExtra }) {
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-ink-50 dark:bg-ink-900">
       <div className="flex items-center gap-2.5 border-b border-ink-200 bg-white px-5 py-3 dark:border-ink-700 dark:bg-ink-800">
         {conversation.isMeetingChat ? (
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-ink-950">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg brand-mark text-white">
             <MessageSquare className="h-4 w-4" />
           </div>
         ) : conversation.isGroup ? (
