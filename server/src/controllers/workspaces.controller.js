@@ -5,6 +5,7 @@ import { notify } from "../services/notification.service.js";
 import { generateInviteCode } from "../utils/inviteCode.js";
 import { ensureWorkspaceStatuses } from "./taskStatuses.controller.js";
 import { isFolderVisible } from "../services/folderAccess.js";
+import { imageDataUrlSchema } from "../utils/imageDataUrl.js";
 
 const createSchema = z.object({
   name: z.string().min(2).max(80),
@@ -18,6 +19,7 @@ const updateSchema = z.object({
   description: z.string().max(400).optional(),
   type: z.enum(["school", "work", "org", "church", "other"]).optional(),
   color: z.string().min(3).max(20).optional(),
+  logoUrl: imageDataUrlSchema,
 });
 
 const joinSchema = z.object({ inviteCode: z.string().min(4).max(20) });
@@ -31,6 +33,7 @@ function workspaceSummary(ws) {
     description: ws.description,
     type: ws.type,
     color: ws.color,
+    logoUrl: ws.logoUrl,
     inviteCode: ws.inviteCode,
     ownerId: ws.ownerId,
     createdAt: ws.createdAt,

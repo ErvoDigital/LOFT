@@ -6,21 +6,12 @@ import { ApiError } from "../utils/ApiError.js";
 import { verifyGoogleCredential } from "../utils/googleAuth.js";
 import { notify } from "../services/notification.service.js";
 import { publicUser } from "../utils/publicUser.js";
-
-// Avatars are stored as data URIs directly on the user row (see
-// client/src/lib/avatarImage.js) rather than in object storage, the same
-// approach already used for images embedded in documents: a plain <img src>
-// can't send the Authorization header a presigned/proxied download route
-// would need. Restricted to raster formats — an svg data URI can carry a
-// <script>, which would run wherever the avatar is rendered.
-const avatarDataUrlPattern = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+import { imageDataUrlSchema } from "../utils/imageDataUrl.js";
 
 const updateSchema = z.object({
   name: z.string().min(2).max(80).optional(),
   avatarColor: z.string().min(3).max(20).optional(),
-  avatarUrl: z
-    .union([z.string().regex(avatarDataUrlPattern).max(300000), z.null()])
-    .optional(),
+  avatarUrl: imageDataUrlSchema,
 });
 
 const verifyPasswordCodeSchema = z.object({ code: z.string().length(6) });

@@ -60,6 +60,7 @@ model Workspace {
   description String?
   type        String   @default("other") // school | work | org | church | other
   color       String   @default("#5B5BD6")
+  logoUrl     String?
   inviteCode  String   @unique
   ownerId     String
   createdAt   DateTime @default(now())
