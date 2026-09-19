@@ -26,36 +26,27 @@ import * as foldersApi from "../../api/folders.js";
 import * as workspacesApi from "../../api/workspaces.js";
 import Avatar from "../common/Avatar.jsx";
 import WorkspaceModal from "./WorkspaceModal.jsx";
-import { displayColor, textOn } from "../../lib/colors.js";
+import WorkspaceMark from "../common/WorkspaceMark.jsx";
 
 const COLLAPSE_KEY = "loft:sidebar-collapsed";
 
-const initialsOf = (name) =>
-  name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join("");
-
 function WorkspaceIcon({ workspace, active }) {
-  const initials = initialsOf(workspace.name);
   return (
     <NavLink
       to={`/workspaces/${workspace.id}/dashboard`}
       title={workspace.name}
       className="group relative flex items-center"
     >
-      <div
-        style={{ backgroundColor: displayColor(workspace.color), color: textOn(workspace.color) }}
-        className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-semibold transition-all ${
+      <WorkspaceMark
+        name={workspace.name}
+        color={workspace.color}
+        logoUrl={workspace.logoUrl}
+        className={`h-9 w-9 rounded-xl text-sm transition-all ${
           active
             ? "ring-2 ring-brand-400 ring-offset-2 ring-offset-ink-950 shadow-glow-sm"
             : "opacity-60 hover:opacity-100 hover:ring-2 hover:ring-white/20"
         }`}
-      >
-        {initials}
-      </div>
+      />
       <span className="pointer-events-none absolute left-full z-10 ml-3 whitespace-nowrap rounded-lg border border-white/10 bg-ink-950/90 px-2.5 py-1 text-xs font-medium text-white opacity-0 shadow-glass backdrop-blur-xl transition-opacity group-hover:opacity-100">
         {workspace.name}
       </span>
@@ -442,18 +433,28 @@ export default function Sidebar() {
         >
           <Plus className="h-4 w-4" />
         </button>
+
+        {/* Pinned to the foot of the rail, away from the page destinations. */}
+        <NavLink
+          to="/settings"
+          title="Settings"
+          aria-label="Settings"
+          className={({ isActive }) => navItemClass({ isActive }) + " mt-auto !px-0 !py-0 h-10 w-10 shrink-0 justify-center"}
+        >
+          <Settings className="h-[18px] w-[18px]" />
+        </NavLink>
       </div>
 
       {/* Contextual panel for the active workspace — shown or fully hidden */}
       {activeWorkspace && !collapsed && (
         <div className="flex w-60 animate-fade-in flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/60 px-2 py-3 shadow-glass backdrop-blur-xl dark:border-white/[0.07] dark:bg-ink-900/80">
           <div className="mb-2 flex min-w-0 items-center gap-2.5 px-2">
-            <div
-              style={{ backgroundColor: displayColor(activeWorkspace.color), color: textOn(activeWorkspace.color) }}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-semibold"
-            >
-              {initialsOf(activeWorkspace.name)}
-            </div>
+            <WorkspaceMark
+              name={activeWorkspace.name}
+              color={activeWorkspace.color}
+              logoUrl={activeWorkspace.logoUrl}
+              className="h-8 w-8 rounded-xl text-xs"
+            />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-ink-800 dark:text-ink-100">{activeWorkspace.name}</p>
               <p className="truncate text-[11px] capitalize text-ink-400">

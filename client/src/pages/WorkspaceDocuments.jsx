@@ -7,6 +7,7 @@ import * as workspacesApi from "../api/workspaces.js";
 import { apiErrorMessage } from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketContext.jsx";
+import { useConfirm } from "../context/ConfirmContext.jsx";
 import Avatar from "../components/common/Avatar.jsx";
 import EmptyState from "../components/common/EmptyState.jsx";
 import Spinner from "../components/common/Spinner.jsx";
@@ -25,6 +26,7 @@ export default function WorkspaceDocuments() {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const confirm = useConfirm();
   const [creating, setCreating] = useState(false);
   const [accessDoc, setAccessDoc] = useState(null);
 
@@ -67,7 +69,13 @@ export default function WorkspaceDocuments() {
 
   async function deleteDocument(e, docId) {
     e.stopPropagation();
-    if (!confirm("Delete this document for everyone?")) return;
+    const ok = await confirm({
+      title: "Delete this document?",
+      subject: documents.find((d) => d.id === docId)?.title,
+      message: "It will be deleted for everyone in this workspace. This can't be undone.",
+      confirmLabel: "Delete document",
+    });
+    if (!ok) return;
     try {
       await documentsApi.deleteDocument(workspaceId, docId);
       setDocuments((prev) => prev.filter((d) => d.id !== docId));

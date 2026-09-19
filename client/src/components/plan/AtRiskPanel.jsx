@@ -10,7 +10,7 @@ export default function AtRiskPanel({ items }) {
       <div className="mb-2 flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
         <p className="text-sm font-semibold text-red-800 dark:text-red-400">
-          {items.length} task{items.length === 1 ? "" : "s"} won't fit before its due date at this pace
+          {items.length === 1 ? "1 task won't fit before its due date" : `${items.length} tasks won't fit before their due dates`} at this pace
         </p>
       </div>
       <div className="space-y-1.5">

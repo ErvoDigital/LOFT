@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarCheck, ListChecks, CalendarDays } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CalendarCheck, CalendarDays, CalendarRange, Rows3 } from "lucide-react";
 import * as planApi from "../api/plan.js";
 import * as tasksApi from "../api/tasks.js";
 import * as workspacesApi from "../api/workspaces.js";
@@ -7,21 +7,36 @@ import * as taskStatusesApi from "../api/taskStatuses.js";
 import { useSocket } from "../context/SocketContext.jsx";
 import AtRiskPanel from "../components/plan/AtRiskPanel.jsx";
 import ConflictsPanel from "../components/dashboard/ConflictsPanel.jsx";
-import StatCard from "../components/dashboard/StatCard.jsx";
-import PlanDayGroup from "../components/plan/PlanDayGroup.jsx";
+import PlanFocusHero from "../components/plan/PlanFocusHero.jsx";
+import PlanTimeline from "../components/plan/PlanTimeline.jsx";
+import PlanWeek from "../components/plan/PlanWeek.jsx";
 import PlanCalendar from "../components/plan/PlanCalendar.jsx";
+import { buildDayLanes, pickFocus, toPlanItems } from "../components/plan/planModel.js";
 import TaskModal from "../components/tasks/TaskModal.jsx";
 import TaskDetailsPanel from "../components/tasks/TaskDetailsPanel.jsx";
-import { TierBadge } from "../components/common/Badges.jsx";
 import Spinner from "../components/common/Spinner.jsx";
 import EmptyState from "../components/common/EmptyState.jsx";
+import Select from "../components/common/Select.jsx";
 
 const CAPACITY_KEY = "loft:plan-capacity";
 const CAPACITY_OPTIONS = [2, 4, 6, 8, 10];
+const VIEW_KEY = "loft:plan-view";
+const VIEWS = [
+  { id: "day", label: "Day by day", Icon: Rows3 },
+  { id: "week", label: "Week", Icon: CalendarRange },
+  { id: "calendar", label: "Calendar", Icon: CalendarDays },
+];
 
 export default function MyPlan() {
   const { socket } = useSocket();
-  const [view, setView] = useState("schedule"); // "schedule" | "calendar"
+  const [view, setView] = useState(() => {
+    try {
+      const stored = localStorage.getItem(VIEW_KEY);
+      return VIEWS.some((v) => v.id === stored) ? stored : "day";
+    } catch {
+      return "day";
+    }
+  });
   const [capacity, setCapacity] = useState(() => {
     const stored = Number(localStorage.getItem(CAPACITY_KEY));
     return CAPACITY_OPTIONS.includes(stored) ? stored : 6;
@@ -34,12 +49,12 @@ export default function MyPlan() {
   const [editorOpen, setEditorOpen] = useState(false);
   const requestId = useRef(0);
 
-  // Two loads can overlap (e.g. a tier edit's reload racing a capacity
-  // change fired right after it) — only the most recently issued response is
-  // allowed to land, so a slow, now-stale request can't clobber a fresher one.
-  const load = useCallback((cap) => {
+  // Two loads can overlap (e.g. a tier edit's reload racing a socket-driven
+  // one) — only the most recently issued response is allowed to land, so a
+  // slow, now-stale request can't clobber a fresher one.
+  const load = useCallback(() => {
     const id = ++requestId.current;
-    planApi.getPlan(cap).then((data) => {
+    planApi.getPlan().then((data) => {
       if (id === requestId.current) setPlan(data);
     }).finally(() => {
       if (id === requestId.current) setLoading(false);
@@ -47,41 +62,54 @@ export default function MyPlan() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    load(capacity);
+    load();
+  }, [load]);
+
+  // Daily hours only change how the plan is measured (lane load, at-risk),
+  // which is worked out here, so a new value needs no reload.
+  useEffect(() => {
     try {
       localStorage.setItem(CAPACITY_KEY, String(capacity));
     } catch {
       // localStorage unavailable — capacity just won't persist.
     }
-  }, [capacity, load]);
+  }, [capacity]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_KEY, view);
+    } catch {
+      // localStorage unavailable — the view just won't persist.
+    }
+  }, [view]);
 
   useEffect(() => {
     if (!socket) return;
-    const handler = () => load(capacity);
+    const handler = () => load();
     const socketEvents = ["task:created", "task:updated", "task:deleted", "event:created", "event:updated", "event:cancelled"];
     socketEvents.forEach((e) => socket.on(e, handler));
     return () => socketEvents.forEach((e) => socket.off(e, handler));
-  }, [socket, load, capacity]);
+  }, [socket, load]);
 
-  // Shared by the status select and the pin/snooze toggles: patch the item
-  // in-place everywhere it appears (today's schedule and the flat task
-  // list) for an instant-feeling UI, persist it, then re-run the Smart
-  // Priority Engine server-side since a pin/snooze change can reshuffle the
-  // whole day-by-day order, not just the one row.
+  // Every view is derived from the flat task list, so patching the one task
+  // there updates the day lanes, the week and the calendar at once.
+  const items = useMemo(() => toPlanItems(plan?.tasks, capacity), [plan, capacity]);
+  const lanes = useMemo(() => buildDayLanes(items), [items]);
+  const atRisk = useMemo(() => items.filter((it) => it.atRisk), [items]);
+
+  // Shared by the status select and the pin/snooze toggles: patch the task
+  // in place for an instant-feeling UI, persist it, then reload so the
+  // server re-scores it — a pin or snooze moves the task's rank, not just
+  // its badge.
   async function patchItem(item, patch) {
     setPlan((prev) =>
       prev && {
         ...prev,
         tasks: prev.tasks.map((t) => (t.id === item.taskId ? { ...t, ...patch } : t)),
-        days: prev.days.map((d) => ({
-          ...d,
-          items: d.items.map((it) => (it.taskId === item.taskId ? { ...it, ...patch } : it)),
-        })),
       }
     );
     await tasksApi.updateTask(item.workspaceId, item.taskId, patch);
-    load(capacity);
+    load();
   }
 
   const handleStatusChange = (item, status) => patchItem(item, { status });
@@ -123,49 +151,66 @@ export default function MyPlan() {
     );
   }
 
-  const criticalCount = plan?.tasks?.filter((t) => t.tier === "TIER_1").length || 0;
-  const today = plan?.days?.find((d) => d.isToday);
-  const hasTasks = plan?.tasks?.length > 0;
+  const hasTasks = items.length > 0;
   const hasConflicts = plan?.conflicts?.length > 0;
+  const todayLane = lanes.find((l) => l.kind === "day" && l.offset === 0);
+  const stats = {
+    open: items.length,
+    critical: items.filter((t) => t.tier === "TIER_1").length,
+    overdue: lanes.find((l) => l.kind === "overdue")?.items.length || 0,
+    atRisk: atRisk.length,
+  };
+  const rowHandlers = {
+    statusesByWorkspace: plan?.statusesByWorkspace,
+    onStatusChange: handleStatusChange,
+    onTogglePin: handleTogglePin,
+    onToggleSnooze: handleToggleSnooze,
+    onTaskClick: openTaskDetail,
+  };
 
   return (
     <>
-      <div className="mx-auto max-w-5xl space-y-6 p-6">
+      <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold text-ink-900 dark:text-ink-50">My Plan</h2>
-            <p className="text-sm text-ink-500">Every open task across your workspaces, ranked by Smart Priority into a day-by-day plan.</p>
-            {view === "schedule" && (
-              <label className="mt-2 flex items-center gap-2 text-sm text-ink-600 dark:text-ink-300">
-                Hours per day
-                <select className="input !w-auto" value={capacity} onChange={(e) => setCapacity(Number(e.target.value))}>
-                  {CAPACITY_OPTIONS.map((h) => (
-                    <option key={h} value={h}>
-                      {h}h
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <p className="text-sm text-ink-500">Every open task across your workspaces, ranked by Smart Priority within its day or its week.</p>
+            {view !== "calendar" && (
+              <div className="mt-2 flex items-center gap-2 text-sm text-ink-600 dark:text-ink-300">
+                <label htmlFor="plan-capacity">Hours per day</label>
+                <Select
+                  id="plan-capacity"
+                  className="!w-24"
+                  value={capacity}
+                  onChange={setCapacity}
+                  options={CAPACITY_OPTIONS.map((h) => ({ value: h, label: `${h}h` }))}
+                />
+              </div>
             )}
           </div>
 
-          <div className="flex shrink-0 items-center gap-1 rounded-lg bg-ink-100 p-1 text-sm dark:bg-ink-900">
-            <button
-              onClick={() => setView("schedule")}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors ${
-                view === "schedule" ? "bg-white text-ink-800 shadow-soft dark:bg-ink-800 dark:text-ink-100" : "text-ink-500"
-              }`}
-            >
-              <ListChecks className="h-4 w-4" /> Schedule
-            </button>
-            <button
-              onClick={() => setView("calendar")}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors ${
-                view === "calendar" ? "bg-white text-ink-800 shadow-soft dark:bg-ink-800 dark:text-ink-100" : "text-ink-500"
-              }`}
-            >
-              <CalendarDays className="h-4 w-4" /> Calendar
-            </button>
+          {/* Full width on phones, where three labelled tabs are wider than
+              the screen; the icons only come back when there's room. */}
+          <div
+            className="flex w-full shrink-0 items-center gap-1 rounded-xl bg-ink-900/[0.05] p-1 text-sm dark:bg-white/[0.05] sm:w-auto"
+            role="group"
+            aria-label="Plan view"
+          >
+            {VIEWS.map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={view === id}
+                onClick={() => setView(id)}
+                className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 font-medium transition-colors sm:flex-none sm:justify-start sm:px-3 ${
+                  view === id
+                    ? "bg-white text-ink-800 shadow-soft dark:bg-ink-800 dark:text-ink-100"
+                    : "text-ink-500 hover:text-ink-800 dark:hover:text-ink-200"
+                }`}
+              >
+                <Icon className="hidden h-4 w-4 sm:block" /> {label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -178,12 +223,13 @@ export default function MyPlan() {
         ) : (
           <>
             {hasTasks && (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <StatCard label="Open tasks" value={plan.tasks.length} />
-                <StatCard label="Critical (Tier 1)" value={criticalCount} tone={criticalCount > 0 ? "danger" : "default"} />
-                <StatCard label="Planned today" value={`${today?.plannedHours || 0}h`} tone="brand" />
-                <StatCard label="At risk" value={plan.atRisk.length} tone={plan.atRisk.length > 0 ? "danger" : "positive"} />
-              </div>
+              <PlanFocusHero
+                focus={pickFocus(lanes)}
+                todayHours={todayLane?.hours || 0}
+                capacity={capacity}
+                stats={stats}
+                onOpen={openTaskDetail}
+              />
             )}
 
             {hasConflicts && (
@@ -195,45 +241,12 @@ export default function MyPlan() {
 
             {hasTasks && (
               <>
-                <AtRiskPanel items={plan.atRisk} />
+                <AtRiskPanel items={atRisk} />
 
-                {view === "schedule" ? (
-                  <section className="space-y-3">
-                    {plan.days.map((day) => (
-                      <PlanDayGroup
-                        key={day.date}
-                        day={day}
-                        statusesByWorkspace={plan.statusesByWorkspace}
-                        onStatusChange={handleStatusChange}
-                        onTogglePin={handleTogglePin}
-                        onToggleSnooze={handleToggleSnooze}
-                        onTaskClick={openTaskDetail}
-                      />
-                    ))}
-                  </section>
-                ) : (
+                {view === "day" && <PlanTimeline lanes={lanes} capacity={capacity} {...rowHandlers} />}
+                {view === "week" && <PlanWeek items={items} capacity={capacity} {...rowHandlers} />}
+                {view === "calendar" && (
                   <PlanCalendar tasks={plan.tasks} events={plan.events || []} onTaskClick={openTaskDetail} />
-                )}
-
-                {plan.unscheduled.length > 0 && (
-                  <section className="card p-4">
-                    <h4 className="mb-2 text-sm font-semibold text-ink-800 dark:text-ink-100">Someday</h4>
-                    <p className="mb-2 text-xs text-ink-400">No due date, and no room in the next 30 days at this pace.</p>
-                    <div className="space-y-1.5">
-                      {plan.unscheduled.map((t) => (
-                        <button
-                          key={t.taskId}
-                          onClick={() => openTaskDetail(t)}
-                          className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-ink-50 dark:hover:bg-ink-700"
-                        >
-                          <TierBadge tier={t.tier} compact />
-                          <p className="truncate text-sm text-ink-600 dark:text-ink-300">
-                            {t.title} <span className="text-ink-400">· {t.workspaceName}</span>
-                          </p>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
                 )}
               </>
             )}
@@ -255,18 +268,18 @@ export default function MyPlan() {
         onClose={() => setEditorOpen(false)}
         workspaceId={detail?.workspaceId}
         members={detail?.members || []}
-        statuses={(detail?.statuses || []).map((s) => ({ value: s.id, label: s.label }))}
+        statuses={(detail?.statuses || []).map((s) => ({ value: s.id, label: s.label, color: s.color }))}
         task={detail?.task}
         onSaved={(saved) => {
           setEditorOpen(false);
           setDetail((prev) => (prev ? { ...prev, task: saved } : prev));
-          load(capacity);
+          load();
         }}
         onDeleted={() => {
           setEditorOpen(false);
           setDetailsOpen(false);
           setDetail(null);
-          load(capacity);
+          load();
         }}
       />
 

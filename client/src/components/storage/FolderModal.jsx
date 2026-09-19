@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Modal from "../common/Modal.jsx";
+import { useConfirm } from "../../context/ConfirmContext.jsx";
 import * as foldersApi from "../../api/folders.js";
 import { apiErrorMessage } from "../../api/client.js";
 
@@ -9,6 +10,7 @@ export default function FolderModal({ open, onClose, workspaceId, members, paren
   const [visibility, setVisibility] = useState("WORKSPACE");
   const [memberIds, setMemberIds] = useState([]);
   const [error, setError] = useState("");
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -48,7 +50,13 @@ export default function FolderModal({ open, onClose, workspaceId, members, paren
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this folder? It must be empty first.")) return;
+    const ok = await confirm({
+      title: "Delete this folder?",
+      subject: folder.name,
+      message: "Only an empty folder can be deleted, so move or delete anything inside it first.",
+      confirmLabel: "Delete folder",
+    });
+    if (!ok) return;
     setLoading(true);
     try {
       await foldersApi.deleteFolder(workspaceId, folder.id);

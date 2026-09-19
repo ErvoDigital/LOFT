@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import { Pin, Moon } from "lucide-react";
 import Modal from "../common/Modal.jsx";
-import { TIER_META } from "../common/Badges.jsx";
+import { useConfirm } from "../../context/ConfirmContext.jsx";
+import { TIER_META, TierBadge } from "../common/Badges.jsx";
+import Select from "../common/Select.jsx";
+import Avatar from "../common/Avatar.jsx";
+import { displayColor } from "../../lib/colors.js";
 import * as tasksApi from "../../api/tasks.js";
 import { apiErrorMessage } from "../../api/client.js";
+import { DatePicker } from "../common/DatePicker.jsx";
 
 const TIERS = ["TIER_1", "TIER_2", "TIER_3", "TIER_4"];
 const DEFAULT_STATUSES = [
@@ -11,6 +16,10 @@ const DEFAULT_STATUSES = [
   { value: "IN_PROGRESS", label: "In progress" },
   { value: "COMPLETED", label: "Completed" },
 ];
+
+function StatusDot({ color }) {
+  return <span className="h-2 w-2 rounded-full" style={{ backgroundColor: displayColor(color) }} />;
+}
 
 function formatDuration(minutes) {
   const m = Number(minutes) || 0;
@@ -34,6 +43,7 @@ export default function TaskModal({ open, onClose, workspaceId, members, statuse
   const [dueDate, setDueDate] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [error, setError] = useState("");
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -91,7 +101,13 @@ export default function TaskModal({ open, onClose, workspaceId, members, statuse
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this task?")) return;
+    const ok = await confirm({
+      title: "Delete this task?",
+      subject: task.title,
+      message: "It will be removed from the board for everyone in this workspace. This can't be undone.",
+      confirmLabel: "Delete task",
+    });
+    if (!ok) return;
     setLoading(true);
     try {
       await tasksApi.deleteTask(workspaceId, task.id);
@@ -117,29 +133,46 @@ export default function TaskModal({ open, onClose, workspaceId, members, statuse
           <textarea className="input" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Priority tier</label>
-          <select className="input" value={tier} onChange={(e) => setTier(e.target.value)}>
-            {TIERS.map((t) => (
-              <option key={t} value={t}>
-                {TIER_META[t].label} ({TIER_META[t].description})
-              </option>
-            ))}
-          </select>
+          <label htmlFor="task-tier" className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">
+            Priority tier
+          </label>
+          <Select
+            id="task-tier"
+            value={tier}
+            onChange={setTier}
+            options={TIERS.map((t) => ({
+              value: t,
+              label: TIER_META[t].description,
+              // Fixed slot so labels line up despite the Tier 1 badge's extra pulse dot.
+              icon: (
+                <span className="flex w-[3.25rem]">
+                  <TierBadge tier={t} compact />
+                </span>
+              ),
+            }))}
+          />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Status</label>
-            <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
-              {STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+            <label htmlFor="task-status" className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">
+              Status
+            </label>
+            <Select
+              id="task-status"
+              value={status}
+              onChange={setStatus}
+              options={STATUSES.map((s) => ({
+                value: s.value,
+                label: s.label,
+                icon: s.color ? <StatusDot color={s.color} /> : undefined,
+              }))}
+            />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Due date (optional)</label>
-            <input type="date" className="input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <label htmlFor="task-due" className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">
+              Due date (optional)
+            </label>
+            <DatePicker id="task-due" value={dueDate} onChange={setDueDate} placeholder="No due date" align="end" clearable />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -157,15 +190,26 @@ export default function TaskModal({ open, onClose, workspaceId, members, statuse
             <p className="mt-1 text-xs text-ink-400">≈ {formatDuration(estimatedMinutes)} — fed into My Plan's daily schedule</p>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Assignee</label>
-            <select className="input" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
-              <option value="">Unassigned</option>
-              {members.map((m) => (
-                <option key={m.user.id} value={m.user.id}>
-                  {m.user.name}
-                </option>
-              ))}
-            </select>
+            <label htmlFor="task-assignee" className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">
+              Assignee
+            </label>
+            <Select
+              id="task-assignee"
+              value={assigneeId}
+              onChange={setAssigneeId}
+              options={[
+                {
+                  value: "",
+                  label: "Unassigned",
+                  icon: <span className="h-5 w-5 rounded-full border border-dashed border-ink-400 dark:border-ink-500" />,
+                },
+                ...members.map((m) => ({
+                  value: m.user.id,
+                  label: m.user.name,
+                  icon: <Avatar name={m.user.name} color={m.user.avatarColor} src={m.user.avatarUrl} size={20} />,
+                })),
+              ]}
+            />
           </div>
         </div>
         <div>

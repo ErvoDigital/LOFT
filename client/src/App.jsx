@@ -20,6 +20,7 @@ import DocumentEditor from "./pages/DocumentEditor.jsx";
 import WorkspaceSettings from "./pages/WorkspaceSettings.jsx";
 import Chat from "./pages/Chat.jsx";
 import Profile from "./pages/Profile.jsx";
+import Settings from "./pages/Settings.jsx";
 
 function PublicOnly({ children }) {
   const { user, loading } = useAuth();
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="/plan" element={<MyPlan />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/workspaces/:workspaceId" element={<Navigate to="dashboard" replace />} />
         <Route path="/workspaces/:workspaceId/dashboard" element={<WorkspaceDashboard />} />
         <Route path="/workspaces/:workspaceId/calendar" element={<WorkspaceCalendar />} />

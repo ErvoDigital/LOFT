@@ -4,6 +4,7 @@ import { CalendarCheck, Video, CalendarDays } from "lucide-react";
 import MonthGrid from "../calendar/MonthGrid.jsx";
 import { TierBadge } from "../common/Badges.jsx";
 import EmptyState from "../common/EmptyState.jsx";
+import { MonthPicker } from "../common/DatePicker.jsx";
 
 function formatDuration(minutes) {
   const m = Number(minutes) || 0;
@@ -55,16 +56,9 @@ export default function PlanCalendar({ tasks, events = [], onTaskClick }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <h4 className="text-sm font-semibold text-ink-800 dark:text-ink-100">{monthDate.toLocaleDateString([], { month: "long", year: "numeric" })}</h4>
-        <input
-          type="month"
-          className="input w-auto"
-          value={`${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, "0")}`}
-          onChange={(e) => {
-            const [year, month] = e.target.value.split("-").map(Number);
-            if (year && month) setMonthDate(new Date(year, month - 1, 1));
-          }}
-        />
+        <h4 className="text-sm font-semibold text-ink-800 dark:text-ink-100">
+          <MonthPicker value={monthDate} onChange={setMonthDate} />
+        </h4>
         <button className="btn-secondary" onClick={() => { setMonthDate(new Date()); setSelectedDate(new Date()); }}>
           Today
         </button>

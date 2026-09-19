@@ -1,3 +1,11 @@
+import plugin from "tailwindcss/plugin";
+import containerQueries from "@tailwindcss/container-queries";
+import { STEPS, basePalette } from "./src/lib/palette.js";
+
+// A color scale read from CSS variables holding space-separated RGB
+// channels, which keeps Tailwind's opacity modifiers (bg-brand-500/10) working.
+const scale = (name) => Object.fromEntries(STEPS.map((s) => [s, `rgb(var(--${name}-${s}) / <alpha-value>)`]));
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: "class",
@@ -5,40 +13,11 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Neutral scale, tinted toward the brand green. Anchored on the LOFT
-        // palette: 950 is the page background, 900 the card surface, 400 the
-        // muted text and 50 the heading text on dark.
-        ink: {
-          50: "#F4F7F6",
-          100: "#E6EDEA",
-          200: "#D0DCD8",
-          300: "#B4C4BF",
-          400: "#8EA39D",
-          500: "#5F7872",
-          600: "#435A55",
-          700: "#28403A",
-          800: "#183029",
-          900: "#102420",
-          950: "#0A0F0D",
-        },
-        // Brand — 800 is the deep emerald the brand is built on; solid brand
-        // fills are the 500→800 gradient (`.brand-mark`, `.btn-primary`) with
-        // white text. 300 is the mint accent for icons, glow and dark-mode
-        // text — keep it off large fills. 600–700 are the light-mode text
-        // shades.
-        brand: {
-          50: "#EDFDF9",
-          100: "#D2FAF1",
-          200: "#A8F4E6",
-          300: "#5EEAD4",
-          400: "#3FD6BC",
-          500: "#1F9B7D",
-          600: "#137A64",
-          700: "#0F5E4E",
-          800: "#134A3C",
-          900: "#0F3A30",
-          950: "#0A2620",
-        },
+        // Both scales are CSS variables so the theme color can change at
+        // runtime (see src/lib/palette.js for what each step is for, and
+        // ThemeContext for the switcher). Defaults are set on :root below.
+        ink: scale("ink"),
+        brand: scale("brand"),
         accent: {
           50: "#FFFBEB",
           100: "#FEF3C7",
@@ -61,8 +40,8 @@ export default {
         // tight drop shadow.
         glass: "0 8px 32px -8px rgba(10,15,13,0.45), inset 0 1px 0 0 rgba(255,255,255,0.06)",
         "glass-lg": "0 24px 64px -16px rgba(10,15,13,0.55), inset 0 1px 0 0 rgba(255,255,255,0.08)",
-        glow: "0 8px 24px -6px rgba(31,155,125,0.5), inset 0 1px 0 0 rgba(94,234,212,0.25)",
-        "glow-sm": "0 4px 12px -3px rgba(31,155,125,0.45), inset 0 1px 0 0 rgba(94,234,212,0.2)",
+        glow: "0 8px 24px -6px rgb(var(--brand-500) / 0.5), inset 0 1px 0 0 rgb(var(--brand-300) / 0.25)",
+        "glow-sm": "0 4px 12px -3px rgb(var(--brand-500) / 0.45), inset 0 1px 0 0 rgb(var(--brand-300) / 0.2)",
       },
       borderRadius: {
         xl: "0.875rem",
@@ -88,14 +67,14 @@ export default {
         },
         // Marks the folder a new item just landed inside of.
         "glow-pulse": {
-          "0%, 100%": { boxShadow: "0 0 0 0 rgba(94,234,212,0)" },
-          "35%": { boxShadow: "0 0 0 4px rgba(94,234,212,0.35), 0 8px 24px -6px rgba(31,155,125,0.5)" },
+          "0%, 100%": { boxShadow: "0 0 0 0 rgb(var(--brand-300) / 0)" },
+          "35%": { boxShadow: "0 0 0 4px rgb(var(--brand-300) / 0.35), 0 8px 24px -6px rgb(var(--brand-500) / 0.5)" },
         },
         // Same signal for a non-rectangular element — drop-shadow follows the
         // drawn silhouette, where box-shadow would halo the bounding box.
         "glow-pulse-drop": {
-          "0%, 100%": { filter: "drop-shadow(0 0 0 rgba(94,234,212,0))" },
-          "35%": { filter: "drop-shadow(0 0 9px rgba(94,234,212,0.85))" },
+          "0%, 100%": { filter: "drop-shadow(0 0 0 rgb(var(--brand-300) / 0))" },
+          "35%": { filter: "drop-shadow(0 0 9px rgb(var(--brand-300) / 0.85))" },
         },
         "slide-fade-in": {
           "0%": { opacity: "0", transform: "translateY(10px)" },
@@ -104,6 +83,11 @@ export default {
         "fade-in": {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
+        },
+        // A dashboard skyline floor settling onto the one below it.
+        rise: {
+          "0%": { opacity: "0", transform: "scaleY(0)" },
+          "100%": { opacity: "1", transform: "scaleY(1)" },
         },
       },
       animation: {
@@ -118,8 +102,21 @@ export default {
         "glow-pulse-drop": "glow-pulse-drop 1.1s ease-in-out 2",
         "slide-fade-in": "slide-fade-in 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
         "fade-in": "fade-in 0.25s ease-out",
+        // `both` holds the collapsed first frame through the stagger delay.
+        rise: "rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both",
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // @container / @lg: variants — dashboard panels size themselves to their
+    // own width, since users resize them.
+    containerQueries,
+    // The emerald defaults. ThemeContext overrides these inline on <html>
+    // when the user picks another theme color.
+    plugin(({ addBase }) => {
+      addBase({
+        ":root": Object.fromEntries(Object.entries(basePalette()).map(([k, v]) => [`--${k}`, v])),
+      });
+    }),
+  ],
 };

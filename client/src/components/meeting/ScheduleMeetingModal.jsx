@@ -3,6 +3,7 @@ import { Video } from "lucide-react";
 import Modal from "../common/Modal.jsx";
 import * as eventsApi from "../../api/events.js";
 import { apiErrorMessage } from "../../api/client.js";
+import { DateTimePicker } from "../common/DatePicker.jsx";
 
 function toLocalInput(date) {
   const d = new Date(date);
@@ -98,12 +99,16 @@ export default function ScheduleMeetingModal({ open, onClose, workspaceId, meetL
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Starts</label>
-              <input type="datetime-local" className="input" value={startTime} onChange={(e) => setStartTime(e.target.value)} required />
+              <label htmlFor="meeting-starts" className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">
+                Starts
+              </label>
+              <DateTimePicker id="meeting-starts" value={startTime} onChange={setStartTime} required />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Ends</label>
-              <input type="datetime-local" className="input" value={endTime} onChange={(e) => setEndTime(e.target.value)} required />
+              <label htmlFor="meeting-ends" className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">
+                Ends
+              </label>
+              <DateTimePicker id="meeting-ends" value={endTime} onChange={setEndTime} align="end" required />
             </div>
           </div>
           <div>

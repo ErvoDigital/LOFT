@@ -14,6 +14,7 @@ function useTitle() {
   if (location.pathname.startsWith("/plan")) return "My Plan";
   if (location.pathname.startsWith("/chat")) return "Messages";
   if (location.pathname.startsWith("/profile")) return "Profile";
+  if (location.pathname.startsWith("/settings")) return "Settings";
   if (workspace) {
     if (location.pathname.endsWith("/dashboard")) return `${workspace.name} · Overview`;
     if (location.pathname.endsWith("/calendar")) return `${workspace.name} · Calendar`;

@@ -14,15 +14,15 @@ function ConflictItemLink({ item }) {
   return (
     <Link
       to={to}
-      className="inline-flex items-center gap-1 rounded-md border border-ink-200 bg-white px-2 py-1 text-xs font-medium text-ink-600 hover:border-ink-300 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600"
+      className="inline-flex max-w-full items-center gap-1 rounded-md border border-ink-200 bg-white px-2 py-1 text-xs font-medium text-ink-600 hover:border-ink-300 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600"
     >
       <span className="truncate max-w-[10rem]">{item.title}</span>
-      <span className="text-ink-400">· {item.workspaceName}</span>
+      <span className="min-w-0 truncate text-ink-400">· {item.workspaceName}</span>
     </Link>
   );
 }
 
-export default function ConflictsPanel({ conflicts }) {
+export default function ConflictsPanel({ conflicts, listClassName = "space-y-2" }) {
   if (!conflicts || conflicts.length === 0) {
     return (
       <div className="card flex items-center gap-3 border-brand-200 bg-brand-50 p-4 dark:bg-brand-500/15">
@@ -36,7 +36,7 @@ export default function ConflictsPanel({ conflicts }) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className={listClassName}>
       {conflicts.map((c, i) => {
         const style = SEVERITY_STYLES[c.severity] || SEVERITY_STYLES.low;
         return (

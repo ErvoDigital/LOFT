@@ -8,10 +8,10 @@
   }
   body {
     @apply text-ink-800 antialiased dark:text-ink-100;
-    background-color: #EEF3F1;
+    background-color: rgb(var(--page));
   }
   .dark body {
-    background-color: theme("colors.ink.950");
+    background-color: rgb(var(--ink-950));
   }
 }
 
@@ -21,35 +21,35 @@
      glass reads as plain grey. Mounted once, fixed, in AppShell. */
   .app-backdrop {
     background-image:
-      radial-gradient(60rem 40rem at 12% -10%, rgba(31, 155, 125, 0.14), transparent 60%),
-      radial-gradient(45rem 35rem at 88% 8%, rgba(94, 234, 212, 0.16), transparent 62%),
-      radial-gradient(50rem 45rem at 70% 105%, rgba(19, 74, 60, 0.1), transparent 60%);
+      radial-gradient(60rem 40rem at 12% -10%, rgb(var(--brand-500) / 0.14), transparent 60%),
+      radial-gradient(45rem 35rem at 88% 8%, rgb(var(--brand-300) / 0.16), transparent 62%),
+      radial-gradient(50rem 45rem at 70% 105%, rgb(var(--brand-800) / 0.1), transparent 60%);
   }
   .dark .app-backdrop {
     background-image:
-      radial-gradient(60rem 40rem at 12% -10%, rgba(31, 155, 125, 0.2), transparent 60%),
-      radial-gradient(45rem 35rem at 88% 8%, rgba(94, 234, 212, 0.08), transparent 62%),
-      radial-gradient(50rem 45rem at 70% 105%, rgba(19, 74, 60, 0.5), transparent 60%);
+      radial-gradient(60rem 40rem at 12% -10%, rgb(var(--brand-500) / 0.2), transparent 60%),
+      radial-gradient(45rem 35rem at 88% 8%, rgb(var(--brand-300) / 0.08), transparent 62%),
+      radial-gradient(50rem 45rem at 70% 105%, rgb(var(--brand-800) / 0.5), transparent 60%);
   }
 
-  /* Login / sign-up ground: a deep emerald glow falling from the top over the
+  /* Login / sign-up ground: a deep brand-color glow falling from the top over the
      base, with side pools so the glass card has colour to blur against. */
   .auth-backdrop {
-    background-color: theme("colors.ink.50");
+    background-color: rgb(var(--ink-50));
     background-image:
-      radial-gradient(70rem 36rem at 50% -12%, rgba(31, 155, 125, 0.28), transparent 62%),
-      radial-gradient(34rem 28rem at 8% 30%, rgba(94, 234, 212, 0.22), transparent 65%),
-      radial-gradient(34rem 28rem at 92% 72%, rgba(19, 74, 60, 0.16), transparent 65%),
-      linear-gradient(180deg, #dceee7 0%, #eef3f1 55%, #f4f7f6 100%);
+      radial-gradient(70rem 36rem at 50% -12%, rgb(var(--brand-500) / 0.28), transparent 62%),
+      radial-gradient(34rem 28rem at 8% 30%, rgb(var(--brand-300) / 0.22), transparent 65%),
+      radial-gradient(34rem 28rem at 92% 72%, rgb(var(--brand-800) / 0.16), transparent 65%),
+      linear-gradient(180deg, rgb(var(--wash-light)) 0%, rgb(var(--page)) 55%, rgb(var(--ink-50)) 100%);
   }
   .dark .auth-backdrop {
-    background-color: theme("colors.ink.950");
+    background-color: rgb(var(--ink-950));
     background-image:
-      radial-gradient(70rem 36rem at 50% -12%, rgba(31, 155, 125, 0.4), transparent 62%),
-      radial-gradient(34rem 28rem at 8% 30%, rgba(19, 74, 60, 0.7), transparent 65%),
-      radial-gradient(34rem 28rem at 92% 72%, rgba(19, 74, 60, 0.55), transparent 65%),
-      radial-gradient(50rem 24rem at 50% 115%, rgba(94, 234, 212, 0.08), transparent 60%),
-      linear-gradient(180deg, #0f2a23 0%, #0a0f0d 60%);
+      radial-gradient(70rem 36rem at 50% -12%, rgb(var(--brand-500) / 0.4), transparent 62%),
+      radial-gradient(34rem 28rem at 8% 30%, rgb(var(--brand-800) / 0.7), transparent 65%),
+      radial-gradient(34rem 28rem at 92% 72%, rgb(var(--brand-800) / 0.55), transparent 65%),
+      radial-gradient(50rem 24rem at 50% 115%, rgb(var(--brand-300) / 0.08), transparent 60%),
+      linear-gradient(180deg, rgb(var(--wash-dark)) 0%, rgb(var(--ink-950)) 60%);
   }
 
   /* Base frosted surface. `.card` is the padded, rounded panel nearly every
@@ -77,10 +77,24 @@
   .btn-primary {
     @apply btn bg-gradient-to-br from-brand-500 to-brand-800 text-white shadow-glow-sm hover:shadow-glow hover:brightness-110 active:brightness-95;
   }
-  /* The brand fill: mid teal falling into deep emerald. Pair it with white
+  /* The brand fill: brand-500 falling into brand-800. Pair it with white
      text. */
   .brand-mark {
     @apply bg-gradient-to-br from-brand-500 to-brand-800;
+  }
+  /* Dashboard hero. The brand gradient taken a step deeper than `.brand-mark`
+     (600 rather than 500 at its lightest corner) so small white text on it
+     still clears 4.5:1, with a mint glow pooling in the top-right. */
+  .hero-panel {
+    @apply relative overflow-hidden rounded-3xl border border-white/10 text-white shadow-glass-lg;
+    background-image:
+      radial-gradient(40rem 22rem at 100% 0%, rgb(var(--brand-300) / 0.2), transparent 60%),
+      linear-gradient(135deg, rgb(var(--brand-600)) 0%, rgb(var(--brand-800)) 58%, rgb(var(--brand-900)) 100%);
+  }
+  .dark .hero-panel {
+    background-image:
+      radial-gradient(40rem 22rem at 100% 0%, rgb(var(--brand-300) / 0.13), transparent 60%),
+      linear-gradient(135deg, rgb(var(--brand-800)) 0%, rgb(var(--brand-900)) 55%, rgb(var(--brand-950)) 100%);
   }
   .btn-secondary {
     @apply btn border border-ink-200 bg-white/70 text-ink-700 backdrop-blur-xl hover:border-brand-400/60 hover:bg-white/90 hover:text-brand-700 dark:border-white/[0.1] dark:bg-white/[0.06] dark:text-ink-200 dark:hover:border-brand-400/30 dark:hover:bg-white/[0.1] dark:hover:text-ink-50;
@@ -88,11 +102,25 @@
   .btn-ghost {
     @apply btn text-ink-600 hover:bg-ink-900/[0.06] hover:text-ink-900 dark:text-ink-300 dark:hover:bg-white/[0.08] dark:hover:text-ink-50;
   }
+  /* The destructive twin of `.btn-primary`: same gradient-and-glow shape in
+     red. Red is the danger signal, not brand, so it stays fixed across theme
+     colors. The via stop keeps red-600 under the label for 4.5:1 white text. */
   .btn-danger {
-    @apply btn bg-red-600 text-white shadow-[0_4px_12px_-3px_rgba(220,38,38,0.5)] hover:bg-red-700;
+    @apply btn bg-gradient-to-br from-red-500 via-red-600 to-red-700 text-white shadow-[0_4px_12px_-3px_rgba(220,38,38,0.5),inset_0_1px_0_0_rgba(255,255,255,0.18)] hover:shadow-[0_8px_24px_-6px_rgba(220,38,38,0.55),inset_0_1px_0_0_rgba(255,255,255,0.18)] hover:brightness-110 active:brightness-95;
   }
+  /* Confirmation dialogs for destructive actions: a red glow pooling from the
+     top edge, so the warning reads from the surface, not only the button. */
+  .danger-wash {
+    background-image: radial-gradient(26rem 10rem at 50% 0%, rgb(239 68 68 / 0.1), transparent 70%);
+  }
+  .dark .danger-wash {
+    background-image: radial-gradient(26rem 10rem at 50% 0%, rgb(239 68 68 / 0.14), transparent 70%);
+  }
+  /* Light mode gives fields a solid white fill, a real border and a faint
+     inset shadow. On the near-white glass cards, a translucent white field
+     with a white border disappeared entirely. */
   .input {
-    @apply w-full rounded-xl border border-white/60 bg-white/70 px-3.5 py-2 text-sm text-ink-800 backdrop-blur-xl transition-all placeholder:text-ink-400 focus:border-brand-500/60 focus:bg-white/90 focus:outline-none focus:ring-2 focus:ring-brand-500/25 dark:border-white/[0.1] dark:bg-white/[0.05] dark:text-ink-100 dark:placeholder:text-ink-500 dark:focus:bg-white/[0.08];
+    @apply w-full rounded-xl border border-ink-400/70 bg-white px-3.5 py-2 text-sm text-ink-900 shadow-[inset_0_1px_2px_rgb(var(--ink-950)/0.06)] backdrop-blur-xl transition-all placeholder:text-ink-500 hover:border-ink-500/70 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/25 dark:border-white/[0.1] dark:bg-white/[0.05] dark:text-ink-100 dark:shadow-none dark:placeholder:text-ink-500 dark:hover:border-white/[0.16] dark:focus:border-brand-500/60 dark:focus:bg-white/[0.08];
   }
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold;
@@ -122,7 +150,7 @@
    entirely, so without this bullet/numbered lists would render with no
    markers at all. */
 .doc-content {
-  color: theme("colors.ink.800");
+  color: rgb(var(--ink-800));
   font-size: 0.9375rem;
   line-height: 1.65;
 }
@@ -132,7 +160,7 @@
 .doc-content h1,
 .doc-content h2 {
   font-weight: 700;
-  color: theme("colors.ink.900");
+  color: rgb(var(--ink-900));
   margin: 1em 0 0.4em;
 }
 .doc-content h1 {
@@ -158,16 +186,16 @@
 .doc-content blockquote {
   margin: 0.75em 0;
   padding-left: 1em;
-  border-left: 3px solid theme("colors.ink.200");
-  color: theme("colors.ink.500");
+  border-left: 3px solid rgb(var(--ink-200));
+  color: rgb(var(--ink-500));
   font-style: italic;
 }
 .doc-content pre {
   margin: 0.75em 0;
   padding: 0.75em 1em;
   border-radius: 0.5rem;
-  background: theme("colors.ink.900");
-  color: theme("colors.ink.50");
+  background: rgb(var(--ink-900));
+  color: rgb(var(--ink-50));
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85em;
   overflow-x: auto;
@@ -178,10 +206,10 @@
 .doc-content hr {
   margin: 1.25em 0;
   border: none;
-  border-top: 1px solid theme("colors.ink.200");
+  border-top: 1px solid rgb(var(--ink-200));
 }
 .doc-content a {
-  color: theme("colors.brand.600");
+  color: rgb(var(--brand-600));
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
@@ -204,7 +232,7 @@
   min-width: 0;
 }
 .doc-content ul[data-type="taskList"] li[data-checked="true"] > div {
-  color: theme("colors.ink.400");
+  color: rgb(var(--ink-400));
   text-decoration: line-through;
 }
 .doc-content mark {
@@ -231,18 +259,18 @@
 }
 .doc-content table td,
 .doc-content table th {
-  border: 1px solid theme("colors.ink.200");
+  border: 1px solid rgb(var(--ink-200));
   padding: 0.4em 0.6em;
   vertical-align: top;
   position: relative;
 }
 .doc-content table th {
-  background: theme("colors.ink.50");
+  background: rgb(var(--ink-50));
   font-weight: 600;
   text-align: left;
 }
 .doc-content table .selectedCell {
-  background: theme("colors.brand.50");
+  background: rgb(var(--brand-50));
 }
 .doc-content table .column-resize-handle {
   position: absolute;
@@ -250,7 +278,7 @@
   top: 0;
   bottom: 0;
   width: 4px;
-  background: theme("colors.brand.400");
+  background: rgb(var(--brand-400));
   pointer-events: none;
 }
 
@@ -294,4 +322,87 @@
   padding: 2px 6px;
   border-radius: 3px 3px 3px 0;
   white-space: nowrap;
+}
+
+/* Customizable dashboard grid (react-grid-layout). The grid has no margins of
+   its own; each item pads itself, so cards sit 24px apart while heights snap
+   to 4px rows. Selectors repeat .react-grid-item to outrank the library's
+   stylesheet. */
+.dash-grid .dash-item {
+  padding: 12px;
+}
+.dash-grid .react-grid-item.react-grid-placeholder {
+  background: transparent;
+  opacity: 1;
+}
+.dash-grid .react-grid-item.react-grid-placeholder::after {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border-radius: 1rem;
+  border: 2px dashed rgb(var(--brand-400) / 0.75);
+  background: rgb(var(--brand-500) / 0.1);
+}
+.dash-grid .react-grid-item.react-draggable-dragging .dash-frame {
+  box-shadow: 0 28px 56px -16px rgb(0 0 0 / 0.45);
+  border-radius: 1rem;
+}
+/* Resize grips: a triangle of dots in the corner for panels, and a pill on
+   the right edge for fit-to-content widgets, which only change width. */
+.dash-grid .react-grid-item > .react-resizable-handle {
+  z-index: 20;
+  opacity: 1;
+  background: none;
+  transform: none;
+  margin: 0;
+}
+.dash-grid .react-grid-item > .react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  border: 0;
+}
+.dash-grid .react-grid-item > .react-resizable-handle.react-resizable-handle-se {
+  right: 14px;
+  bottom: 14px;
+  width: 22px;
+  height: 22px;
+  cursor: nwse-resize;
+}
+.dash-grid .react-grid-item > .react-resizable-handle.react-resizable-handle-se::after {
+  inset: 3px;
+  width: auto;
+  height: auto;
+  background-image: radial-gradient(circle, rgb(var(--brand-400)) 1.3px, transparent 1.6px);
+  background-size: 5px 5px;
+  background-position: right bottom;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+.dash-grid .react-grid-item > .react-resizable-handle.react-resizable-handle-e {
+  top: 50%;
+  right: 5px;
+  width: 14px;
+  height: 48px;
+  margin-top: -24px;
+  cursor: ew-resize;
+}
+.dash-grid .react-grid-item > .react-resizable-handle.react-resizable-handle-e::after {
+  top: 6px;
+  bottom: 6px;
+  left: 5px;
+  right: auto;
+  width: 4px;
+  height: auto;
+  border-radius: 9999px;
+  background: rgb(var(--brand-400));
+  box-shadow: 0 0 0 3px rgb(var(--brand-400) / 0.2);
+}
+.dash-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--ink-400) / 0.4) transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-grid.react-grid-layout,
+  .dash-grid .react-grid-item {
+    transition: none;
+  }
 }

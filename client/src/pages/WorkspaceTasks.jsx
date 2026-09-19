@@ -135,8 +135,8 @@ export default function WorkspaceTasks() {
 
   return (
     <>
-      <div className="mx-auto max-w-6xl space-y-4 p-6">
-        <div className="flex items-center justify-between">
+      <div className="flex h-full flex-col gap-4 p-6">
+        <div className="flex shrink-0 items-center justify-between">
           <h2 className="text-2xl font-semibold tracking-tight text-ink-900 dark:text-ink-50">Tasks</h2>
           <div className="flex items-center gap-2">
             {isAdmin && (
@@ -156,7 +156,7 @@ export default function WorkspaceTasks() {
           </div>
         </div>
 
-        <div className="flex gap-4 overflow-x-auto pb-2">
+        <div className="flex min-h-0 flex-1 items-start gap-4 overflow-x-auto pb-2">
           {columns.map((col) => {
             const colTasks = columnTasks(col.id);
             const showIndicator = dropIndicator?.status === col.id;
@@ -166,16 +166,17 @@ export default function WorkspaceTasks() {
                 key={col.id}
                 onDragOver={(e) => handleColumnDragOver(e, col.id)}
                 onDrop={(e) => handleDrop(e, col.id)}
-                className="min-w-[240px] flex-1 rounded-2xl border border-white/50 bg-white/30 p-3 backdrop-blur-md transition-colors dark:border-white/[0.06] dark:bg-white/[0.02]"
+                className="flex max-h-full min-w-[260px] flex-1 flex-col rounded-2xl border border-white/50 bg-white/30 p-3 backdrop-blur-md transition-colors dark:border-white/[0.06] dark:bg-white/[0.02]"
               >
-                <div className="mb-3 flex items-center justify-between px-1">
+                <div className="mb-2 flex shrink-0 items-center justify-between px-1">
                   <h3 className="flex items-center gap-1.5 text-sm font-semibold text-ink-700 dark:text-ink-200">
                     <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: displayColor(col.color) }} />
                     {col.label}
                   </h3>
                   <span className="chip !px-2 !py-0.5 tabular-nums">{colTasks.length}</span>
                 </div>
-                <div className="space-y-2">
+                {/* Bleeds into the column's padding so the scroll box doesn't clip the cards' hover glow. */}
+                <div className="-mx-3 -mb-3 min-h-0 space-y-2 overflow-y-auto px-3 pb-3 pt-1">
                   {colTasks.map((t, i) => (
                     <div key={t.id}>
                       {showIndicator && dropIndicator.index === i && <DropLine />}
@@ -218,7 +219,7 @@ export default function WorkspaceTasks() {
         onClose={() => setModalOpen(false)}
         workspaceId={workspaceId}
         members={members}
-        statuses={columns.map((c) => ({ value: c.id, label: c.label }))}
+        statuses={columns.map((c) => ({ value: c.id, label: c.label, color: c.color }))}
         task={editingTask}
         onSaved={(saved) => {
           setTasks((prev) => {

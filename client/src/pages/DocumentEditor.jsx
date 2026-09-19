@@ -25,6 +25,7 @@ import { fileToDataUri, pickImageFile } from "../lib/documentImageUpload.js";
 import { SuggestionInsert, SuggestionMode, countSuggestions } from "../lib/tiptapSuggestion.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketContext.jsx";
+import { useConfirm } from "../context/ConfirmContext.jsx";
 import { SocketYjsProvider } from "../lib/yjsSocketProvider.js";
 import Avatar from "../components/common/Avatar.jsx";
 import Spinner from "../components/common/Spinner.jsx";
@@ -135,6 +136,7 @@ export default function DocumentEditor() {
 
   const [meta, setMeta] = useState(null); // { id, title, createdBy, createdAt, updatedAt } from REST
   const [error, setError] = useState("");
+  const confirm = useConfirm();
   const [ready, setReady] = useState(false);
   const [title, setTitle] = useState("");
   const [peers, setPeers] = useState([]); // [{ userId, name, avatarColor }]
@@ -280,7 +282,13 @@ export default function DocumentEditor() {
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this document for everyone?")) return;
+    const ok = await confirm({
+      title: "Delete this document?",
+      subject: title,
+      message: "It will be deleted for everyone in this workspace. This can't be undone.",
+      confirmLabel: "Delete document",
+    });
+    if (!ok) return;
     try {
       await documentsApi.deleteDocument(workspaceId, docId);
       navigate(`/workspaces/${workspaceId}/docs`);
@@ -330,7 +338,7 @@ export default function DocumentEditor() {
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder="Untitled document"
-          className="min-w-0 flex-1 truncate border-none bg-transparent text-lg font-semibold text-ink-800 outline-none placeholder:text-ink-300 dark:text-ink-100"
+          className="min-w-0 flex-1 truncate border-none bg-transparent text-lg font-semibold text-ink-800 outline-none placeholder:text-ink-400 dark:text-ink-100"
         />
         {meta?.visibility === "ASSIGNED" && (
           <Lock className="h-3.5 w-3.5 shrink-0 text-accent-500" aria-label="Restricted to the assigned person" />

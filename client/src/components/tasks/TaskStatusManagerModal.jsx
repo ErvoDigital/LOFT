@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { GripVertical, Check } from "lucide-react";
 import Modal from "../common/Modal.jsx";
+import { useConfirm } from "../../context/ConfirmContext.jsx";
 import * as taskStatusesApi from "../../api/taskStatuses.js";
 import { apiErrorMessage } from "../../api/client.js";
 import { displayColor } from "../../lib/colors.js";
@@ -13,6 +14,7 @@ export default function TaskStatusManagerModal({ open, onClose, workspaceId, sta
   const [label, setLabel] = useState("");
   const [color, setColor] = useState(COLORS[0]);
   const [error, setError] = useState("");
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -74,7 +76,13 @@ export default function TaskStatusManagerModal({ open, onClose, workspaceId, sta
   }
 
   async function handleDelete(status) {
-    if (!confirm(`Delete the "${status.label}" status?`)) return;
+    const ok = await confirm({
+      title: "Delete this status?",
+      subject: status.label,
+      message: "Its column is removed from the board for everyone. A status that still holds tasks can't be deleted, so move them out first.",
+      confirmLabel: "Delete status",
+    });
+    if (!ok) return;
     setError("");
     try {
       await taskStatusesApi.deleteTaskStatus(workspaceId, status.id);
@@ -143,7 +151,7 @@ export default function TaskStatusManagerModal({ open, onClose, workspaceId, sta
             </span>
             <span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: displayColor(s.color) }} />
             <input
-              className="min-w-0 flex-1 rounded-md border-none bg-transparent px-1 py-0.5 text-sm text-ink-700 focus:bg-ink-50 focus:outline-none dark:text-ink-200 dark:focus:bg-ink-700"
+              className="min-w-0 flex-1 rounded-md border-none bg-transparent px-1 py-0.5 text-sm text-ink-900 focus:bg-ink-50 focus:outline-none dark:text-ink-200 dark:focus:bg-ink-700"
               defaultValue={s.label}
               onBlur={(e) => handleRename(s, e.target.value)}
             />

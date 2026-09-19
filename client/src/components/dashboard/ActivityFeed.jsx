@@ -12,13 +12,17 @@ function timeAgo(date) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-export default function ActivityFeed({ activity, showWorkspace = true }) {
+export default function ActivityFeed({
+  activity,
+  showWorkspace = true,
+  emptyDescription = "Messages across your workspaces will appear here.",
+}) {
   if (!activity || activity.length === 0) {
     return (
       <EmptyState
         icon={<Activity className="h-5 w-5" />}
         title="No recent activity"
-        description="Messages across your workspaces will appear here."
+        description={emptyDescription}
       />
     );
   }

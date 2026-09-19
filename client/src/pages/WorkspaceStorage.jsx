@@ -7,6 +7,7 @@ import * as workspacesApi from "../api/workspaces.js";
 import { apiErrorMessage } from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketContext.jsx";
+import { useConfirm } from "../context/ConfirmContext.jsx";
 import AssetCard from "../components/storage/AssetCard.jsx";
 import FolderCard from "../components/storage/FolderCard.jsx";
 import FolderModal from "../components/storage/FolderModal.jsx";
@@ -32,6 +33,7 @@ export default function WorkspaceStorage() {
   const [myRole, setMyRole] = useState("MEMBER");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const confirm = useConfirm();
   const [dropzoneActive, setDropzoneActive] = useState(false);
   const [versionUploads, setVersionUploads] = useState(new Map()); // assetId -> percent, for version-upload cards
   const [newUploads, setNewUploads] = useState([]); // [{ id, name, size, progress }], for the floating panel
@@ -225,7 +227,13 @@ export default function WorkspaceStorage() {
   }
 
   async function remove(assetId) {
-    if (!confirm("Delete this file and all its versions?")) return;
+    const ok = await confirm({
+      title: "Delete this file?",
+      subject: assets.find((a) => a.id === assetId)?.name,
+      message: "Every version of it will be deleted for everyone in this workspace. This can't be undone.",
+      confirmLabel: "Delete file",
+    });
+    if (!ok) return;
     try {
       await assetsApi.deleteAsset(workspaceId, assetId);
       setAssets((prev) => prev.filter((a) => a.id !== assetId));
@@ -348,7 +356,13 @@ export default function WorkspaceStorage() {
                       onOpen={navigate}
                       onEdit={(folder) => setFolderModal({ folder })}
                       onDelete={async (folderId) => {
-                        if (!confirm("Delete this folder? It must be empty first.")) return;
+                        const ok = await confirm({
+                          title: "Delete this folder?",
+                          subject: f.name,
+                          message: "Only an empty folder can be deleted, so move or delete anything inside it first.",
+                          confirmLabel: "Delete folder",
+                        });
+                        if (!ok) return;
                         try {
                           await foldersApi.deleteFolder(workspaceId, folderId);
                           load();

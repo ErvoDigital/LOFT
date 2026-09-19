@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
+import { CalendarX } from "lucide-react";
 import Modal from "../common/Modal.jsx";
+import { useConfirm } from "../../context/ConfirmContext.jsx";
 import * as eventsApi from "../../api/events.js";
 import { apiErrorMessage } from "../../api/client.js";
+import { DateTimePicker } from "../common/DatePicker.jsx";
 
 function toLocalInput(date) {
   const d = date ? new Date(date) : new Date();
@@ -9,7 +12,9 @@ function toLocalInput(date) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default function EventModal({ open, onClose, workspaceId, members, defaultDate, event, onSaved, onDeleted }) {
+// defaultStart, when given, is the exact start for a new event (a slot picked
+// in the week view); otherwise a new event starts at 9 AM on defaultDate.
+export default function EventModal({ open, onClose, workspaceId, members, defaultDate, defaultStart, event, onSaved, onDeleted }) {
   const isEdit = !!event;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -18,6 +23,7 @@ export default function EventModal({ open, onClose, workspaceId, members, defaul
   const [endTime, setEndTime] = useState("");
   const [attendeeIds, setAttendeeIds] = useState([]);
   const [error, setError] = useState("");
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -30,8 +36,8 @@ export default function EventModal({ open, onClose, workspaceId, members, defaul
       setEndTime(toLocalInput(event.endTime));
       setAttendeeIds(event.attendees?.map((a) => a.id) || []);
     } else {
-      const base = defaultDate ? new Date(defaultDate) : new Date();
-      base.setHours(9, 0, 0, 0);
+      const base = new Date(defaultStart || defaultDate || Date.now());
+      if (!defaultStart) base.setHours(9, 0, 0, 0);
       const end = new Date(base.getTime() + 60 * 60 * 1000);
       setTitle("");
       setDescription("");
@@ -41,7 +47,7 @@ export default function EventModal({ open, onClose, workspaceId, members, defaul
       setAttendeeIds(members.map((m) => m.user.id));
     }
     setError("");
-  }, [open, event, defaultDate, members]);
+  }, [open, event, defaultDate, defaultStart, members]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -69,7 +75,15 @@ export default function EventModal({ open, onClose, workspaceId, members, defaul
   }
 
   async function handleDelete() {
-    if (!confirm("Cancel this event?")) return;
+    const ok = await confirm({
+      title: "Cancel this event?",
+      subject: event.title,
+      message: "It will be removed from the calendar for everyone invited. This can't be undone.",
+      confirmLabel: "Cancel event",
+      cancelLabel: "Keep event",
+      icon: CalendarX,
+    });
+    if (!ok) return;
     setLoading(true);
     try {
       await eventsApi.cancelEvent(workspaceId, event.id);
@@ -96,12 +110,16 @@ export default function EventModal({ open, onClose, workspaceId, members, defaul
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Starts</label>
-            <input type="datetime-local" className="input" value={startTime} onChange={(e) => setStartTime(e.target.value)} required />
+            <label htmlFor="event-starts" className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">
+              Starts
+            </label>
+            <DateTimePicker id="event-starts" value={startTime} onChange={setStartTime} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Ends</label>
-            <input type="datetime-local" className="input" value={endTime} onChange={(e) => setEndTime(e.target.value)} required />
+            <label htmlFor="event-ends" className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">
+              Ends
+            </label>
+            <DateTimePicker id="event-ends" value={endTime} onChange={setEndTime} align="end" required />
           </div>
         </div>
         <div>

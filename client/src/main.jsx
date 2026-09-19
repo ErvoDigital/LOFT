@@ -10,6 +10,7 @@ import { PresenceProvider } from "./context/PresenceContext.jsx";
 import { WorkspaceProvider } from "./context/WorkspaceContext.jsx";
 import { NotificationsProvider } from "./context/NotificationsContext.jsx";
 import { MeetingProvider } from "./context/MeetingContext.jsx";
+import { ConfirmProvider } from "./context/ConfirmContext.jsx";
 import "./styles/index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
@@ -23,7 +24,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 <WorkspaceProvider>
                   <NotificationsProvider>
                     <MeetingProvider>
-                      <App />
+                      <ConfirmProvider>
+                        <App />
+                      </ConfirmProvider>
                     </MeetingProvider>
                   </NotificationsProvider>
                 </WorkspaceProvider>

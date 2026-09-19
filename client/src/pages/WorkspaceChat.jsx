@@ -5,6 +5,7 @@ import * as conversationsApi from "../api/conversations.js";
 import * as workspacesApi from "../api/workspaces.js";
 import { apiErrorMessage } from "../api/client.js";
 import { useSocket } from "../context/SocketContext.jsx";
+import { useConfirm } from "../context/ConfirmContext.jsx";
 import EmptyState from "../components/common/EmptyState.jsx";
 import Spinner from "../components/common/Spinner.jsx";
 import ChatThread from "../components/chat/ChatThread.jsx";
@@ -19,6 +20,7 @@ export default function WorkspaceChat() {
   const [activeId, setActiveId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const confirm = useConfirm();
   const [channelModalOpen, setChannelModalOpen] = useState(false);
 
   const load = useCallback(() => {
@@ -56,7 +58,13 @@ export default function WorkspaceChat() {
   }, [socket, load]);
 
   async function deleteChannel(conversationId) {
-    if (!confirm("Delete this channel for everyone?")) return;
+    const ok = await confirm({
+      title: "Delete this channel?",
+      subject: conversations.find((c) => c.id === conversationId)?.title,
+      message: "The channel and all of its messages will be deleted for everyone. This can't be undone.",
+      confirmLabel: "Delete channel",
+    });
+    if (!ok) return;
     try {
       await conversationsApi.deleteWorkspaceConversation(workspaceId, conversationId);
       setConversations((prev) => prev.filter((c) => c.id !== conversationId));
