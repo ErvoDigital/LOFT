@@ -12,5 +12,6 @@ router.post("/me/change-password", usersController.changePassword);
 router.post("/me/link-google", usersController.linkGoogle);
 router.post("/me/unlink-google", usersController.unlinkGoogle);
 router.get("/search", usersController.searchUsers);
+router.get("/:userId/profile", usersController.getUserProfile);
 
 export default router;

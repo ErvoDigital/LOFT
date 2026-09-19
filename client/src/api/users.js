@@ -10,3 +10,5 @@ export const linkGoogle = (credential) =>
   api.post("/users/me/link-google", { credential }).then((r) => r.data.user);
 export const unlinkGoogle = () => api.post("/users/me/unlink-google").then((r) => r.data.user);
 export const searchUsers = (q) => api.get("/users/search", { params: { q } }).then((r) => r.data.users);
+export const getUserProfile = (userId, workspaceId) =>
+  api.get(`/users/${userId}/profile`, { params: workspaceId ? { workspaceId } : undefined }).then((r) => r.data);

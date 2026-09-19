@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
 import { notify } from "../services/notification.service.js";
+import { emitToUser } from "../sockets/io.js";
 
 const sendSchema = z.object({
   content: z.string().max(4000).default(""),
@@ -223,6 +224,56 @@ export async function toggleReaction(req, res) {
   });
 
   res.json({ messageId, reactions: serializeReactions(reactions) });
+}
+
+// Removes a message for everyone in the conversation. The sender can always
+// delete their own; in a workspace channel, that workspace's admins can also
+// delete anyone's, so a channel can be moderated. An attached file stays in
+// the workspace's Storage — only the message pointing at it goes.
+//
+// Broadcast to each participant's user room rather than the conversation
+// room, so every client hears it exactly once whether or not the thread is
+// open, and conversation lists can refresh a preview that just disappeared.
+export async function deleteMessage(req, res) {
+  const { conversationId, messageId } = req.params;
+  const conversation = await assertParticipant(conversationId, req.userId);
+
+  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  if (!message || message.conversationId !== conversationId) throw new ApiError(404, "Message not found");
+
+  if (message.senderId !== req.userId) {
+    const membership = conversation.workspaceId
+      ? await prisma.workspaceMember.findUnique({
+          where: { workspaceId_userId: { workspaceId: conversation.workspaceId, userId: req.userId } },
+        })
+      : null;
+    if (membership?.role !== "ADMIN") throw new ApiError(403, "You can only delete your own messages");
+  }
+
+  await prisma.message.delete({ where: { id: messageId } });
+
+  const participants = await prisma.conversationParticipant.findMany({ where: { conversationId } });
+  for (const p of participants) {
+    emitToUser(p.userId, "message:deleted", { conversationId, messageId, workspaceId: conversation.workspaceId });
+  }
+
+  res.json({ conversationId, messageId });
+}
+
+// Deletes a direct message thread, with its whole history, for both people
+// in it — either one can do it. Workspace channels go through
+// conversations.controller.js's admin-only delete instead.
+export async function deleteDirectConversation(req, res) {
+  const conversation = await assertParticipant(req.params.conversationId, req.userId);
+  if (conversation.isGroup) throw new ApiError(400, "Only direct messages can be deleted here");
+
+  const participants = await prisma.conversationParticipant.findMany({ where: { conversationId: conversation.id } });
+  await prisma.conversation.delete({ where: { id: conversation.id } });
+  for (const p of participants) {
+    emitToUser(p.userId, "conversation:deleted", { id: conversation.id });
+  }
+
+  res.json({ message: "Conversation deleted" });
 }
 
 export async function startDirectMessage(req, res) {

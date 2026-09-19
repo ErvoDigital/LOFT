@@ -22,6 +22,7 @@ import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
 import { useSocket } from "../../context/SocketContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { usePresence } from "../../context/PresenceContext.jsx";
+import { useMemberProfile } from "../../context/MemberProfileContext.jsx";
 import * as foldersApi from "../../api/folders.js";
 import * as workspacesApi from "../../api/workspaces.js";
 import Avatar from "../common/Avatar.jsx";
@@ -247,6 +248,7 @@ const MEMBER_PREVIEW = 6;
 function MembersList({ workspaceId }) {
   const { user } = useAuth();
   const { supported, isOnline } = usePresence();
+  const openProfile = useMemberProfile();
   const [members, setMembers] = useState([]);
   const [showAll, setShowAll] = useState(false);
 
@@ -296,10 +298,12 @@ function MembersList({ workspaceId }) {
           const online = isOnline(m.user.id);
           const dim = supported && !online;
           return (
-            <div
+            <button
               key={m.id}
+              type="button"
+              onClick={() => openProfile(m.user.id, workspaceId)}
               title={supported ? `${m.user.name} · ${online ? "Online" : "Offline"}` : m.user.name}
-              className="flex items-center gap-2.5 rounded-lg px-3 py-1.5"
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-ink-900/[0.04] dark:hover:bg-white/[0.06]"
             >
               <span className="relative shrink-0">
                 <span className={dim ? "opacity-60" : ""}>
@@ -322,7 +326,7 @@ function MembersList({ workspaceId }) {
                 {m.user.id === user?.id && <span className="font-normal text-ink-400"> (you)</span>}
               </span>
               {supported && <span className="sr-only">{online ? "online" : "offline"}</span>}
-            </div>
+            </button>
           );
         })}
       </div>

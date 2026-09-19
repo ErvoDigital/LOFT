@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { MessageSquare, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 import * as messagesApi from "../api/messages.js";
+import { apiErrorMessage } from "../api/client.js";
 import { useSocket } from "../context/SocketContext.jsx";
+import { useConfirm } from "../context/ConfirmContext.jsx";
 import Avatar from "../components/common/Avatar.jsx";
 import EmptyState from "../components/common/EmptyState.jsx";
 import Spinner from "../components/common/Spinner.jsx";
@@ -13,9 +16,14 @@ const COLLAPSE_KEY = "loft:messages-list-collapsed";
 
 export default function Chat() {
   const { socket } = useSocket();
+  const confirm = useConfirm();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState([]);
-  const [activeId, setActiveId] = useState(null);
+  // A profile card's "Message" button lands here with the DM to open.
+  const [activeId, setActiveId] = useState(() => location.state?.conversationId ?? null);
   const [loadingConvos, setLoadingConvos] = useState(true);
+  const [error, setError] = useState("");
   const [dmModalOpen, setDmModalOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -37,7 +45,7 @@ export default function Chat() {
     messagesApi.listConversations().then((convos) => {
       setConversations(convos);
       setLoadingConvos(false);
-      setActiveId((prev) => prev ?? (convos.length > 0 ? convos[0].id : null));
+      setActiveId((prev) => (prev && convos.some((c) => c.id === prev) ? prev : convos[0]?.id ?? null));
     });
   }, []);
 
@@ -45,11 +53,47 @@ export default function Chat() {
     loadConversations();
   }, [loadConversations]);
 
+  // Already on this page when a profile's "Message" button is used: the route
+  // doesn't remount, so pick the new state up here. The state is cleared
+  // afterwards so a refresh doesn't keep forcing that conversation open.
+  const requestedId = location.state?.conversationId;
+  useEffect(() => {
+    if (!requestedId) return;
+    setActiveId(requestedId);
+    loadConversations();
+    navigate(location.pathname, { replace: true, state: null });
+  }, [requestedId, loadConversations, navigate, location.pathname]);
+
   useEffect(() => {
     if (!socket) return;
     socket.on("message:preview", loadConversations);
-    return () => socket.off("message:preview", loadConversations);
+    socket.on("message:deleted", loadConversations);
+    socket.on("conversation:deleted", loadConversations);
+    return () => {
+      socket.off("message:preview", loadConversations);
+      socket.off("message:deleted", loadConversations);
+      socket.off("conversation:deleted", loadConversations);
+    };
   }, [socket, loadConversations]);
+
+  async function deleteConversation(conversation) {
+    const ok = await confirm({
+      title: "Delete this conversation?",
+      subject: conversation.title,
+      message: `The whole conversation will be deleted for both you and ${conversation.title}. This can't be undone.`,
+      confirmLabel: "Delete conversation",
+    });
+    if (!ok) return;
+    setError("");
+    try {
+      await messagesApi.deleteDirectConversation(conversation.id);
+      const remaining = conversations.filter((c) => c.id !== conversation.id);
+      setConversations(remaining);
+      setActiveId((id) => (id === conversation.id ? remaining[0]?.id ?? null : id));
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
+  }
 
   const active = conversations.find((c) => c.id === activeId);
 
@@ -79,6 +123,9 @@ export default function Chat() {
             </button>
           </div>
         </div>
+        {error && !collapsed && (
+          <p className="mx-3 mt-2 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>
+        )}
         <div className={`flex-1 overflow-y-auto ${collapsed ? "flex w-full flex-col items-center gap-1 py-2" : ""}`}>
           {loadingConvos ? (
             <Spinner className="py-8" />
@@ -129,7 +176,17 @@ export default function Chat() {
       {!active ? (
         <div className="flex flex-1 items-center justify-center text-ink-400">Select a conversation</div>
       ) : (
-        <ChatThread key={active.id} conversation={active} />
+        <ChatThread
+          key={active.id}
+          conversation={active}
+          headerExtra={
+            !active.isGroup ? (
+              <button onClick={() => deleteConversation(active)} className="shrink-0 text-xs font-medium text-red-500 hover:underline">
+                Delete conversation
+              </button>
+            ) : null
+          }
+        />
       )}
 
       <NewDmModal

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Briefcase, Building2, CalendarPlus, CheckSquare, Church, GraduationCap, Shapes } from "lucide-react";
 import * as workspacesApi from "../../api/workspaces.js";
 import { usePresence } from "../../context/PresenceContext.jsx";
+import { useMemberProfile } from "../../context/MemberProfileContext.jsx";
 import { displayColor } from "../../lib/colors.js";
 import Avatar from "../common/Avatar.jsx";
 import WorkspaceMark from "../common/WorkspaceMark.jsx";
@@ -53,6 +54,7 @@ function summarize(summary, days) {
 // avatar ringed in white so the overlap reads on the brand gradient.
 function MemberStack({ workspaceId, fallbackCount }) {
   const { supported, isOnline } = usePresence();
+  const openProfile = useMemberProfile();
   const [members, setMembers] = useState(null);
 
   useEffect(() => {
@@ -78,16 +80,19 @@ function MemberStack({ workspaceId, fallbackCount }) {
       {sorted.length > 0 && (
         <div className="flex -space-x-2">
           {sorted.slice(0, STACK_LIMIT).map((m) => (
-            <span
+            <button
               key={m.id}
-              className="relative rounded-full ring-2 ring-white/25"
+              type="button"
+              onClick={() => openProfile(m.user.id, workspaceId)}
+              className="relative rounded-full ring-2 ring-white/25 transition-transform hover:z-10 hover:-translate-y-0.5 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-white/80"
               title={supported ? `${m.user.name} · ${isOnline(m.user.id) ? "Online" : "Offline"}` : m.user.name}
+              aria-label={`View ${m.user.name}'s profile`}
             >
               <Avatar name={m.user.name} color={m.user.avatarColor} src={m.user.avatarUrl} size={28} />
               {supported && isOnline(m.user.id) && (
                 <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-brand-800" />
               )}
-            </span>
+            </button>
           ))}
           {sorted.length > STACK_LIMIT && (
             <span className="relative flex h-7 min-w-[1.75rem] items-center justify-center rounded-full bg-white/15 px-1.5 text-[11px] font-semibold text-white ring-2 ring-white/25">

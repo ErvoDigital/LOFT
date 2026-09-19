@@ -6,6 +6,7 @@ import { apiErrorMessage } from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useWorkspaces } from "../context/WorkspaceContext.jsx";
 import { useConfirm } from "../context/ConfirmContext.jsx";
+import { useMemberProfile } from "../context/MemberProfileContext.jsx";
 import Avatar from "../components/common/Avatar.jsx";
 import { RoleBadge } from "../components/common/Badges.jsx";
 import Spinner from "../components/common/Spinner.jsx";
@@ -26,6 +27,7 @@ export default function WorkspaceSettings() {
   const [workspace, setWorkspace] = useState(null);
   const [error, setError] = useState("");
   const confirm = useConfirm();
+  const openProfile = useMemberProfile();
   const [copied, setCopied] = useState(false);
 
   const load = useCallback(() => {
@@ -106,13 +108,20 @@ export default function WorkspaceSettings() {
           <div className="space-y-2">
             {workspace.members.map((m) => (
               <div key={m.id} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-ink-50 dark:hover:bg-ink-700">
-                <Avatar name={m.user.name} color={m.user.avatarColor} src={m.user.avatarUrl} size={32} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-ink-700 dark:text-ink-200">
-                    {m.user.name} {m.user.id === user.id && <span className="text-ink-400">(you)</span>}
-                  </p>
-                  <p className="truncate text-xs text-ink-400">{m.user.email}</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => openProfile(m.user.id, workspaceId)}
+                  title={`View ${m.user.name}'s profile`}
+                  className="group flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
+                  <Avatar name={m.user.name} color={m.user.avatarColor} src={m.user.avatarUrl} size={32} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-ink-700 group-hover:text-brand-600 dark:text-ink-200 dark:group-hover:text-brand-300">
+                      {m.user.name} {m.user.id === user.id && <span className="text-ink-400">(you)</span>}
+                    </span>
+                    <span className="block truncate text-xs text-ink-400">{m.user.email}</span>
+                  </span>
+                </button>
                 {isAdmin && m.user.id !== user.id ? (
                   <div className="flex items-center gap-2">
                     <Select

@@ -4,6 +4,7 @@ import {
   MessageSquare,
   Paperclip,
   Smile,
+  Trash2,
   X,
   File as FileIcon,
   Film,
@@ -16,6 +17,9 @@ import * as assetsApi from "../../api/assets.js";
 import { apiErrorMessage } from "../../api/client.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useSocket } from "../../context/SocketContext.jsx";
+import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
+import { useConfirm } from "../../context/ConfirmContext.jsx";
+import { useMemberProfile } from "../../context/MemberProfileContext.jsx";
 import Avatar from "../common/Avatar.jsx";
 import EmptyState from "../common/EmptyState.jsx";
 import Spinner from "../common/Spinner.jsx";
@@ -92,6 +96,13 @@ function renderContent(content, selfId) {
   return nodes;
 }
 
+// One-line stand-in for a message in the delete confirmation.
+function messageSummary(message) {
+  const text = (message.content || "").replace(MENTION_RE, "@$1").trim();
+  if (text) return text.length > 80 ? `${text.slice(0, 80)}…` : text;
+  return message.attachment?.name || "";
+}
+
 function AttachmentIcon({ mimeType, className }) {
   if (!mimeType) return <FileIcon className={className} />;
   if (mimeType.startsWith("video/")) return <Film className={className} />;
@@ -106,6 +117,9 @@ function AttachmentIcon({ mimeType, className }) {
 export default function ChatThread({ conversation, headerExtra }) {
   const { user } = useAuth();
   const { socket } = useSocket();
+  const { workspaces } = useWorkspaces();
+  const confirm = useConfirm();
+  const openProfile = useMemberProfile();
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [loadingMessages, setLoadingMessages] = useState(true);
@@ -115,6 +129,7 @@ export default function ChatThread({ conversation, headerExtra }) {
   const [pendingAttachment, setPendingAttachment] = useState(null);
   const [attachmentUpload, setAttachmentUpload] = useState(null); // { name, size, progress } | null
   const [attachError, setAttachError] = useState("");
+  const [deleteError, setDeleteError] = useState("");
   const [previewing, setPreviewing] = useState(null); // { assetId, version } | null
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [reactionPickerFor, setReactionPickerFor] = useState(null); // messageId | null
@@ -132,6 +147,9 @@ export default function ChatThread({ conversation, headerExtra }) {
   const conversationId = conversation.id;
   const workspaceId = conversation.workspaceId;
   const canAttach = !!workspaceId;
+  // Workspace admins can remove anyone's message in their workspace's
+  // channels; everyone else only their own. The server enforces the same rule.
+  const canModerate = !!workspaceId && workspaces.find((w) => w.id === workspaceId)?.myRole === "ADMIN";
   const mentionCandidates = (conversation.participants || []).filter((p) => p.id !== user.id);
   const filteredMentions = mentionState
     ? mentionCandidates.filter((c) => c.name.toLowerCase().startsWith(mentionState.query.toLowerCase())).slice(0, 6)
@@ -143,6 +161,7 @@ export default function ChatThread({ conversation, headerExtra }) {
     setPendingAttachment(null);
     setMentionState(null);
     setReactionPickerFor(null);
+    setDeleteError("");
     messagesApi.getMessages(conversationId).then((msgs) => {
       shouldScrollToBottom.current = true;
       setMessages(msgs);
@@ -173,13 +192,20 @@ export default function ChatThread({ conversation, headerExtra }) {
       if (cid !== conversationId) return;
       setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reactions } : m)));
     };
+    const onDeleted = ({ conversationId: cid, messageId }) => {
+      if (cid !== conversationId) return;
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      setReactionPickerFor((id) => (id === messageId ? null : id));
+    };
     socket.on("message:new", onMessage);
     socket.on("typing", onTyping);
     socket.on("message:reaction", onReaction);
+    socket.on("message:deleted", onDeleted);
     return () => {
       socket.off("message:new", onMessage);
       socket.off("typing", onTyping);
       socket.off("message:reaction", onReaction);
+      socket.off("message:deleted", onDeleted);
     };
   }, [socket, conversationId, user.id]);
 
@@ -246,6 +272,28 @@ export default function ChatThread({ conversation, headerExtra }) {
     socket.emit("message:react", { conversationId, messageId, emoji }, (res) => {
       if (res?.error) console.error(res.error);
     });
+  }
+
+  async function deleteMessage(message) {
+    setReactionPickerFor(null);
+    setDeleteError("");
+    const ok = await confirm({
+      title: "Delete this message?",
+      subject: messageSummary(message),
+      message: message.attachment
+        ? "It will be removed for everyone in this conversation. The attached file stays in the workspace's Storage."
+        : "It will be removed for everyone in this conversation. This can't be undone.",
+      confirmLabel: "Delete message",
+    });
+    if (!ok) return;
+    try {
+      await messagesApi.deleteMessage(conversationId, message.id);
+      // The socket broadcast does this too; doing it here as well means the
+      // message goes right away even if that event is slow to arrive.
+      setMessages((prev) => prev.filter((m) => m.id !== message.id));
+    } catch (err) {
+      setDeleteError(apiErrorMessage(err));
+    }
   }
 
   function handleDraftChange(e) {
@@ -328,10 +376,22 @@ export default function ChatThread({ conversation, headerExtra }) {
           >
             {conversation.title.slice(0, 2).toUpperCase()}
           </div>
+        ) : null}
+        {!conversation.isGroup && conversation.otherUser ? (
+          <button
+            type="button"
+            onClick={() => openProfile(conversation.otherUser.id)}
+            title={`View ${conversation.otherUser.name}'s profile`}
+            className="group flex min-w-0 flex-1 items-center gap-2.5 text-left"
+          >
+            <Avatar name={conversation.otherUser.name} color={conversation.otherUser.avatarColor} src={conversation.otherUser.avatarUrl} size={32} />
+            <span className="truncate text-sm font-semibold text-ink-800 group-hover:text-brand-600 dark:text-ink-100 dark:group-hover:text-brand-300">
+              {conversation.title}
+            </span>
+          </button>
         ) : (
-          <Avatar name={conversation.otherUser?.name} color={conversation.otherUser?.avatarColor} size={32} />
+          <p className="flex-1 text-sm font-semibold text-ink-800 dark:text-ink-100">{conversation.title}</p>
         )}
-        <p className="flex-1 text-sm font-semibold text-ink-800 dark:text-ink-100">{conversation.title}</p>
         {headerExtra}
       </div>
 
@@ -349,16 +409,38 @@ export default function ChatThread({ conversation, headerExtra }) {
           messages.map((m, i) => {
             const mine = m.sender.id === user.id;
             const showAvatar = !mine && (i === 0 || messages[i - 1].sender.id !== m.sender.id);
+            const canDelete = mine || canModerate;
             return (
               <div key={m.id} className={`group flex items-end gap-2 ${mine ? "flex-row-reverse" : ""}`}>
-                {!mine && <div className="w-7">{showAvatar && <Avatar name={m.sender.name} color={m.sender.avatarColor} size={28} />}</div>}
+                {!mine && (
+                  <div className="w-7">
+                    {showAvatar && (
+                      <button
+                        type="button"
+                        onClick={() => openProfile(m.sender.id, workspaceId)}
+                        title={`View ${m.sender.name}'s profile`}
+                        className="block rounded-full transition-opacity hover:opacity-80"
+                      >
+                        <Avatar name={m.sender.name} color={m.sender.avatarColor} src={m.sender.avatarUrl} size={28} />
+                      </button>
+                    )}
+                  </div>
+                )}
                 <div className="flex min-w-0 max-w-md flex-col">
                   <div
                     className={`relative min-w-0 rounded-2xl px-3.5 py-2 text-sm shadow-soft ${
                       mine ? "rounded-br-sm bg-gradient-to-br from-brand-600 to-brand-800 text-white" : "rounded-bl-sm border border-ink-200 bg-white text-ink-800 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-100"
                     }`}
                   >
-                    {!mine && conversation.isGroup && <p className="mb-0.5 text-xs font-semibold text-brand-600 dark:text-brand-400">{m.sender.name}</p>}
+                    {!mine && conversation.isGroup && (
+                      <button
+                        type="button"
+                        onClick={() => openProfile(m.sender.id, workspaceId)}
+                        className="mb-0.5 block text-left text-xs font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                      >
+                        {m.sender.name}
+                      </button>
+                    )}
                     {m.content && <p className="whitespace-pre-wrap break-words">{renderContent(m.content, user.id)}</p>}
                     {m.attachment && (
                       <button
@@ -389,7 +471,9 @@ export default function ChatThread({ conversation, headerExtra }) {
                     )}
                     <p className={`mt-0.5 text-right text-[10px] ${mine ? "text-white/70" : "text-ink-400"}`}>{timeLabel(m.createdAt)}</p>
 
-                    <div className={`absolute top-1 ${mine ? "-left-8" : "-right-8"}`}>
+                    {/* Hover actions, react nearest the bubble. The picker
+                        anchors to this whole row, not the react button. */}
+                    <div className={`absolute top-1 flex items-center gap-1 ${mine ? "right-full mr-2 flex-row-reverse" : "left-full ml-2"}`}>
                       <button
                         type="button"
                         onClick={() => {
@@ -403,6 +487,19 @@ export default function ChatThread({ conversation, headerExtra }) {
                       >
                         <Smile className="h-3.5 w-3.5" />
                       </button>
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => deleteMessage(m)}
+                          title={mine ? "Delete message" : "Delete message (admin)"}
+                          aria-label="Delete message"
+                          className={`flex h-6 w-6 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-400 shadow-soft transition-opacity hover:text-red-500 dark:border-ink-700 dark:bg-ink-800 dark:hover:text-red-400 ${
+                            reactionPickerFor === m.id ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                          }`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       {reactionPickerFor === m.id && (
                         <EmojiPicker onSelect={(emoji) => toggleReaction(m.id, emoji)} onClose={() => setReactionPickerFor(null)} />
                       )}
@@ -442,6 +539,7 @@ export default function ChatThread({ conversation, headerExtra }) {
 
       <div className="border-t border-ink-200 bg-white p-4 dark:border-ink-700 dark:bg-ink-800">
         {attachError && <p className="mb-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{attachError}</p>}
+        {deleteError && <p className="mb-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{deleteError}</p>}
 
         {mentionState && filteredMentions.length > 0 && (
           <div className="mb-2 max-h-40 overflow-y-auto rounded-lg border border-ink-200 bg-white shadow-panel dark:border-ink-700 dark:bg-ink-800">

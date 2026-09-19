@@ -9,3 +9,9 @@ export const toggleReaction = (conversationId, messageId, emoji) =>
   api
     .post(`/messages/conversations/${conversationId}/messages/${messageId}/reactions`, { emoji })
     .then((r) => r.data.reactions);
+export const deleteMessage = (conversationId, messageId) =>
+  api.delete(`/messages/conversations/${conversationId}/messages/${messageId}`).then((r) => r.data);
+// Direct messages only — workspace channels are deleted through
+// conversations.js's deleteWorkspaceConversation (admin-only).
+export const deleteDirectConversation = (conversationId) =>
+  api.delete(`/messages/conversations/${conversationId}`).then((r) => r.data);

@@ -118,6 +118,93 @@ export async function unlinkGoogle(req, res) {
   res.json({ user: publicUser(updated) });
 }
 
+const UPCOMING_TASK_LIMIT = 5;
+
+// What a teammate sees when they open someone's profile: who they are, the
+// workspaces the two of them share (with this person's role in each), and
+// the tasks on this person's plate in those workspaces. Only workspaces the
+// viewer also belongs to are ever counted, so it can't reveal anything the
+// viewer couldn't already find on those workspaces' own boards.
+//
+// `workspaceId` narrows the task figures to the workspace the profile was
+// opened from; without it they span every shared workspace.
+export async function getUserProfile(req, res) {
+  const targetId = req.params.userId;
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    select: { id: true, name: true, email: true, avatarColor: true, avatarUrl: true, createdAt: true },
+  });
+  if (!target) throw new ApiError(404, "User not found");
+
+  const [mine, theirs] = await Promise.all([
+    prisma.workspaceMember.findMany({ where: { userId: req.userId }, select: { workspaceId: true } }),
+    prisma.workspaceMember.findMany({
+      where: { userId: targetId },
+      include: { workspace: { select: { id: true, name: true, color: true, logoUrl: true } } },
+      orderBy: { joinedAt: "asc" },
+    }),
+  ]);
+  const myWorkspaceIds = new Set(mine.map((m) => m.workspaceId));
+  const shared = theirs.filter((m) => myWorkspaceIds.has(m.workspaceId));
+
+  // Someone you share no workspace with is only visible if you already have
+  // a conversation with them — otherwise this is a 404, not a 403, so it
+  // can't be used to confirm that an account exists.
+  if (targetId !== req.userId && shared.length === 0) {
+    const sharedConversation = await prisma.conversation.findFirst({
+      where: {
+        AND: [{ participants: { some: { userId: req.userId } } }, { participants: { some: { userId: targetId } } }],
+      },
+      select: { id: true },
+    });
+    if (!sharedConversation) throw new ApiError(404, "User not found");
+  }
+
+  const focusId = String(req.query.workspaceId || "");
+  const scopeIds = shared.some((m) => m.workspaceId === focusId) ? [focusId] : shared.map((m) => m.workspaceId);
+
+  let tasks = { open: 0, overdue: 0, done: 0, upcoming: [] };
+  if (scopeIds.length > 0) {
+    const [doneStatuses, assigned] = await Promise.all([
+      prisma.taskStatus.findMany({ where: { workspaceId: { in: scopeIds }, isDone: true }, select: { id: true } }),
+      prisma.task.findMany({
+        where: { workspaceId: { in: scopeIds }, assigneeId: targetId },
+        select: { id: true, title: true, tier: true, dueDate: true, status: true, workspaceId: true },
+      }),
+    ]);
+    const doneIds = new Set(doneStatuses.map((s) => s.id));
+    const now = new Date();
+    const open = assigned.filter((t) => !doneIds.has(t.status));
+    const workspaceNames = new Map(shared.map((m) => [m.workspaceId, m.workspace.name]));
+
+    // Dated work first, soonest (including overdue) at the top; undated after.
+    const upcoming = [...open].sort((a, b) => {
+      if (!a.dueDate || !b.dueDate) return Number(!a.dueDate) - Number(!b.dueDate);
+      return a.dueDate - b.dueDate;
+    });
+
+    tasks = {
+      open: open.length,
+      overdue: open.filter((t) => t.dueDate && t.dueDate < now).length,
+      done: assigned.length - open.length,
+      upcoming: upcoming.slice(0, UPCOMING_TASK_LIMIT).map((t) => ({
+        id: t.id,
+        title: t.title,
+        tier: t.tier,
+        dueDate: t.dueDate,
+        workspaceId: t.workspaceId,
+        workspaceName: workspaceNames.get(t.workspaceId),
+      })),
+    };
+  }
+
+  res.json({
+    user: target,
+    sharedWorkspaces: shared.map((m) => ({ ...m.workspace, role: m.role, joinedAt: m.joinedAt })),
+    tasks,
+  });
+}
+
 export async function searchUsers(req, res) {
   const q = String(req.query.q || "").trim();
   if (q.length < 2) return res.json({ users: [] });
