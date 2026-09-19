@@ -18,7 +18,7 @@ export default function WorkspaceList({ workspaces, openTasksById, meetingsById,
         </button>
       </div>
 
-      <div className="dash-scroll -mx-2 min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2">
+      <div className="-mx-2 min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2">
         {workspaces.map((w) => {
           const open = openTasksById.get(w.id) || 0;
           const meetings = meetingsById.get(w.id) || 0;

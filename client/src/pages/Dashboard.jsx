@@ -158,7 +158,7 @@ function ListPanel({ title, subtitle, action, children }) {
         </div>
         {action}
       </div>
-      <div className="dash-scroll -mx-2 min-h-0 flex-1 overflow-y-auto px-2">{children}</div>
+      <div className="-mx-2 min-h-0 flex-1 overflow-y-auto px-2">{children}</div>
     </section>
   );
 }

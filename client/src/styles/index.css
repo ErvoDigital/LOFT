@@ -13,6 +13,46 @@
   .dark body {
     background-color: rgb(var(--ink-950));
   }
+
+  /* Scrollbars: a slim thumb only a shade off the surface, on a clear track,
+     so they stay findable without drawing the eye. Chromium drops these
+     ::-webkit-scrollbar rules for any element that sets scrollbar-color or
+     scrollbar-width, so those two are left to Firefox alone below. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 9999px;
+    background-clip: padding-box;
+    background-color: rgb(var(--ink-900) / 0.14);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(var(--ink-900) / 0.28);
+  }
+  .dark::-webkit-scrollbar-thumb,
+  .dark ::-webkit-scrollbar-thumb {
+    background-color: rgb(255 255 255 / 0.07);
+  }
+  .dark::-webkit-scrollbar-thumb:hover,
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(255 255 255 / 0.16);
+  }
+  @supports (-moz-appearance: none) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgb(var(--ink-900) / 0.18) transparent;
+    }
+    .dark,
+    .dark * {
+      scrollbar-color: rgb(255 255 255 / 0.1) transparent;
+    }
+  }
 }
 
 @layer components {
@@ -395,10 +435,6 @@
   border-radius: 9999px;
   background: rgb(var(--brand-400));
   box-shadow: 0 0 0 3px rgb(var(--brand-400) / 0.2);
-}
-.dash-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: rgb(var(--ink-400) / 0.4) transparent;
 }
 @media (prefers-reduced-motion: reduce) {
   .dash-grid.react-grid-layout,

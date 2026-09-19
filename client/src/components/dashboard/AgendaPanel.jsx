@@ -120,7 +120,7 @@ export default function AgendaPanel({ days, selectedKey, onShowAll, colorFor, cl
         </div>
       ) : (
         // Scrolls inside the card when the dashboard gives it a fixed height.
-        <div className="dash-scroll -mx-2 min-h-0 flex-1 space-y-3 overflow-y-auto px-2">
+        <div className="-mx-2 min-h-0 flex-1 space-y-3 overflow-y-auto px-2">
           {groups.map(({ day, items }) => (
             <div key={day.key}>
               {!selected && (
