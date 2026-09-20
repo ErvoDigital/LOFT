@@ -16,6 +16,7 @@ import assetsRoutes from "./routes/assets.routes.js";
 import foldersRoutes from "./routes/folders.routes.js";
 import conversationsRoutes from "./routes/conversations.routes.js";
 import documentsRoutes from "./routes/documents.routes.js";
+import searchRoutes from "./routes/search.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/error.js";
 
 export function createApp() {
@@ -42,6 +43,7 @@ export function createApp() {
   app.use("/api/notifications", notificationsRoutes);
   app.use("/api/dashboard", dashboardRoutes);
   app.use("/api/plan", planRoutes);
+  app.use("/api/search", searchRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
