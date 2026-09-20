@@ -128,9 +128,11 @@ export default function ConfirmDialog({
         )}
 
         {/* Stacked on phones, with Cancel at the bottom like an action sheet;
-            side by side there, "Delete document" wraps onto two lines. */}
+            side by side above that, where Cancel takes only the width its own
+            word needs so the longer action label keeps the rest and stays on
+            one line. */}
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row">
-          <button ref={cancelRef} type="button" onClick={onCancel} className="btn-secondary sm:flex-1">
+          <button ref={cancelRef} type="button" onClick={onCancel} className="btn-secondary sm:flex-none">
             {cancelLabel}
           </button>
           <button type="button" onClick={() => onConfirm(optionChecked)} className="btn-danger sm:flex-1">

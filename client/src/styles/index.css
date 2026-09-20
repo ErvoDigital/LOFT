@@ -111,8 +111,12 @@
     @apply transition-all duration-200 hover:border-brand-400/50 hover:bg-white/85 hover:shadow-glass-lg dark:hover:border-brand-400/30 dark:hover:bg-ink-800/90;
   }
 
+  /* whitespace-nowrap: a label belongs on one line. Buttons here sit in
+     flex rows that hand out equal shares of the width, so without it a
+     longer label like "Remove from my list" breaks across two lines and the
+     button grows a row taller than the one beside it. */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-primary {
     @apply btn bg-gradient-to-br from-brand-500 to-brand-800 text-white shadow-glow-sm hover:shadow-glow hover:brightness-110 active:brightness-95;
