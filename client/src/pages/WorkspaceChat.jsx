@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { MessageSquare, Hash, Circle } from "lucide-react";
+import { MessageSquare, Hash, Circle, Trash2 } from "lucide-react";
 import * as conversationsApi from "../api/conversations.js";
 import * as workspacesApi from "../api/workspaces.js";
 import { apiErrorMessage } from "../api/client.js";
@@ -122,8 +122,13 @@ export default function WorkspaceChat() {
           conversation={active}
           headerExtra={
             !active.isDefault && myRole === "ADMIN" ? (
-              <button onClick={() => deleteChannel(active.id)} className="text-xs font-medium text-red-500 hover:underline">
-                Delete channel
+              <button
+                onClick={() => deleteChannel(active.id)}
+                title="Delete channel"
+                aria-label="Delete channel"
+                className="shrink-0 rounded-lg p-1 text-ink-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+              >
+                <Trash2 className="h-4 w-4" />
               </button>
             ) : null
           }

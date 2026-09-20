@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { MessageSquare, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
+import { MessageSquare, PanelLeftClose, PanelLeftOpen, Plus, Trash2 } from "lucide-react";
 import * as messagesApi from "../api/messages.js";
 import { apiErrorMessage } from "../api/client.js";
 import { useSocket } from "../context/SocketContext.jsx";
@@ -181,8 +181,13 @@ export default function Chat() {
           conversation={active}
           headerExtra={
             !active.isGroup ? (
-              <button onClick={() => deleteConversation(active)} className="shrink-0 text-xs font-medium text-red-500 hover:underline">
-                Delete conversation
+              <button
+                onClick={() => deleteConversation(active)}
+                title="Delete conversation"
+                aria-label="Delete conversation"
+                className="shrink-0 rounded-lg p-1 text-ink-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+              >
+                <Trash2 className="h-4 w-4" />
               </button>
             ) : null
           }
