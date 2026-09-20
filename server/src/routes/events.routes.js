@@ -11,8 +11,12 @@ const workspaceRouter = Router({ mergeParams: true });
 workspaceRouter.use(requireWorkspaceMember());
 workspaceRouter.get("/", eventsController.listWorkspaceEvents);
 workspaceRouter.post("/", eventsController.createEvent);
-workspaceRouter.patch("/:eventId", eventsController.updateEvent);
-workspaceRouter.delete("/:eventId", eventsController.cancelEvent);
+// Changing a shared calendar is admin-only — any member can still add an
+// event, but only an admin can edit or cancel one once it's on there. The
+// calendar's details card hides both actions for everyone else; this is what
+// actually enforces it.
+workspaceRouter.patch("/:eventId", requireWorkspaceMember(["ADMIN"]), eventsController.updateEvent);
+workspaceRouter.delete("/:eventId", requireWorkspaceMember(["ADMIN"]), eventsController.cancelEvent);
 
 export default router;
 export { workspaceRouter as workspaceEventsRouter };

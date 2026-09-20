@@ -201,7 +201,7 @@ function TimelineItem({ event, day, now, first, last, onOpen }) {
         <button
           type="button"
           onClick={() => onOpen(event)}
-          aria-label={`Edit ${event.title}, ${range}`}
+          aria-label={`${event.title}, ${range}`}
           className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
         />
         <div className="pointer-events-none relative">

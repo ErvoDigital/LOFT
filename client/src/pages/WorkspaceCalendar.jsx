@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { CalendarX, Plus } from "lucide-react";
 import * as eventsApi from "../api/events.js";
 import * as workspacesApi from "../api/workspaces.js";
 import { useSocket } from "../context/SocketContext.jsx";
+import { useConfirm } from "../context/ConfirmContext.jsx";
+import { apiErrorMessage } from "../api/client.js";
 import MonthView from "../components/calendar/MonthView.jsx";
 import WeekView from "../components/calendar/WeekView.jsx";
 import DayPanel from "../components/calendar/DayPanel.jsx";
 import EventModal from "../components/calendar/EventModal.jsx";
+import EventDetailsModal from "../components/calendar/EventDetailsModal.jsx";
 import Spinner from "../components/common/Spinner.jsx";
 import { MonthPicker } from "../components/common/DatePicker.jsx";
 import {
@@ -110,16 +113,23 @@ export default function WorkspaceCalendar() {
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [events, setEvents] = useState([]);
   const [members, setMembers] = useState([]);
+  const [myRole, setMyRole] = useState("MEMBER");
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [draftStart, setDraftStart] = useState(null);
+  // The open event is tracked by id, not by value, so a live edit or
+  // cancellation from someone else flows straight into the open card.
+  const [detailsId, setDetailsId] = useState(null);
+  const [error, setError] = useState("");
+  const confirm = useConfirm();
 
   const load = useCallback(() => {
     Promise.all([eventsApi.listWorkspaceEvents(workspaceId), workspacesApi.getWorkspace(workspaceId)]).then(
       ([evts, workspace]) => {
         setEvents(evts);
         setMembers(workspace.members);
+        setMyRole(workspace.myRole);
         setLoading(false);
       }
     );
@@ -193,11 +203,41 @@ export default function WorkspaceCalendar() {
     setModalOpen(true);
   }
 
+  // Clicking an event anywhere in the calendar shows it first; editing is a
+  // deliberate second step, and an admin-only one.
   function openEvent(event) {
-    setEditingEvent(event);
+    setError("");
+    setDetailsId(event.id);
+  }
+
+  function editFromDetails() {
+    setEditingEvent(detailsEvent);
     setDraftStart(null);
+    setDetailsId(null);
     setModalOpen(true);
   }
+
+  async function cancelFromDetails() {
+    const ok = await confirm({
+      title: "Cancel this event?",
+      subject: detailsEvent.title,
+      message: "It will be removed from the calendar for everyone invited. This can't be undone.",
+      confirmLabel: "Cancel event",
+      cancelLabel: "Keep event",
+      icon: CalendarX,
+    });
+    if (!ok) return;
+    try {
+      await eventsApi.cancelEvent(workspaceId, detailsEvent.id);
+      setEvents((prev) => prev.filter((e) => e.id !== detailsEvent.id));
+      setDetailsId(null);
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
+  }
+
+  const detailsEvent = detailsId ? events.find((e) => e.id === detailsId) : null;
+  const canManageEvents = myRole === "ADMIN";
 
   const [rangeStart, rangeEnd] =
     view === "week"
@@ -270,6 +310,10 @@ export default function WorkspaceCalendar() {
         </div>
       </header>
 
+      {error && (
+        <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>
+      )}
+
       {/* Explicit grid-cols-1: an implicit track grows to fit its widest
           content and pushes the week grid off-screen on phones. */}
       <div className="grid grid-cols-1 gap-5 xl:min-h-[38rem] xl:flex-1 xl:grid-cols-[minmax(0,1fr)_22rem] xl:grid-rows-[minmax(0,1fr)]">
@@ -306,6 +350,17 @@ export default function WorkspaceCalendar() {
           onOpenEvent={openEvent}
         />
       </div>
+
+      <EventDetailsModal
+        open={!!detailsEvent}
+        onClose={() => setDetailsId(null)}
+        event={detailsEvent}
+        now={now}
+        canManage={canManageEvents}
+        createdByName={members.find((m) => m.user.id === detailsEvent?.createdById)?.user.name}
+        onEdit={editFromDetails}
+        onCancelEvent={cancelFromDetails}
+      />
 
       <EventModal
         open={modalOpen}
