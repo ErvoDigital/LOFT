@@ -88,9 +88,14 @@ function serializeMessage(message) {
 // Every conversation the user is an explicit participant of — workspace
 // channels and direct messages alike. Membership in a workspace no longer
 // implies access to its channels; you have to actually be added.
+// Meeting chats are excluded for the same reason listWorkspaceConversations
+// excludes them, only more so: a meeting's chat exists solely inside that
+// meeting and dies with it (see getOrCreateMeetingChat), so surfacing it here
+// would both pile up identically-titled rows and put meeting chatter back in
+// front of people who already left the call.
 export async function listConversations(req, res) {
   const conversations = await prisma.conversation.findMany({
-    where: { participants: { some: { userId: req.userId } } },
+    where: { isMeetingChat: false, participants: { some: { userId: req.userId } } },
     include: {
       workspace: { select: { id: true, name: true, color: true } },
       participants: { include: { user: { select: { id: true, name: true, avatarColor: true, avatarUrl: true } } } },
@@ -182,7 +187,13 @@ export async function sendMessageRest(req, res) {
 
   const participants = await prisma.conversationParticipant.findMany({ where: { conversationId } });
   const mentionedIds = extractMentionedUserIds(trimmed, participants.map((p) => p.userId), req.userId);
-  const link = conversation.workspaceId ? `/workspaces/${conversation.workspaceId}/chat` : "/chat";
+  // A meeting chat isn't reachable from the chat page by design, so its
+  // mentions point back at the meeting itself.
+  const link = conversation.isMeetingChat
+    ? `/workspaces/${conversation.workspaceId}/meeting`
+    : conversation.workspaceId
+    ? `/workspaces/${conversation.workspaceId}/chat`
+    : "/chat";
   await Promise.all(
     mentionedIds.map((userId) =>
       notify(userId, {

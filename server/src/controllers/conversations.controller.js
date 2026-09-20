@@ -130,7 +130,10 @@ export async function getOrCreateMeetingChat(req, res) {
       },
       include: { participants: { include: { user: participantSelect } } },
     });
-    emitToWorkspace(workspaceId, "conversation:created", serialize(conversation));
+    // Deliberately not broadcast as conversation:created — the chat pages
+    // reload their channel list on that event, and this conversation is
+    // excluded from both of those lists anyway. Announcing it would only
+    // churn every member's sidebar each time someone opens a meeting's chat.
   } else if (!conversation.participants.some((p) => p.userId === req.userId)) {
     await prisma.conversationParticipant.create({ data: { conversationId: conversation.id, userId: req.userId } });
     conversation = await prisma.conversation.findUnique({

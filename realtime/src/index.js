@@ -170,7 +170,9 @@ async function handleMessageSend(conn, data) {
   const attachmentAssetId = data?.attachmentAssetId || null;
   if ((!content && !attachmentAssetId) || !conversationId) return { error: "Invalid message" };
 
-  const convRes = await pool.query(`SELECT id, "workspaceId" FROM "Conversation" WHERE id=$1`, [conversationId]);
+  const convRes = await pool.query(`SELECT id, "workspaceId", "isMeetingChat" FROM "Conversation" WHERE id=$1`, [
+    conversationId,
+  ]);
   const conversation = convRes.rows[0];
   if (!conversation) return { error: "Conversation not found" };
 
@@ -236,7 +238,13 @@ async function handleMessageSend(conn, data) {
   );
 
   const mentionedIds = extractMentionedUserIds(content, participantIds, conn.userId);
-  const link = conversation.workspaceId ? `/workspaces/${conversation.workspaceId}/chat` : "/chat";
+  // A meeting chat isn't reachable from the chat page by design, so its
+  // mentions point back at the meeting itself.
+  const link = conversation.isMeetingChat
+    ? `/workspaces/${conversation.workspaceId}/meeting`
+    : conversation.workspaceId
+    ? `/workspaces/${conversation.workspaceId}/chat`
+    : "/chat";
   await Promise.all(
     mentionedIds.map((userId) =>
       notify(userId, {
@@ -437,6 +445,19 @@ async function handleMeetingLeave(conn) {
 
   publish(`meeting:${workspaceId}`, "meeting:peer-left", { userId: conn.userId }, { excludeConnId: conn.connId });
   publish(`workspace:${workspaceId}`, "meeting:activity", { workspaceId, active: remaining > 0, count: remaining });
+
+  // The meeting just fully ended — close out its chat so the next meeting
+  // starts a fresh conversation instead of inheriting this one's history.
+  // The mirror of this lives in server/src/sockets/meeting.socket.js's
+  // leaveMeeting(); this is the copy that actually runs in production, since
+  // meetings are served by this service, not by the REST app's Socket.io.
+  if (remaining === 0) {
+    await pool.query(
+      `UPDATE "Conversation" SET "meetingEndedAt"=now()
+       WHERE "workspaceId"=$1 AND "isMeetingChat"=true AND "meetingEndedAt" IS NULL`,
+      [workspaceId]
+    );
+  }
 }
 
 // ---- Presence ----

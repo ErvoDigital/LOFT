@@ -145,6 +145,45 @@ export async function uploadTaskAttachment(req, res) {
   res.status(201).json({ asset: serialize(asset) });
 }
 
+// A meeting's chat is thrown away with the meeting, but files shared in it
+// aren't — they still land in Storage. Since every meeting gets its own
+// conversation, they'd otherwise pile up as a stack of identically-named
+// top-level folders, so meeting chat folders are named after when the
+// meeting happened and tucked under one shared "Meeting files" parent.
+function meetingFolderName(conversation) {
+  const when = new Date(conversation.createdAt);
+  return `Meeting · ${when.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })}`;
+}
+
+async function getOrCreateMeetingFilesFolder(conversation, userId) {
+  const existing = await prisma.folder.findFirst({
+    where: {
+      workspaceId: conversation.workspaceId,
+      name: "Meeting files",
+      parentId: null,
+      chatConversationId: null,
+    },
+  });
+  if (existing) return existing;
+
+  const folder = await prisma.folder.create({
+    data: {
+      workspaceId: conversation.workspaceId,
+      name: "Meeting files",
+      visibility: "WORKSPACE",
+      createdById: userId,
+    },
+    include: folderInclude,
+  });
+  emitToWorkspace(conversation.workspaceId, "folder:created", serializeFolder(folder));
+  return folder;
+}
+
 // Finds (or creates) the one folder that holds every file shared in a given
 // conversation's chat. The default "General" channel's folder stays
 // WORKSPACE-visible like the channel itself; a smaller, hand-picked channel
@@ -158,11 +197,17 @@ async function getOrCreateChatFolder(conversation, userId) {
   if (existing) return existing;
 
   const isPickedChannel = conversation.isGroup && !conversation.isDefault;
+  const meetingParent = conversation.isMeetingChat ? await getOrCreateMeetingFilesFolder(conversation, userId) : null;
   try {
     const folder = await prisma.folder.create({
       data: {
         workspaceId: conversation.workspaceId,
-        name: conversation.isDefault ? "Chat files" : `${conversation.title} (chat files)`,
+        name: conversation.isMeetingChat
+          ? meetingFolderName(conversation)
+          : conversation.isDefault
+          ? "Chat files"
+          : `${conversation.title} (chat files)`,
+        parentId: meetingParent?.id ?? null,
         visibility: isPickedChannel ? "RESTRICTED" : "WORKSPACE",
         createdById: userId,
         chatConversationId: conversation.id,

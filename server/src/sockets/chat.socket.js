@@ -155,7 +155,13 @@ export function initSockets(httpServer, corsOrigin) {
         }
 
         const mentionedIds = extractMentionedUserIds(trimmed, participants.map((p) => p.userId), socket.userId);
-        const link = conversation.workspaceId ? `/workspaces/${conversation.workspaceId}/chat` : "/chat";
+        // A meeting chat isn't reachable from the chat page by design, so its
+        // mentions point back at the meeting itself.
+        const link = conversation.isMeetingChat
+          ? `/workspaces/${conversation.workspaceId}/meeting`
+          : conversation.workspaceId
+          ? `/workspaces/${conversation.workspaceId}/chat`
+          : "/chat";
         await Promise.all(
           mentionedIds.map((userId) =>
             notify(userId, {
