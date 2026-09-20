@@ -112,7 +112,17 @@ export async function listConversations(req, res) {
     if (!lastByConv.has(m.conversationId)) lastByConv.set(m.conversationId, m);
   }
 
-  const all = conversations.map((c) => {
+  // A chat the caller deleted from their list stays hidden until it has
+  // something new to show: once a message lands after hiddenAt, it comes back
+  // on its own. Nothing here is hidden from anyone else.
+  const visible = conversations.filter((c) => {
+    const hiddenAt = c.participants.find((p) => p.userId === req.userId)?.hiddenAt;
+    if (!hiddenAt) return true;
+    const last = lastByConv.get(c.id);
+    return !!last && last.createdAt > hiddenAt;
+  });
+
+  const all = visible.map((c) => {
     const base = {
       id: c.id,
       isGroup: c.isGroup,
@@ -274,9 +284,37 @@ export async function deleteMessage(req, res) {
 // Deletes a direct message thread, with its whole history, for both people
 // in it — either one can do it. Workspace channels go through
 // conversations.controller.js's admin-only delete instead.
-export async function deleteDirectConversation(req, res) {
+// Deleting a chat from the Messages list. By default it's a personal act:
+// the conversation is hidden for the caller alone and everyone else — and
+// every message — is untouched. `?purge=true` is the opt-in second step that
+// actually destroys the conversation for all of its participants, which is
+// why it's gated: a DM is the caller's to delete, but a workspace channel is
+// the workspace's, so only its admins can purge one, and never the General
+// channel that everybody is in.
+export async function deleteConversation(req, res) {
   const conversation = await assertParticipant(req.params.conversationId, req.userId);
-  if (conversation.isGroup) throw new ApiError(400, "Only direct messages can be deleted here");
+  const purge = String(req.query.purge) === "true";
+
+  if (!purge) {
+    await prisma.conversationParticipant.update({
+      where: { conversationId_userId: { conversationId: conversation.id, userId: req.userId } },
+      data: { hiddenAt: new Date() },
+    });
+    emitToUser(req.userId, "conversation:deleted", { id: conversation.id });
+    return res.json({ message: "Conversation removed from your list", purged: false });
+  }
+
+  if (conversation.isGroup) {
+    if (conversation.isDefault) throw new ApiError(400, "The General channel can't be deleted");
+    const membership = conversation.workspaceId
+      ? await prisma.workspaceMember.findUnique({
+          where: { workspaceId_userId: { workspaceId: conversation.workspaceId, userId: req.userId } },
+        })
+      : null;
+    if (membership?.role !== "ADMIN") {
+      throw new ApiError(403, "Only workspace admins can delete a group chat for everyone");
+    }
+  }
 
   const participants = await prisma.conversationParticipant.findMany({ where: { conversationId: conversation.id } });
   await prisma.conversation.delete({ where: { id: conversation.id } });
@@ -284,7 +322,7 @@ export async function deleteDirectConversation(req, res) {
     emitToUser(p.userId, "conversation:deleted", { id: conversation.id });
   }
 
-  res.json({ message: "Conversation deleted" });
+  res.json({ message: "Conversation deleted", purged: true });
 }
 
 export async function startDirectMessage(req, res) {
@@ -303,7 +341,15 @@ export async function startDirectMessage(req, res) {
       ],
     },
   });
-  if (existing) return res.json({ conversationId: existing.id });
+  // Deliberately starting this DM again un-hides it: the caller asked for it
+  // back, so it shouldn't stay invisible until the other person writes.
+  if (existing) {
+    await prisma.conversationParticipant.updateMany({
+      where: { conversationId: existing.id, userId: req.userId, hiddenAt: { not: null } },
+      data: { hiddenAt: null },
+    });
+    return res.json({ conversationId: existing.id });
+  }
 
   const conversation = await prisma.conversation.create({
     data: {

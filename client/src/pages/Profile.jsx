@@ -9,6 +9,7 @@ import Avatar from "../components/common/Avatar.jsx";
 import GoogleSignInButton from "../components/common/GoogleSignInButton.jsx";
 import ChangePasswordModal from "../components/profile/ChangePasswordModal.jsx";
 import AppearanceSettings from "../components/profile/AppearanceSettings.jsx";
+import FollowsPanel from "../components/profile/FollowsPanel.jsx";
 import { displayColor } from "../lib/colors.js";
 
 const COLORS = ["#134A3C", "#1F9B7D", "#E76F51", "#E9A23B", "#5EEAD4", "#C44569", "#3F6B52", "#C17538"];
@@ -202,6 +203,8 @@ export default function Profile() {
           </button>
         </div>
       </div>
+
+      <FollowsPanel />
 
       <ChangePasswordModal
         open={passwordModalOpen}

@@ -1,24 +1,37 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Trash2 } from "lucide-react";
 
 // The styled stand-in for window.confirm on destructive actions. Mounted once
 // by ConfirmProvider; call sites reach it through useConfirm().
+//
+// `option`, when given ({ label, description }), adds one opt-in checkbox for
+// a second, harsher version of the same action — deleting a chat's messages
+// for everyone on top of removing it from your own list, say. It starts
+// unchecked, so the gentler action is what a hurried Enter gets.
 export default function ConfirmDialog({
   open,
   title,
   subject,
   message,
+  option,
   confirmLabel = "Delete",
   cancelLabel = "Cancel",
   icon: Icon = Trash2,
   onConfirm,
   onCancel,
 }) {
+  const [optionChecked, setOptionChecked] = useState(false);
   const titleId = useId();
   const messageId = useId();
   const panelRef = useRef(null);
   const cancelRef = useRef(null);
+
+  // Each opening starts from the safe default, so a checkbox ticked last time
+  // can't silently carry into the next delete.
+  useEffect(() => {
+    if (open) setOptionChecked(false);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -36,7 +49,7 @@ export default function ConfirmDialog({
         return;
       }
       if (e.key !== "Tab") return;
-      const buttons = panelRef.current?.querySelectorAll("button");
+      const buttons = panelRef.current?.querySelectorAll("button, input");
       if (!buttons?.length) return;
       const first = buttons[0];
       const last = buttons[buttons.length - 1];
@@ -97,14 +110,31 @@ export default function ConfirmDialog({
           </p>
         )}
 
+        {option && (
+          <label className="mt-5 flex cursor-pointer items-start gap-2.5 rounded-xl border border-ink-200/80 bg-white/70 p-3 text-left dark:border-white/[0.08] dark:bg-white/[0.04]">
+            <input
+              type="checkbox"
+              checked={optionChecked}
+              onChange={(e) => setOptionChecked(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-red-600"
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-ink-800 dark:text-ink-100">{option.label}</span>
+              {option.description && (
+                <span className="mt-0.5 block text-xs leading-relaxed text-ink-500 dark:text-ink-400">{option.description}</span>
+              )}
+            </span>
+          </label>
+        )}
+
         {/* Stacked on phones, with Cancel at the bottom like an action sheet;
             side by side there, "Delete document" wraps onto two lines. */}
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row">
           <button ref={cancelRef} type="button" onClick={onCancel} className="btn-secondary sm:flex-1">
             {cancelLabel}
           </button>
-          <button type="button" onClick={onConfirm} className="btn-danger sm:flex-1">
-            {confirmLabel}
+          <button type="button" onClick={() => onConfirm(optionChecked)} className="btn-danger sm:flex-1">
+            {option && optionChecked && option.confirmLabel ? option.confirmLabel : confirmLabel}
           </button>
         </div>
       </div>

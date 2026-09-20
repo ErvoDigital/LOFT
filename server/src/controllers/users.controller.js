@@ -6,6 +6,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { verifyGoogleCredential } from "../utils/googleAuth.js";
 import { notify } from "../services/notification.service.js";
 import { publicUser } from "../utils/publicUser.js";
+import { findFollowRow, followState } from "./follows.controller.js";
 import { imageDataUrlSchema } from "../utils/imageDataUrl.js";
 
 const updateSchema = z.object({
@@ -147,18 +148,12 @@ export async function getUserProfile(req, res) {
   const myWorkspaceIds = new Set(mine.map((m) => m.workspaceId));
   const shared = theirs.filter((m) => myWorkspaceIds.has(m.workspaceId));
 
-  // Someone you share no workspace with is only visible if you already have
-  // a conversation with them — otherwise this is a 404, not a 403, so it
-  // can't be used to confirm that an account exists.
-  if (targetId !== req.userId && shared.length === 0) {
-    const sharedConversation = await prisma.conversation.findFirst({
-      where: {
-        AND: [{ participants: { some: { userId: req.userId } } }, { participants: { some: { userId: targetId } } }],
-      },
-      select: { id: true },
-    });
-    if (!sharedConversation) throw new ApiError(404, "User not found");
-  }
+  // Someone you share nothing with still resolves, because following works by
+  // search (see searchUsers, which already returns any account's name and
+  // email to any signed-in caller — hiding the profile behind a 404 would
+  // guard something that endpoint gives away anyway). What they don't get is
+  // any content: sharedWorkspaces comes back empty and the task figures stay
+  // zeroed below, since both are derived purely from workspaces in common.
 
   const focusId = String(req.query.workspaceId || "");
   const scopeIds = shared.some((m) => m.workspaceId === focusId) ? [focusId] : shared.map((m) => m.workspaceId);
@@ -198,10 +193,13 @@ export async function getUserProfile(req, res) {
     };
   }
 
+  const follow = targetId === req.userId ? "self" : followState(await findFollowRow(req.userId, targetId), req.userId);
+
   res.json({
     user: target,
     sharedWorkspaces: shared.map((m) => ({ ...m.workspace, role: m.role, joinedAt: m.joinedAt })),
     tasks,
+    follow,
   });
 }
 

@@ -6,6 +6,10 @@ const ConfirmContext = createContext(null);
 // One styled confirmation dialog for the whole app, driven by a promise so
 // call sites read like window.confirm did:
 //   if (!(await confirm({ title, subject, message, confirmLabel }))) return;
+//
+// Passing an `option` adds a checkbox, and the promise then resolves to
+// { option: boolean } instead of plain true. Both are truthy, so the guard
+// above keeps working untouched at every existing call site.
 export function ConfirmProvider({ children }) {
   const [request, setRequest] = useState(null);
   const resolveRef = useRef(null);
@@ -25,7 +29,10 @@ export function ConfirmProvider({ children }) {
     });
   }, []);
 
-  const accept = useCallback(() => settle(true), [settle]);
+  const accept = useCallback(
+    (optionChecked) => settle(request?.option ? { option: !!optionChecked } : true),
+    [settle, request]
+  );
   const cancel = useCallback(() => settle(false), [settle]);
 
   return (

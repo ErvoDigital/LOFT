@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mail, MessageSquare, UserPen } from "lucide-react";
+import { Mail, MessageSquare, UserCheck, UserPen, UserPlus, UserX } from "lucide-react";
 import * as usersApi from "../../api/users.js";
 import * as messagesApi from "../../api/messages.js";
 import { apiErrorMessage } from "../../api/client.js";
@@ -13,6 +13,14 @@ import WorkspaceMark from "../common/WorkspaceMark.jsx";
 import { RoleBadge, TierBadge } from "../common/Badges.jsx";
 
 const ROLE_LABELS = { ADMIN: "Admin", MANAGER: "Manager", MEMBER: "Member" };
+
+// Each state's button doubles as the way out of it: a sent request can be
+// withdrawn, and an accepted follow unfollowed, both through removeFollow.
+const FOLLOW_BUTTON = {
+  none: { label: "Follow", icon: <UserPlus className="h-4 w-4" />, title: "Send a follow request" },
+  outgoing: { label: "Requested", icon: <UserX className="h-4 w-4" />, title: "Cancel your follow request" },
+  following: { label: "Following", icon: <UserCheck className="h-4 w-4" />, title: "Unfollow" },
+};
 
 function dayDiff(date) {
   const start = new Date();
@@ -56,6 +64,10 @@ export default function MemberProfileModal({ open, onClose, userId, workspaceId 
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
+  // Held apart from `profile` so the button can flip the moment the server
+  // answers, without refetching the whole card.
+  const [follow, setFollow] = useState("none");
+  const [followBusy, setFollowBusy] = useState(false);
 
   useEffect(() => {
     if (!open || !userId) return;
@@ -64,7 +76,11 @@ export default function MemberProfileModal({ open, onClose, userId, workspaceId 
     setError("");
     usersApi
       .getUserProfile(userId, workspaceId)
-      .then((data) => !cancelled && setProfile(data))
+      .then((data) => {
+        if (cancelled) return;
+        setProfile(data);
+        setFollow(data.follow || "none");
+      })
       .catch((err) => !cancelled && setError(apiErrorMessage(err)));
     return () => {
       cancelled = true;
@@ -87,6 +103,22 @@ export default function MemberProfileModal({ open, onClose, userId, workspaceId 
       setError(apiErrorMessage(err));
     } finally {
       setStarting(false);
+    }
+  }
+
+  // Every follow action returns the resulting state, so the button never has
+  // to guess what it became.
+  async function changeFollow(action) {
+    setFollowBusy(true);
+    setError("");
+    try {
+      setFollow(await action(userId));
+      // Tells the People panel on the profile page to reload, wherever it is.
+      window.dispatchEvent(new CustomEvent("loft:follow-changed"));
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setFollowBusy(false);
     }
   }
 
@@ -138,7 +170,7 @@ export default function MemberProfileModal({ open, onClose, userId, workspaceId 
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {isMe ? (
               <button
                 onClick={() => {
@@ -150,9 +182,34 @@ export default function MemberProfileModal({ open, onClose, userId, workspaceId 
                 <UserPen className="h-4 w-4" /> Edit your profile
               </button>
             ) : (
-              <button onClick={startMessage} disabled={starting} className="btn-primary flex-1">
-                <MessageSquare className="h-4 w-4" /> {starting ? "Opening…" : "Message"}
-              </button>
+              <>
+                <button onClick={startMessage} disabled={starting} className="btn-primary flex-1">
+                  <MessageSquare className="h-4 w-4" /> {starting ? "Opening…" : "Message"}
+                </button>
+                {/* An incoming request is the one state with two answers, so
+                    it takes the whole row underneath rather than squeezing a
+                    third button in beside Message. */}
+                {follow === "incoming" ? (
+                  <div className="flex w-full gap-2">
+                    <button onClick={() => changeFollow(usersApi.acceptFollow)} disabled={followBusy} className="btn-primary flex-1">
+                      <UserCheck className="h-4 w-4" /> Accept follow
+                    </button>
+                    <button onClick={() => changeFollow(usersApi.removeFollow)} disabled={followBusy} className="btn-secondary flex-1">
+                      <UserX className="h-4 w-4" /> Decline
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => changeFollow(follow === "none" ? usersApi.requestFollow : usersApi.removeFollow)}
+                    disabled={followBusy}
+                    title={FOLLOW_BUTTON[follow]?.title}
+                    className={`${follow === "none" ? "btn-secondary" : "btn-ghost"} flex-1`}
+                  >
+                    {FOLLOW_BUTTON[follow]?.icon}
+                    {FOLLOW_BUTTON[follow]?.label}
+                  </button>
+                )}
+              </>
             )}
           </div>
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}

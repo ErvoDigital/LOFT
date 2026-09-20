@@ -52,6 +52,8 @@ model User {
   folderMemberships    FolderMember[]
   createdDocuments     Document[]                @relation("DocumentCreator")
   documentAssignments  DocumentAssignee[]
+  followsRequested     Follow[]                  @relation("FollowRequester")
+  followsReceived      Follow[]                  @relation("FollowAddressee")
 }
 
 model Workspace {
@@ -201,11 +203,17 @@ model Conversation {
   chatFolder   Folder?
 }
 
+// hiddenAt is "I deleted this chat from my Messages list": it hides the
+// conversation for this one participant without touching the conversation,
+// its messages, or anyone else's view, and without removing them from it.
+// listConversations compares it against the latest message, so a new message
+// brings the chat back on its own rather than needing the flag cleared.
 model ConversationParticipant {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   conversationId String
   userId         String
-  lastReadAt     DateTime @default(now())
+  lastReadAt     DateTime  @default(now())
+  hiddenAt       DateTime?
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -250,10 +258,33 @@ model MessageReaction {
   @@unique([messageId, userId, emoji])
 }
 
+// A follow, which is mutual here rather than one-way: the requester asks, the
+// addressee accepts, and only then do the two show up in each other's people
+// lists (the new-message dialog reads exactly this). One row per ordered pair
+// — requester→addressee — with status carrying it from PENDING to ACCEPTED.
+// A declined request is deleted rather than kept as a third status, so asking
+// again is an ordinary insert and nothing accumulates. The pair is unique in
+// one direction only, so two people can independently request each other;
+// whoever accepts first collapses it (see acceptFollow in users.controller.js).
+model Follow {
+  id          String    @id @default(uuid())
+  requesterId String
+  addresseeId String
+  status      String    @default("PENDING") // PENDING | ACCEPTED
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+
+  requester User @relation("FollowRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("FollowAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
+}
+
 model Notification {
   id        String   @id @default(uuid())
   userId    String
-  type      String // TASK_ASSIGNED | EVENT_REMINDER | NEW_MESSAGE | DEADLINE_CONFLICT | WORKSPACE_INVITE | TASK_DUE_SOON | MENTION | MEETING_STARTED
+  type      String // TASK_ASSIGNED | EVENT_REMINDER | NEW_MESSAGE | DEADLINE_CONFLICT | WORKSPACE_INVITE | TASK_DUE_SOON | MENTION | MEETING_STARTED | FOLLOW_REQUEST | FOLLOW_ACCEPTED
   title     String
   body      String?
   link      String?

@@ -5,6 +5,7 @@ import * as messagesApi from "../api/messages.js";
 import { apiErrorMessage } from "../api/client.js";
 import { useSocket } from "../context/SocketContext.jsx";
 import { useConfirm } from "../context/ConfirmContext.jsx";
+import { useWorkspaces } from "../context/WorkspaceContext.jsx";
 import Avatar from "../components/common/Avatar.jsx";
 import EmptyState from "../components/common/EmptyState.jsx";
 import Spinner from "../components/common/Spinner.jsx";
@@ -17,6 +18,7 @@ const COLLAPSE_KEY = "loft:messages-list-collapsed";
 export default function Chat() {
   const { socket } = useSocket();
   const confirm = useConfirm();
+  const { workspaces } = useWorkspaces();
   const location = useLocation();
   const navigate = useNavigate();
   const [conversations, setConversations] = useState([]);
@@ -76,17 +78,35 @@ export default function Chat() {
     };
   }, [socket, loadConversations]);
 
+  // Deleting a chat here is about your own list, not the chat itself — so the
+  // dialog offers wiping the messages for everyone as a separate, unticked
+  // box, and only where you're actually allowed to (your own DMs, or a
+  // workspace channel you administer; never the General channel).
   async function deleteConversation(conversation) {
+    const workspace = conversation.isGroup ? workspaces.find((w) => w.id === conversation.workspaceId) : null;
+    const canPurge = conversation.isGroup ? !conversation.isDefault && workspace?.myRole === "ADMIN" : true;
+
     const ok = await confirm({
-      title: "Delete this conversation?",
+      title: "Delete this chat?",
       subject: conversation.title,
-      message: `The whole conversation will be deleted for both you and ${conversation.title}. This can't be undone.`,
-      confirmLabel: "Delete conversation",
+      message: conversation.isGroup
+        ? "It disappears from your Messages. You stay in the chat, and it comes back if someone posts."
+        : `It disappears from your Messages. ${conversation.otherUser?.name || "They"} still has it, and it comes back if they write.`,
+      confirmLabel: "Remove from my list",
+      option: canPurge
+        ? {
+            label: "Also delete the messages for everyone",
+            description: conversation.isGroup
+              ? "Deletes this channel and its whole history for every member. This can't be undone."
+              : "Deletes the conversation and its whole history for both of you. This can't be undone.",
+            confirmLabel: "Delete for everyone",
+          }
+        : undefined,
     });
     if (!ok) return;
     setError("");
     try {
-      await messagesApi.deleteDirectConversation(conversation.id);
+      await messagesApi.deleteConversation(conversation.id, { purge: !!ok.option });
       const remaining = conversations.filter((c) => c.id !== conversation.id);
       setConversations(remaining);
       setActiveId((id) => (id === conversation.id ? remaining[0]?.id ?? null : id));
@@ -180,16 +200,14 @@ export default function Chat() {
           key={active.id}
           conversation={active}
           headerExtra={
-            !active.isGroup ? (
-              <button
-                onClick={() => deleteConversation(active)}
-                title="Delete conversation"
-                aria-label="Delete conversation"
-                className="shrink-0 rounded-lg p-1 text-ink-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            ) : null
+            <button
+              onClick={() => deleteConversation(active)}
+              title="Delete chat"
+              aria-label="Delete chat"
+              className="shrink-0 rounded-lg p-1 text-ink-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           }
         />
       )}
