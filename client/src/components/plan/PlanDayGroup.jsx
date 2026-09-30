@@ -3,17 +3,21 @@ import PlanTaskRow from "./PlanTaskRow.jsx";
 import { daysLate, formatHours, relativeDayName } from "./planModel.js";
 
 // Both the tile column and the spine in PlanTimeline are sized off this, so
-// the spine runs through the middle of every tile.
-export const LANE_GRID = "grid grid-cols-[3.5rem_minmax(0,1fr)] gap-3 sm:grid-cols-[4rem_minmax(0,1fr)] sm:gap-4";
+// the spine runs through the middle of every tile. Phones have no tile
+// column: the card takes the full width and carries a small tile in its
+// header instead (see `compact` below).
+export const LANE_GRID = "grid grid-cols-1 sm:grid-cols-[4rem_minmax(0,1fr)] sm:gap-4";
 
-function DateTile({ lane }) {
-  const base = "flex h-16 w-full flex-col items-center justify-center rounded-2xl sm:h-[4.5rem]";
+function DateTile({ lane, compact = false }) {
+  const base = compact
+    ? "flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl"
+    : "flex h-[4.5rem] w-full flex-col items-center justify-center rounded-2xl";
 
   if (lane.kind === "overdue") {
     return (
       <div className={`${base} gap-1 bg-gradient-to-br from-red-500 via-red-600 to-red-700 text-white shadow-[0_4px_12px_-3px_rgba(220,38,38,0.5)]`}>
         <AlarmClock className="h-4 w-4" aria-hidden="true" />
-        <span className="text-[10px] font-semibold uppercase tracking-wider">Late</span>
+        {!compact && <span className="text-[10px] font-semibold uppercase tracking-wider">Late</span>}
       </div>
     );
   }
@@ -21,7 +25,7 @@ function DateTile({ lane }) {
     return (
       <div className={`${base} gap-1 border border-dashed border-ink-300 bg-white/60 text-ink-500 dark:border-white/15 dark:bg-white/[0.04] dark:text-ink-400`}>
         <Undated className="h-4 w-4" aria-hidden="true" />
-        <span className="text-[10px] font-semibold uppercase tracking-wider">Open</span>
+        {!compact && <span className="text-[10px] font-semibold uppercase tracking-wider">Open</span>}
       </div>
     );
   }
@@ -35,13 +39,15 @@ function DateTile({ lane }) {
           : "border border-white/70 bg-white/90 text-ink-800 shadow-glass dark:border-white/[0.08] dark:bg-ink-900/90 dark:text-ink-100"
       }`}
     >
-      <span className={`text-[10px] font-semibold uppercase tracking-wider ${isToday ? "text-white/80" : "text-ink-400"}`}>
+      <span className={`font-semibold uppercase tracking-wider ${compact ? "text-[9px] leading-tight" : "text-[10px]"} ${isToday ? "text-white/80" : "text-ink-400"}`}>
         {lane.date.toLocaleDateString([], { weekday: "short" })}
       </span>
-      <span className="text-xl font-semibold leading-tight tabular-nums">{lane.date.getDate()}</span>
-      <span className={`text-[10px] font-medium uppercase tracking-wider ${isToday ? "text-white/80" : "text-ink-400"}`}>
-        {lane.date.toLocaleDateString([], { month: "short" })}
-      </span>
+      <span className={`font-semibold tabular-nums ${compact ? "text-base leading-none" : "text-xl leading-tight"}`}>{lane.date.getDate()}</span>
+      {!compact && (
+        <span className={`text-[10px] font-medium uppercase tracking-wider ${isToday ? "text-white/80" : "text-ink-400"}`}>
+          {lane.date.toLocaleDateString([], { month: "short" })}
+        </span>
+      )}
     </div>
   );
 }
@@ -97,19 +103,24 @@ export default function PlanDayGroup({ lane, capacity, statusesByWorkspace, onSt
   return (
     <li className={LANE_GRID}>
       {/* The tile rides down the lane while its tasks scroll past. */}
-      <div>
+      <div className="hidden sm:block">
         <div className="sticky top-4 z-[1]">
           <DateTile lane={lane} />
         </div>
       </div>
 
       <section className={`card min-w-0 p-3 sm:p-4 ${cardTone}`} aria-label={title}>
-        <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 px-2">
-          <div className="min-w-0">
-            <h3 className={`text-base font-semibold ${lane.kind === "overdue" ? "text-red-600 dark:text-red-400" : "text-ink-900 dark:text-ink-50"}`}>
-              {title}
-            </h3>
-            <p className="text-xs text-ink-500 dark:text-ink-400">{subtitle}</p>
+        <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 px-1 sm:gap-y-2 sm:px-2">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="sm:hidden" aria-hidden="true">
+              <DateTile lane={lane} compact />
+            </span>
+            <div className="min-w-0">
+              <h3 className={`text-base font-semibold ${lane.kind === "overdue" ? "text-red-600 dark:text-red-400" : "text-ink-900 dark:text-ink-50"}`}>
+                {title}
+              </h3>
+              <p className="text-xs text-ink-500 dark:text-ink-400">{subtitle}</p>
+            </div>
           </div>
           {!empty && <LaneLoad lane={lane} capacity={capacity} />}
         </header>

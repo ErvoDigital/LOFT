@@ -21,6 +21,11 @@ function buildGridDays(monthDate) {
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+// Phones mark a day with a dot per item, in its workspace's color, since a
+// seventh of the screen is too narrow for titles. The selected day's list,
+// shown beside or under the grid, carries the names.
+const PHONE_DOTS = 3;
+
 export default function MonthGrid({ monthDate, events, selectedDate, onSelectDate }) {
   const days = buildGridDays(monthDate);
   const today = new Date();
@@ -33,13 +38,13 @@ export default function MonthGrid({ monthDate, events, selectedDate, onSelectDat
   }
 
   return (
-    <div className="card p-4">
-      <div className="grid grid-cols-7 gap-1 pb-2 text-center text-xs font-semibold text-ink-400">
+    <div className="card p-2 sm:p-4">
+      <div className="grid grid-cols-7 gap-0.5 pb-2 text-center text-xs font-semibold text-ink-400 sm:gap-1">
         {WEEKDAYS.map((d) => (
           <div key={d}>{d}</div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
         {days.map((d) => {
           const inMonth = d.getMonth() === monthDate.getMonth();
           const isToday = d.toDateString() === today.toDateString();
@@ -50,7 +55,7 @@ export default function MonthGrid({ monthDate, events, selectedDate, onSelectDat
             <button
               key={d.toISOString()}
               onClick={() => onSelectDate(d)}
-              className={`flex h-20 flex-col items-start rounded-lg p-1.5 text-left transition-colors ${
+              className={`flex h-12 flex-col items-center rounded-lg p-1 text-center transition-colors sm:h-20 sm:items-start sm:p-1.5 sm:text-left ${
                 isSelected
                   ? "brand-mark text-white"
                   : inMonth
@@ -59,13 +64,27 @@ export default function MonthGrid({ monthDate, events, selectedDate, onSelectDat
               }`}
             >
               <span
-                className={`mb-1 flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium ${
+                className={`mb-1 flex h-6 w-6 items-center justify-center rounded-full text-[13px] font-medium sm:h-5 sm:w-5 sm:text-xs ${
                   isToday && !isSelected ? "bg-accent-400 text-white" : ""
                 }`}
               >
                 {d.getDate()}
               </span>
-              <div className="flex w-full flex-1 flex-col gap-0.5 overflow-hidden">
+              {dayEvents.length > 0 && (
+                <span className="flex items-center justify-center gap-0.5 sm:hidden">
+                  {dayEvents.slice(0, PHONE_DOTS).map((e) => (
+                    <span
+                      key={e.id}
+                      className={`h-1.5 w-1.5 rounded-full ${isSelected ? "bg-white" : ""}`}
+                      style={!isSelected ? { backgroundColor: displayColor(e.workspaceColor) } : {}}
+                    />
+                  ))}
+                  <span className="sr-only">
+                    {dayEvents.length} item{dayEvents.length === 1 ? "" : "s"}
+                  </span>
+                </span>
+              )}
+              <div className="hidden w-full flex-1 flex-col gap-0.5 overflow-hidden sm:flex">
                 {dayEvents.slice(0, 2).map((e) => (
                   <span
                     key={e.id}

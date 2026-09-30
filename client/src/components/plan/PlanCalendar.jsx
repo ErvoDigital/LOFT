@@ -67,7 +67,7 @@ export default function PlanCalendar({ tasks, events = [], onTaskClick }) {
       <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
         <MonthGrid monthDate={monthDate} events={[...eventChips, ...taskChips]} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
 
-        <div className="card space-y-4 p-4">
+        <div className="card space-y-4 p-3.5 sm:p-4">
           <div>
             <h4 className="mb-3 text-sm font-semibold text-ink-700 dark:text-ink-200">
               {selectedDate.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
