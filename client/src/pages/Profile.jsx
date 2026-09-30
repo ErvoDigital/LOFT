@@ -93,8 +93,8 @@ export default function Profile() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-6">
-      <div className="card p-6">
+    <div className="mx-auto max-w-2xl space-y-4 p-4 sm:space-y-6 sm:p-6">
+      <div className="card p-5 sm:p-6">
         <h2 className="mb-4 text-base font-semibold text-ink-800 dark:text-ink-100">Profile</h2>
         <div className="mb-5 flex items-center gap-4">
           <div className="relative shrink-0">
@@ -155,10 +155,10 @@ export default function Profile() {
 
       <AppearanceSettings />
 
-      <div className="card p-6">
+      <div className="card p-5 sm:p-6">
         <h2 className="mb-4 text-base font-semibold text-ink-800 dark:text-ink-100">Sign-in methods</h2>
 
-        <div className="mb-5 flex items-center justify-between rounded-lg border border-ink-100 px-4 py-3 dark:border-ink-700">
+        <div className="mb-5 flex flex-col gap-3 rounded-lg border border-ink-100 px-4 py-3 dark:border-ink-700 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-medium text-ink-700 dark:text-ink-200">Google</p>
             <p className="text-xs text-ink-400">

@@ -27,6 +27,7 @@ import PreviewModal from "../storage/PreviewModal.jsx";
 import UploadProgressPanel from "../storage/UploadProgressPanel.jsx";
 import EmojiPicker from "./EmojiPicker.jsx";
 import { displayColor, textOn } from "../../lib/colors.js";
+import useMediaQuery from "../../hooks/useMediaQuery.js";
 
 const DOCUMENT_MIME_TYPES = new Set([
   "application/pdf",
@@ -114,7 +115,10 @@ function AttachmentIcon({ mimeType, className }) {
 
 // The message list + composer for one conversation. Shared by the global
 // Messages page and each workspace's own Chat section.
-export default function ChatThread({ conversation, headerExtra }) {
+// headerStart sits before the conversation name: the phone layouts put
+// their way back to the conversation list there.
+export default function ChatThread({ conversation, headerStart, headerExtra }) {
+  const roomy = useMediaQuery("(min-width: 640px)");
   const { user } = useAuth();
   const { socket } = useSocket();
   const { workspaces } = useWorkspaces();
@@ -364,7 +368,8 @@ export default function ChatThread({ conversation, headerExtra }) {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-ink-50 dark:bg-ink-900">
-      <div className="flex items-center gap-2.5 border-b border-ink-200 bg-white px-5 py-3 dark:border-ink-700 dark:bg-ink-800">
+      <div className="flex min-h-[57px] items-center gap-2.5 border-b border-ink-200 bg-white px-3 py-2.5 dark:border-ink-700 dark:bg-ink-800 sm:px-5 sm:py-3">
+        {headerStart}
         {conversation.isMeetingChat ? (
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg brand-mark text-white">
             <MessageSquare className="h-4 w-4" />
@@ -390,7 +395,7 @@ export default function ChatThread({ conversation, headerExtra }) {
             </span>
           </button>
         ) : (
-          <p className="flex-1 text-sm font-semibold text-ink-800 dark:text-ink-100">{conversation.title}</p>
+          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-800 dark:text-ink-100">{conversation.title}</p>
         )}
         {headerExtra}
       </div>
@@ -399,7 +404,7 @@ export default function ChatThread({ conversation, headerExtra }) {
         ref={scrollRef}
         onDragOver={handleThreadDragOver}
         onDrop={handleThreadDrop}
-        className="flex-1 space-y-3 overflow-y-auto p-5"
+        className="flex-1 space-y-3 overflow-y-auto overflow-x-hidden overscroll-contain p-3 sm:p-5"
       >
         {loadingMessages ? (
           <Spinner className="py-8" />
@@ -426,9 +431,10 @@ export default function ChatThread({ conversation, headerExtra }) {
                     )}
                   </div>
                 )}
-                <div className="flex min-w-0 max-w-md flex-col">
+                <div className="flex min-w-0 max-w-[72%] flex-col sm:max-w-md">
                   <div
-                    className={`relative min-w-0 rounded-2xl px-3.5 py-2 text-sm shadow-soft ${
+                    tabIndex={0}
+                    className={`relative min-w-0 rounded-2xl px-3.5 py-2 text-sm shadow-soft outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 ${
                       mine ? "rounded-br-sm bg-gradient-to-br from-brand-600 to-brand-800 text-white" : "rounded-bl-sm border border-ink-200 bg-white text-ink-800 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-100"
                     }`}
                   >
@@ -481,8 +487,8 @@ export default function ChatThread({ conversation, headerExtra }) {
                           setReactionPickerFor((id) => (id === m.id ? null : m.id));
                         }}
                         title="React"
-                        className={`flex h-6 w-6 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-400 shadow-soft transition-opacity hover:text-ink-600 dark:border-ink-700 dark:bg-ink-800 dark:hover:text-ink-100 ${
-                          reactionPickerFor === m.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        className={`flex h-7 w-7 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-400 shadow-soft transition-opacity hover:text-ink-600 sm:h-6 sm:w-6 dark:border-ink-700 dark:bg-ink-800 dark:hover:text-ink-100 ${
+                          reactionPickerFor === m.id ? "opacity-100" : "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
                         }`}
                       >
                         <Smile className="h-3.5 w-3.5" />
@@ -493,8 +499,8 @@ export default function ChatThread({ conversation, headerExtra }) {
                           onClick={() => deleteMessage(m)}
                           title={mine ? "Delete message" : "Delete message (admin)"}
                           aria-label="Delete message"
-                          className={`flex h-6 w-6 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-400 shadow-soft transition-opacity hover:text-red-500 dark:border-ink-700 dark:bg-ink-800 dark:hover:text-red-400 ${
-                            reactionPickerFor === m.id ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                          className={`flex h-7 w-7 items-center justify-center rounded-full border border-ink-200 bg-white text-ink-400 shadow-soft transition-opacity hover:text-red-500 sm:h-6 sm:w-6 dark:border-ink-700 dark:bg-ink-800 dark:hover:text-red-400 ${
+                            reactionPickerFor === m.id ? "opacity-100" : "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
                           }`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -537,7 +543,7 @@ export default function ChatThread({ conversation, headerExtra }) {
         {typingUser && <p className="pl-9 text-xs italic text-ink-400">typing…</p>}
       </div>
 
-      <div className="border-t border-ink-200 bg-white p-4 dark:border-ink-700 dark:bg-ink-800">
+      <div className="border-t border-ink-200 bg-white p-2.5 dark:border-ink-700 dark:bg-ink-800 sm:p-4">
         {attachError && <p className="mb-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{attachError}</p>}
         {deleteError && <p className="mb-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{deleteError}</p>}
 
@@ -574,13 +580,13 @@ export default function ChatThread({ conversation, headerExtra }) {
           </div>
         )}
 
-        <form onSubmit={sendMessage} className="flex items-center gap-2">
+        <form onSubmit={sendMessage} className="flex items-center gap-1 sm:gap-2">
           <button
             type="button"
             onClick={() => canAttach && fileInputRef.current?.click()}
             disabled={!canAttach || !!attachmentUpload}
             title={canAttach ? "Attach a file or video" : "File sharing is only available in workspace channels"}
-            className="btn-ghost !px-2.5 !py-2 disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn-ghost shrink-0 !px-2.5 !py-2 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Paperclip className="h-4 w-4" />
           </button>
@@ -609,13 +615,13 @@ export default function ChatThread({ conversation, headerExtra }) {
           </div>
           <input
             ref={inputRef}
-            className="input"
-            placeholder="Write a message… (@ to mention someone)"
+            className="input min-w-0"
+            placeholder={roomy ? "Write a message… (@ to mention someone)" : "Message…"}
             value={draft}
             onChange={handleDraftChange}
             onKeyDown={handleComposerKeyDown}
           />
-          <button type="submit" className="btn-primary" disabled={!draft.trim() && !pendingAttachment}>
+          <button type="submit" className="btn-primary shrink-0 max-sm:!px-3.5" disabled={!draft.trim() && !pendingAttachment}>
             Send
           </button>
         </form>

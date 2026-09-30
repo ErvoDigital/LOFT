@@ -67,7 +67,7 @@ function TiptapEditor({ ydoc, provider, user, onReady, pageless, pageSize, colum
       SuggestionMode,
     ],
     editorProps: {
-      attributes: { class: "doc-content px-20 py-16 focus:outline-none" },
+      attributes: { class: "doc-content px-5 py-6 focus:outline-none sm:px-12 sm:py-12 md:px-20 md:py-16" },
     },
     onCreate: ({ editor }) => onReady?.(editor),
   });
@@ -119,7 +119,7 @@ function TiptapEditor({ ydoc, provider, user, onReady, pageless, pageSize, colum
         {pageless ? (
           content
         ) : (
-          <div className={`doc-page mx-auto my-8 min-h-[1056px] ${PAGE_WIDTH[pageSize] || PAGE_WIDTH.letter} rounded-sm bg-white shadow-soft dark:bg-ink-800`}>
+          <div className={`doc-page mx-auto min-h-full bg-white dark:bg-ink-800 sm:my-8 sm:min-h-[1056px] sm:rounded-sm sm:shadow-soft ${PAGE_WIDTH[pageSize] || PAGE_WIDTH.letter}`}>
             {content}
           </div>
         )}
@@ -324,7 +324,7 @@ export default function DocumentEditor() {
 
   return (
     <div className={fullscreen ? "fixed inset-0 z-50 flex flex-col bg-white dark:bg-ink-900" : "flex h-full flex-col bg-white dark:bg-ink-900"}>
-      <div className="flex items-center gap-3 border-b border-ink-200 px-4 py-3 dark:border-ink-700 print:hidden">
+      <div className="flex items-center gap-2 border-b border-ink-200 px-2 py-2 dark:border-ink-700 sm:gap-3 sm:px-4 sm:py-3 print:hidden">
         <button
           onClick={() => navigate(`/workspaces/${workspaceId}/docs`)}
           title="Close document"
@@ -338,7 +338,7 @@ export default function DocumentEditor() {
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder="Untitled document"
-          className="min-w-0 flex-1 truncate border-none bg-transparent text-lg font-semibold text-ink-800 outline-none placeholder:text-ink-400 dark:text-ink-100"
+          className="min-w-0 flex-1 truncate border-none bg-transparent text-base font-semibold sm:text-lg text-ink-800 outline-none placeholder:text-ink-400 dark:text-ink-100"
         />
         {meta?.visibility === "ASSIGNED" && (
           <Lock className="h-3.5 w-3.5 shrink-0 text-accent-500" aria-label="Restricted to the assigned person" />

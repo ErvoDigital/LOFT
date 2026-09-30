@@ -62,10 +62,10 @@ function BillingSection() {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           {usage.map((u) => (
-            <div key={u.label} className="stat-card">
-              <p className="stat-value tabular-nums">{u.value}</p>
+            <div key={u.label} className="stat-card max-sm:!p-3">
+              <p className="stat-value tabular-nums max-sm:!text-2xl">{u.value}</p>
               <p className="stat-label">{u.label}</p>
             </div>
           ))}
@@ -89,7 +89,7 @@ function BillingSection() {
 
 export default function Settings() {
   return (
-    <div className="mx-auto max-w-3xl space-y-8 p-6">
+    <div className="mx-auto max-w-3xl space-y-8 p-4 sm:p-6">
       <BillingSection />
     </div>
   );

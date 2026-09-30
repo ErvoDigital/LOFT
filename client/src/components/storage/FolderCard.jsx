@@ -58,14 +58,15 @@ export default function FolderCard({ folder, canManage, onOpen, onEdit, onDelete
             onOpen(folder.id);
           }
         }}
-        className={`group relative h-32 w-72 cursor-pointer focus:outline-none ${glowing ? "animate-glow-pulse-drop" : ""}`}
+        className={`group relative h-32 w-full cursor-pointer focus:outline-none sm:w-72 ${glowing ? "animate-glow-pulse-drop" : ""}`}
       >
         <svg
           viewBox="0 0 288 128"
+          preserveAspectRatio="none"
           className="absolute inset-0 h-full w-full transition-colors group-focus-visible:stroke-brand-400"
           aria-hidden="true"
         >
-          <path d={FOLDER_PATH} strokeWidth="1" className={`transition-colors ${surface}`} />
+          <path d={FOLDER_PATH} strokeWidth="1" vectorEffect="non-scaling-stroke" className={`transition-colors ${surface}`} />
         </svg>
 
         <div className="relative flex h-full flex-col px-4 pb-4 pt-8">
@@ -79,7 +80,7 @@ export default function FolderCard({ folder, canManage, onOpen, onEdit, onDelete
               )}
             </div>
             {canManage && (
-              <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+              <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 touch:opacity-100">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

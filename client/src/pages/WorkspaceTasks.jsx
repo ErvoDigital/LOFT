@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import { SlidersHorizontal } from "lucide-react";
 import * as tasksApi from "../api/tasks.js";
 import * as workspacesApi from "../api/workspaces.js";
 import * as taskStatusesApi from "../api/taskStatuses.js";
@@ -135,13 +136,19 @@ export default function WorkspaceTasks() {
 
   return (
     <>
-      <div className="flex h-full flex-col gap-4 p-6">
-        <div className="flex shrink-0 items-center justify-between">
-          <h2 className="text-2xl font-semibold tracking-tight text-ink-900 dark:text-ink-50">Tasks</h2>
+      <div className="flex h-full flex-col gap-3 p-4 sm:gap-4 sm:p-6">
+        <div className="flex shrink-0 items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold tracking-tight text-ink-900 dark:text-ink-50 sm:text-2xl">Tasks</h2>
           <div className="flex items-center gap-2">
             {isAdmin && (
-              <button className="btn-secondary" onClick={() => setStatusModalOpen(true)}>
-                Customize statuses
+              <button
+                className="btn-secondary max-sm:!px-2.5"
+                onClick={() => setStatusModalOpen(true)}
+                aria-label="Customize statuses"
+                title="Customize statuses"
+              >
+                <SlidersHorizontal className="h-4 w-4 sm:hidden" />
+                <span className="hidden sm:inline">Customize statuses</span>
               </button>
             )}
             <button
@@ -156,7 +163,9 @@ export default function WorkspaceTasks() {
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 items-start gap-4 overflow-x-auto pb-2">
+        {/* Phones get one column per swipe, snapping into place, with the
+            next column peeking in so it's clear the board carries on. */}
+        <div className="-mx-4 flex min-h-0 flex-1 snap-x snap-mandatory scroll-px-4 items-start gap-3 overflow-x-auto overscroll-x-contain px-4 pb-2 sm:mx-0 sm:snap-none sm:gap-4 sm:px-0">
           {columns.map((col) => {
             const colTasks = columnTasks(col.id);
             const showIndicator = dropIndicator?.status === col.id;
@@ -166,7 +175,7 @@ export default function WorkspaceTasks() {
                 key={col.id}
                 onDragOver={(e) => handleColumnDragOver(e, col.id)}
                 onDrop={(e) => handleDrop(e, col.id)}
-                className="flex max-h-full min-w-[260px] flex-1 flex-col rounded-2xl border border-white/50 bg-white/30 p-3 backdrop-blur-md transition-colors dark:border-white/[0.06] dark:bg-white/[0.02]"
+                className="flex max-h-full w-[calc(100vw-4.5rem)] max-w-[22rem] shrink-0 snap-start flex-col rounded-2xl sm:w-auto sm:min-w-[260px] sm:max-w-none sm:flex-1 sm:shrink border border-white/50 bg-white/30 p-3 backdrop-blur-md transition-colors dark:border-white/[0.06] dark:bg-white/[0.02]"
               >
                 <div className="mb-2 flex shrink-0 items-center justify-between px-1">
                   <h3 className="flex items-center gap-1.5 text-sm font-semibold text-ink-700 dark:text-ink-200">

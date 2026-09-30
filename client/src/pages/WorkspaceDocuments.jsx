@@ -93,13 +93,13 @@ export default function WorkspaceDocuments() {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
+    <div className="p-4 sm:p-6">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-lg font-semibold text-ink-800 dark:text-ink-100">Docs</h1>
           <p className="text-sm text-ink-400">Shared documents everyone in this workspace can co-edit.</p>
         </div>
-        <button onClick={createDocument} disabled={creating} className="btn-primary">
+        <button onClick={createDocument} disabled={creating} className="btn-primary w-full sm:w-auto">
           <Plus className="h-4 w-4" /> New document
         </button>
       </div>
@@ -132,7 +132,7 @@ export default function WorkspaceDocuments() {
                     <FileText className="h-4 w-4" />
                   </span>
                   {canManage && (
-                    <div className="flex shrink-0 items-center gap-1 opacity-0 transition-colors group-hover:opacity-100">
+                    <div className="flex shrink-0 items-center gap-1 opacity-0 transition-colors focus-within:opacity-100 group-hover:opacity-100 touch:opacity-100">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -140,7 +140,7 @@ export default function WorkspaceDocuments() {
                         }}
                         title="Document access"
                         aria-label="Document access"
-                        className="rounded-lg p-1.5 text-ink-300 hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                        className="rounded-lg p-1.5 text-ink-300 touch:p-2 hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
                       >
                         <Settings className="h-3.5 w-3.5" />
                       </button>
@@ -148,7 +148,7 @@ export default function WorkspaceDocuments() {
                         onClick={(e) => deleteDocument(e, doc.id)}
                         title="Delete document"
                         aria-label="Delete document"
-                        className="rounded-lg p-1.5 text-ink-300 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                        className="rounded-lg p-1.5 text-ink-300 touch:p-2 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

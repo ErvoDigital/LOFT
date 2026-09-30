@@ -84,6 +84,11 @@ export default {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
         },
+        // A phone bottom sheet rising from below the screen edge.
+        "sheet-up": {
+          "0%": { transform: "translateY(100%)" },
+          "100%": { transform: "translateY(0)" },
+        },
         // A dashboard skyline floor settling onto the one below it.
         rise: {
           "0%": { opacity: "0", transform: "scaleY(0)" },
@@ -102,6 +107,7 @@ export default {
         "glow-pulse-drop": "glow-pulse-drop 1.1s ease-in-out 2",
         "slide-fade-in": "slide-fade-in 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
         "fade-in": "fade-in 0.25s ease-out",
+        "sheet-up": "sheet-up 0.34s cubic-bezier(0.22, 1, 0.36, 1)",
         // `both` holds the collapsed first frame through the stagger delay.
         rise: "rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both",
       },
@@ -117,6 +123,12 @@ export default {
       addBase({
         ":root": Object.fromEntries(Object.entries(basePalette()).map(([k, v]) => [`--${k}`, v])),
       });
+    }),
+    // `touch:` targets phones and tablets, where nothing hovers. Controls that
+    // desktop reveals on hover use it to stay visible, and drag-and-drop hints
+    // use it to step aside.
+    plugin(({ addVariant }) => {
+      addVariant("touch", "@media (hover: none) and (pointer: coarse)");
     }),
   ],
 };

@@ -275,7 +275,7 @@ export default function WorkspaceCalendar() {
             <span>{rangeSummary}</span>
             {nextUp && (
               <>
-                <span className="text-ink-300 dark:text-ink-600" aria-hidden="true">
+                <span className="hidden text-ink-300 dark:text-ink-600 sm:inline" aria-hidden="true">
                   ·
                 </span>
                 <NextUp event={nextUp} now={now} onReveal={reveal} />

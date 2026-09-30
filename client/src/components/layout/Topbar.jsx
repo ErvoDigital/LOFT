@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, LogOut, Sun, Moon } from "lucide-react";
+import { User, LogOut, Sun, Moon, Menu } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import Avatar from "../common/Avatar.jsx";
@@ -12,7 +12,7 @@ const PAGE_TITLES = {
   "/profile": "Profile",
 };
 
-export default function Topbar({ title }) {
+export default function Topbar({ title, context, navOpen, onOpenNav }) {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -31,14 +31,33 @@ export default function Topbar({ title }) {
   // without a z-index the account/notification dropdowns paint under <main>,
   // which comes later in the DOM.
   return (
-    <header className="relative z-30 flex h-14 shrink-0 items-center justify-between border-b border-white/50 bg-white/60 px-6 backdrop-blur-xl dark:border-white/[0.06] dark:bg-white/[0.03] print:hidden">
-      <h1 className="text-base font-semibold tracking-tight text-ink-900 dark:text-ink-50">{title}</h1>
-      <div className="flex items-center gap-3">
+    <header className="relative z-30 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-white/50 bg-white/60 px-2 backdrop-blur-xl dark:border-white/[0.06] dark:bg-white/[0.03] sm:px-4 lg:px-6 print:hidden">
+      <div className="flex min-w-0 items-center gap-1">
+        <button
+          onClick={onOpenNav}
+          aria-label="Open navigation"
+          aria-controls="mobile-nav"
+          aria-expanded={!!navOpen}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-ink-600 transition-colors hover:bg-brand-500/10 active:bg-brand-500/15 dark:text-ink-200 dark:hover:bg-white/[0.08] lg:hidden"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        {/* Phones stack the workspace over the page name, since the two
+            together rarely fit on one line; desktop joins them. */}
+        <div className="min-w-0 lg:hidden">
+          {context && <p className="truncate text-[11px] font-medium leading-tight text-ink-400">{context}</p>}
+          <h1 className="truncate text-base font-semibold leading-tight tracking-tight text-ink-900 dark:text-ink-50">{title}</h1>
+        </div>
+        <h1 className="hidden truncate text-base font-semibold tracking-tight text-ink-900 dark:text-ink-50 lg:block">
+          {context ? `${context} · ${title}` : title}
+        </h1>
+      </div>
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2 lg:gap-3">
         <button
           onClick={toggleTheme}
           title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          className="flex h-8 w-8 items-center justify-center rounded-xl text-ink-500 transition-all hover:bg-brand-500/10 hover:text-brand-600 dark:text-ink-300 dark:hover:bg-white/[0.08] dark:hover:text-brand-300"
+          className="flex h-10 w-10 items-center justify-center rounded-xl text-ink-500 transition-all lg:h-8 lg:w-8 hover:bg-brand-500/10 hover:text-brand-600 dark:text-ink-300 dark:hover:bg-white/[0.08] dark:hover:text-brand-300"
         >
           {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
@@ -48,7 +67,7 @@ export default function Topbar({ title }) {
             onClick={() => setMenuOpen((o) => !o)}
             title="Account menu"
             aria-label="Account menu"
-            className={`flex items-center rounded-full p-0.5 ring-2 transition-all ${
+            className={`ml-1 flex items-center rounded-full p-0.5 ring-2 transition-all lg:ml-0 ${
               menuOpen ? "ring-brand-400/70" : "ring-transparent hover:ring-brand-400/40"
             }`}
           >

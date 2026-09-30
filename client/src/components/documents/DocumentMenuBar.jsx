@@ -50,7 +50,7 @@ function MenuButton({ label, isOpen, onToggle }) {
   return (
     <button
       onClick={onToggle}
-      className={`rounded px-2.5 py-1 text-sm transition-colors ${isOpen ? "bg-ink-100 text-ink-900 dark:bg-ink-700 dark:text-ink-50" : "text-ink-600 hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-700"}`}
+      className={`rounded px-2 py-1.5 text-sm transition-colors sm:px-2.5 sm:py-1 ${isOpen ? "bg-ink-100 text-ink-900 dark:bg-ink-700 dark:text-ink-50" : "text-ink-600 hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-700"}`}
     >
       {label}
     </button>
@@ -62,7 +62,7 @@ function Item({ Icon, label, shortcut, onClick, disabled, active }) {
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm disabled:opacity-40 disabled:pointer-events-none ${
+      className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm touch:py-2.5 disabled:opacity-40 disabled:pointer-events-none ${
         active ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "text-ink-600 hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-700"
       }`}
     >
@@ -187,10 +187,14 @@ export default function DocumentMenuBar({
     Insert: (
       <>
         <Item Icon={ImageIcon} label="Image" onClick={run(onInsertImage)} />
-        <div className="relative" onMouseEnter={() => setTableFlyoutOpen(true)} onMouseLeave={() => setTableFlyoutOpen(false)}>
+        <div
+          className="relative"
+          onPointerEnter={(e) => e.pointerType === "mouse" && setTableFlyoutOpen(true)}
+          onPointerLeave={(e) => e.pointerType === "mouse" && setTableFlyoutOpen(false)}
+        >
           <button
             onClick={() => setTableFlyoutOpen((o) => !o)}
-            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm text-ink-600 hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-700"
+            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm text-ink-600 hover:bg-ink-50 touch:py-2.5 dark:text-ink-300 dark:hover:bg-ink-700"
           >
             <TableIcon className="h-3.5 w-3.5 shrink-0 text-ink-400" />
             <span className="flex-1">Table</span>
@@ -202,7 +206,7 @@ export default function DocumentMenuBar({
             />
           </button>
           {tableFlyoutOpen && (
-            <div className="absolute left-full top-0 z-40 ml-1 card shadow-panel">
+            <div className="card mt-1 w-fit shadow-panel sm:absolute sm:left-full sm:top-0 sm:z-40 sm:ml-1 sm:mt-0">
               <TableGridPicker
                 onInsert={(rows, cols) => {
                   cmd((c) => c.insertTable({ rows, cols, withHeaderRow: true }))();
@@ -260,13 +264,13 @@ export default function DocumentMenuBar({
   };
 
   return (
-    <div ref={ref} className="relative flex items-center gap-0.5 border-b border-ink-100 bg-white px-3 py-1 dark:border-ink-700 dark:bg-ink-900 print:hidden">
+    <div ref={ref} className="relative flex items-center gap-0.5 border-b border-ink-100 bg-white px-1.5 py-1 dark:border-ink-700 dark:bg-ink-900 sm:px-3 print:hidden">
       {Object.entries(menus).map(([label, content]) => (
-        <div key={label} className="relative">
+        <div key={label} className="sm:relative">
           <MenuButton label={label} isOpen={openMenu === label} onToggle={() => setOpenMenu((m) => (m === label ? null : label))} />
           {openMenu === label && (
             <div
-              className={`absolute left-0 top-full z-30 mt-1 w-64 card p-1.5 shadow-panel ${
+              className={`absolute inset-x-2 top-full z-30 mt-1 card p-1.5 shadow-panel sm:inset-x-auto sm:left-0 sm:w-64 ${
                 label === "Insert" ? "overflow-visible" : "max-h-[70vh] overflow-y-auto"
               }`}
             >

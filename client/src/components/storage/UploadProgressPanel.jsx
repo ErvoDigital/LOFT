@@ -15,7 +15,7 @@ export default function UploadProgressPanel({ uploads }) {
   if (uploads.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 w-72 space-y-2">
+    <div className="fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-40 space-y-2 sm:inset-x-auto sm:bottom-4 sm:right-4 sm:w-72">
       {uploads.map((u) => (
         <div key={u.id} className="card p-3 shadow-panel">
           <div className="mb-1.5 flex items-center gap-2">

@@ -96,14 +96,14 @@ export default function WorkspaceSettings() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
 
       <WorkspaceProfileCard key={workspace.id} workspace={workspace} canEdit={isAdmin} onSaved={handleProfileSaved} />
 
       {/* Members take the wide column; invite and leave stack to their right. */}
       <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
-        <div className="card p-6 lg:col-span-2">
+        <div className="card p-5 sm:p-6 lg:col-span-2">
           <h2 className="mb-4 text-base font-semibold text-ink-800 dark:text-ink-100">Members ({workspace.members.length})</h2>
           <div className="space-y-2">
             {workspace.members.map((m) => (
@@ -145,7 +145,7 @@ export default function WorkspaceSettings() {
         </div>
 
         <div className="space-y-6">
-          <div className="card p-6">
+          <div className="card p-5 sm:p-6">
             <h2 className="mb-1 text-base font-semibold text-ink-800 dark:text-ink-100">Invite people</h2>
             <p className="mb-3 text-sm text-ink-400">Share this code so others can join.</p>
             <div className="flex items-center gap-2">
@@ -166,7 +166,7 @@ export default function WorkspaceSettings() {
           </div>
 
           {workspace.ownerId !== user.id && (
-            <div className="card border-red-100 p-6">
+            <div className="card border-red-100 p-5 sm:p-6">
               <h2 className="mb-1 text-base font-semibold text-ink-800 dark:text-ink-100">Leave workspace</h2>
               <p className="mb-3 text-sm text-ink-400">You'll lose access to its calendar, tasks, and chat.</p>
               <button onClick={handleLeave} className="btn-danger">

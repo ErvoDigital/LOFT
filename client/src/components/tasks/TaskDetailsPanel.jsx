@@ -138,17 +138,17 @@ export default function TaskDetailsPanel({ open, task, workspaceId, statuses, on
       />
       <div
         className={`absolute inset-y-0 right-0 flex w-full flex-col bg-white shadow-panel transition-all duration-300 ease-out dark:bg-ink-800 ${
-          expanded ? "max-w-full" : "max-w-sm md:max-w-md"
+          expanded ? "max-w-full" : "sm:max-w-sm md:max-w-md"
         } ${show ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"}`}
       >
-        <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4 dark:border-ink-700">
+        <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3 dark:border-ink-700 sm:px-5 sm:py-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-400">Task details</h2>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => setExpanded((e) => !e)}
               title={expanded ? "Collapse" : "Expand"}
-              className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-100"
+              className="hidden rounded-lg p-1.5 sm:block text-ink-400 hover:bg-ink-100 hover:text-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-100"
             >
               {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </button>
@@ -156,7 +156,8 @@ export default function TaskDetailsPanel({ open, task, workspaceId, statuses, on
               type="button"
               onClick={onEdit}
               title="Edit task"
-              className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-100"
+              aria-label="Edit task"
+              className="rounded-lg p-2 sm:p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-100"
             >
               <Pencil className="h-4 w-4" />
             </button>
@@ -164,14 +165,15 @@ export default function TaskDetailsPanel({ open, task, workspaceId, statuses, on
               type="button"
               onClick={onClose}
               title="Close"
-              className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-100"
+              aria-label="Close"
+              className="rounded-lg p-2 sm:p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-100"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        <div className={`flex-1 overflow-y-auto py-5 ${expanded ? "px-10" : "px-5"}`}>
+        <div className={`flex-1 overflow-y-auto overscroll-contain py-5 ${expanded ? "px-4 sm:px-10" : "px-4 sm:px-5"}`}>
           <div className={`space-y-5 ${expanded ? "mx-auto w-full max-w-6xl" : ""}`}>
             <div>
               <div className="mb-2 flex flex-wrap items-center gap-1.5">

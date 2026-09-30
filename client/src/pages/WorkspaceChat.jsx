@@ -10,6 +10,7 @@ import EmptyState from "../components/common/EmptyState.jsx";
 import Spinner from "../components/common/Spinner.jsx";
 import ChatThread from "../components/chat/ChatThread.jsx";
 import NewChannelModal from "../components/chat/NewChannelModal.jsx";
+import useMediaQuery, { TWO_PANE } from "../hooks/useMediaQuery.js";
 
 export default function WorkspaceChat() {
   const { workspaceId } = useParams();
@@ -22,6 +23,10 @@ export default function WorkspaceChat() {
   const [error, setError] = useState("");
   const confirm = useConfirm();
   const [channelModalOpen, setChannelModalOpen] = useState(false);
+  // Phones show the channel list or one channel. They open straight into the
+  // default channel, since most workspaces only ever use that one.
+  const twoPane = useMediaQuery(TWO_PANE);
+  const [showThread, setShowThread] = useState(true);
 
   const load = useCallback(() => {
     Promise.all([conversationsApi.listWorkspaceConversations(workspaceId), workspacesApi.getWorkspace(workspaceId)])
@@ -41,6 +46,7 @@ export default function WorkspaceChat() {
   useEffect(() => {
     setLoading(true);
     setActiveId(null);
+    setShowThread(true);
     load();
   }, [load]);
 
@@ -69,12 +75,14 @@ export default function WorkspaceChat() {
       await conversationsApi.deleteWorkspaceConversation(workspaceId, conversationId);
       setConversations((prev) => prev.filter((c) => c.id !== conversationId));
       setActiveId((prev) => (prev === conversationId ? null : prev));
+      setShowThread(false);
     } catch (err) {
       setError(apiErrorMessage(err));
     }
   }
 
   const active = conversations.find((c) => c.id === activeId);
+  const listHidden = !twoPane && showThread && !!active;
 
   if (loading) {
     return (
@@ -86,7 +94,11 @@ export default function WorkspaceChat() {
 
   return (
     <div className="flex h-full">
-      <div className="flex w-64 shrink-0 flex-col border-r border-ink-200 bg-white dark:border-ink-700 dark:bg-ink-800">
+      <div
+        className={`flex w-full shrink-0 flex-col border-ink-200 bg-white dark:border-ink-700 dark:bg-ink-800 md:w-64 md:border-r ${
+          listHidden ? "hidden" : ""
+        }`}
+      >
         <div className="flex items-center justify-between border-b border-ink-200 p-4 dark:border-ink-700">
           <h2 className="text-sm font-semibold text-ink-800 dark:text-ink-100">Channels</h2>
           {myRole === "ADMIN" && (
@@ -100,9 +112,12 @@ export default function WorkspaceChat() {
           {conversations.map((c) => (
             <button
               key={c.id}
-              onClick={() => setActiveId(c.id)}
-              className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-ink-50 dark:hover:bg-ink-700 ${
-                activeId === c.id ? "bg-brand-50 font-medium text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "text-ink-600 dark:text-ink-300"
+              onClick={() => {
+                setActiveId(c.id);
+                setShowThread(true);
+              }}
+              className={`flex min-h-[44px] w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-ink-50 dark:hover:bg-ink-700 md:min-h-0 ${
+                activeId === c.id && twoPane ? "bg-brand-50 font-medium text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "text-ink-600 dark:text-ink-300"
               }`}
             >
               {c.isDefault ? <Hash className="h-3.5 w-3.5 text-ink-400" /> : <Circle className="h-2.5 w-2.5 text-ink-400" />}
@@ -113,20 +128,30 @@ export default function WorkspaceChat() {
       </div>
 
       {!active ? (
-        <div className="flex flex-1 items-center justify-center">
+        <div className="hidden flex-1 items-center justify-center md:flex">
           <EmptyState icon={<MessageSquare className="h-5 w-5" />} title="No channel selected" description="Pick a channel to start chatting." />
         </div>
-      ) : (
+      ) : !twoPane && !showThread ? null : (
         <ChatThread
           key={active.id}
           conversation={active}
+          headerStart={
+            !twoPane && (
+              <button
+                onClick={() => setShowThread(false)}
+                className="btn-secondary -ml-0.5 shrink-0 !gap-1.5 !rounded-lg !px-2.5 !py-1.5 text-xs"
+              >
+                <Hash className="h-3.5 w-3.5" /> Channels
+              </button>
+            )
+          }
           headerExtra={
             !active.isDefault && myRole === "ADMIN" ? (
               <button
                 onClick={() => deleteChannel(active.id)}
                 title="Delete channel"
                 aria-label="Delete channel"
-                className="shrink-0 rounded-lg p-1 text-ink-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                className="shrink-0 rounded-lg p-2 text-ink-400 hover:bg-red-50 sm:p-1 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -143,6 +168,7 @@ export default function WorkspaceChat() {
         onCreated={(conversation) => {
           setConversations((prev) => [...prev, conversation]);
           setActiveId(conversation.id);
+          setShowThread(true);
         }}
       />
     </div>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { MessageSquare, PanelLeftClose, PanelLeftOpen, Plus, Trash2 } from "lucide-react";
+import { MessageSquare, MessagesSquare, PanelLeftClose, PanelLeftOpen, Plus, Trash2 } from "lucide-react";
 import * as messagesApi from "../api/messages.js";
 import { apiErrorMessage } from "../api/client.js";
 import { useSocket } from "../context/SocketContext.jsx";
@@ -12,6 +12,7 @@ import Spinner from "../components/common/Spinner.jsx";
 import NewDmModal from "../components/chat/NewDmModal.jsx";
 import ChatThread from "../components/chat/ChatThread.jsx";
 import { displayColor, textOn } from "../lib/colors.js";
+import useMediaQuery, { TWO_PANE } from "../hooks/useMediaQuery.js";
 
 const COLLAPSE_KEY = "loft:messages-list-collapsed";
 
@@ -27,6 +28,10 @@ export default function Chat() {
   const [loadingConvos, setLoadingConvos] = useState(true);
   const [error, setError] = useState("");
   const [dmModalOpen, setDmModalOpen] = useState(false);
+  // Phones show the list or one open conversation, never both. The list
+  // comes first unless a profile's "Message" button sent us to a chat.
+  const twoPane = useMediaQuery(TWO_PANE);
+  const [showThread, setShowThread] = useState(() => !!location.state?.conversationId);
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(COLLAPSE_KEY) === "1";
@@ -62,6 +67,7 @@ export default function Chat() {
   useEffect(() => {
     if (!requestedId) return;
     setActiveId(requestedId);
+    setShowThread(true);
     loadConversations();
     navigate(location.pathname, { replace: true, state: null });
   }, [requestedId, loadConversations, navigate, location.pathname]);
@@ -110,47 +116,51 @@ export default function Chat() {
       const remaining = conversations.filter((c) => c.id !== conversation.id);
       setConversations(remaining);
       setActiveId((id) => (id === conversation.id ? remaining[0]?.id ?? null : id));
+      setShowThread(false);
     } catch (err) {
       setError(apiErrorMessage(err));
     }
   }
 
   const active = conversations.find((c) => c.id === activeId);
+  // The icon-only rail is a desktop space saver; phones always get names.
+  const railOnly = collapsed && twoPane;
+  const listHidden = !twoPane && showThread && !!active;
 
   return (
     <div className="flex h-full">
       <div
-        className={`flex shrink-0 flex-col border-r border-ink-200 bg-white transition-[width] duration-150 dark:border-ink-700 dark:bg-ink-800 ${
-          collapsed ? "w-16 items-center" : "w-72"
-        }`}
+        className={`flex shrink-0 flex-col border-ink-200 bg-white transition-[width] duration-150 dark:border-ink-700 dark:bg-ink-800 md:border-r ${
+          railOnly ? "w-16 items-center" : "w-full md:w-72"
+        } ${listHidden ? "hidden" : ""}`}
       >
-        <div className={`flex items-center border-b border-ink-200 p-4 dark:border-ink-700 ${collapsed ? "flex-col gap-2" : "justify-between"}`}>
-          {!collapsed && <h2 className="text-sm font-semibold text-ink-800 dark:text-ink-100">Messages</h2>}
-          <div className={`flex items-center gap-1 ${collapsed ? "flex-col" : ""}`}>
+        <div className={`flex items-center border-b border-ink-200 p-4 dark:border-ink-700 ${railOnly ? "flex-col gap-2" : "justify-between"}`}>
+          {!railOnly && <h2 className="text-sm font-semibold text-ink-800 dark:text-ink-100">Messages</h2>}
+          <div className={`flex items-center gap-1 ${railOnly ? "flex-col" : ""}`}>
             <button
               onClick={() => setDmModalOpen(true)}
               title="New conversation"
-              className={collapsed ? "rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-700 dark:hover:text-ink-100" : "btn-ghost !px-2 !py-1 text-xs"}
+              className={railOnly ? "rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-700 dark:hover:text-ink-100" : "btn-ghost !px-2 !py-1 text-xs"}
             >
-              {collapsed ? <Plus className="h-4 w-4" /> : "+ New"}
+              {railOnly ? <Plus className="h-4 w-4" /> : "+ New"}
             </button>
             <button
               onClick={() => setCollapsed((c) => !c)}
-              title={collapsed ? "Expand messages" : "Collapse messages"}
-              className="shrink-0 rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-700 dark:hover:text-ink-100"
+              title={railOnly ? "Expand messages" : "Collapse messages"}
+              className="hidden shrink-0 rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-700 dark:hover:text-ink-100 md:block"
             >
-              {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+              {railOnly ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </button>
           </div>
         </div>
-        {error && !collapsed && (
+        {error && !railOnly && (
           <p className="mx-3 mt-2 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>
         )}
-        <div className={`flex-1 overflow-y-auto ${collapsed ? "flex w-full flex-col items-center gap-1 py-2" : ""}`}>
+        <div className={`flex-1 overflow-y-auto ${railOnly ? "flex w-full flex-col items-center gap-1 py-2" : ""}`}>
           {loadingConvos ? (
             <Spinner className="py-8" />
           ) : conversations.length === 0 ? (
-            !collapsed && (
+            !railOnly && (
               <div className="p-4">
                 <EmptyState icon={<MessageSquare className="h-5 w-5" />} title="No conversations yet" description="Join a workspace to get a group chat, or start a DM." />
               </div>
@@ -167,14 +177,17 @@ export default function Chat() {
               return (
                 <button
                   key={c.id}
-                  onClick={() => setActiveId(c.id)}
-                  title={collapsed ? c.title : undefined}
+                  onClick={() => {
+                    setActiveId(c.id);
+                    setShowThread(true);
+                  }}
+                  title={railOnly ? c.title : undefined}
                   className={`flex items-center hover:bg-ink-50 dark:hover:bg-ink-700 ${
-                    collapsed ? "h-11 w-11 justify-center rounded-lg" : "w-full gap-2.5 px-4 py-3 text-left"
-                  } ${activeId === c.id ? "bg-brand-50 dark:bg-brand-500/15" : ""}`}
+                    railOnly ? "h-11 w-11 justify-center rounded-lg" : "w-full gap-3 px-4 py-3 text-left md:gap-2.5"
+                  } ${activeId === c.id && twoPane ? "bg-brand-50 dark:bg-brand-500/15" : ""}`}
                 >
                   {avatar}
-                  {!collapsed && (
+                  {!railOnly && (
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-ink-800 dark:text-ink-100">{c.title}</p>
                       <p className="truncate text-xs text-ink-400">
@@ -194,17 +207,27 @@ export default function Chat() {
       </div>
 
       {!active ? (
-        <div className="flex flex-1 items-center justify-center text-ink-400">Select a conversation</div>
-      ) : (
+        <div className="hidden flex-1 items-center justify-center text-ink-400 md:flex">Select a conversation</div>
+      ) : !twoPane && !showThread ? null : (
         <ChatThread
           key={active.id}
           conversation={active}
+          headerStart={
+            !twoPane && (
+              <button
+                onClick={() => setShowThread(false)}
+                className="btn-secondary -ml-0.5 shrink-0 !gap-1.5 !rounded-lg !px-2.5 !py-1.5 text-xs"
+              >
+                <MessagesSquare className="h-3.5 w-3.5" /> Chats
+              </button>
+            )
+          }
           headerExtra={
             <button
               onClick={() => deleteConversation(active)}
               title="Delete chat"
               aria-label="Delete chat"
-              className="shrink-0 rounded-lg p-1 text-ink-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+              className="shrink-0 rounded-lg p-2 text-ink-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400 sm:p-1"
             >
               <Trash2 className="h-4 w-4" />
             </button>
@@ -218,6 +241,7 @@ export default function Chat() {
         onStarted={(conversationId) => {
           loadConversations();
           setActiveId(conversationId);
+          setShowThread(true);
         }}
       />
     </div>

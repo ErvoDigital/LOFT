@@ -35,7 +35,7 @@ function WorkspaceIcon({ workspace, active }) {
   return (
     <NavLink
       to={`/workspaces/${workspace.id}/dashboard`}
-      title={workspace.name}
+      aria-label={workspace.name}
       className="group relative flex items-center"
     >
       <WorkspaceMark
@@ -69,7 +69,7 @@ const subNavItemClass = ({ isActive }) =>
       : "text-ink-500 hover:bg-ink-900/[0.06] hover:text-ink-800 dark:text-ink-400 dark:hover:bg-white/[0.06] dark:hover:text-ink-100"
   }`;
 
-const NAV_GROUPS = [
+export const NAV_GROUPS = [
   {
     label: "Workspace",
     items: [
@@ -381,10 +381,13 @@ export default function Sidebar() {
     setCollapsed(hidden);
   }
 
+  // Lifted above the content column (and the rail above the workspace panel)
+  // so workspace-name tooltips aren't painted underneath them. Overlays and
+  // modals sit at z-40+, so they still cover the sidebar.
   return (
-    <div className="flex h-full gap-2 p-2 print:hidden">
+    <div className="relative z-20 hidden h-full gap-2 p-2 lg:flex print:hidden">
       {/* Rail: global nav + workspace switcher */}
-      <div className="flex w-16 flex-col items-center gap-3 rounded-2xl border border-white/[0.07] bg-ink-950/80 py-4 shadow-glass backdrop-blur-xl">
+      <div className="relative z-10 flex w-16 flex-col items-center gap-3 rounded-2xl border border-white/[0.07] bg-ink-950/80 py-4 shadow-glass backdrop-blur-xl">
         <div className="flex flex-col items-center">
           {/* Where the panel's hide button lands while the panel is hidden.
               Always mounted and animated on grid rows, so the logo and

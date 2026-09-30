@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Undo2,
   Redo2,
@@ -27,6 +28,7 @@ import {
   Superscript,
 } from "lucide-react";
 import { promptForLink } from "../../lib/tiptapLink.js";
+import useFloatingPanel from "../common/useFloatingPanel.js";
 
 const TEXT_COLORS = ["#1E293B", "#DC2626", "#D97706", "#16A34A", "#2563EB", "#7C3AED"];
 const HIGHLIGHT_COLORS = ["#FEF08A", "#BBF7D0", "#BFDBFE", "#FBCFE8", "#FED7AA"];
@@ -38,7 +40,7 @@ function ToolButton({ Icon, title, active, disabled, onClick }) {
       disabled={disabled}
       title={title}
       aria-label={title}
-      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors disabled:opacity-30 disabled:pointer-events-none ${
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors disabled:opacity-30 sm:h-8 sm:w-8 disabled:pointer-events-none ${
         active ? "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400" : "text-ink-500 hover:bg-ink-100 hover:text-ink-800 dark:hover:bg-ink-700 dark:hover:text-ink-100"
       }`}
     >
@@ -51,61 +53,65 @@ function Divider() {
   return <div className="mx-1 h-5 w-px shrink-0 bg-ink-200 dark:bg-ink-700" />;
 }
 
+// The swatches are portaled and placed against the button, because on phones
+// the toolbar is a sideways-scrolling strip that would clip them.
 function ColorPickerButton({ Icon, title, colors, activeColor, onPick, onClear }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [open]);
+  const triggerRef = useRef(null);
+  const panelRef = useRef(null);
+  const close = useCallback(() => setOpen(false), []);
+  const { style } = useFloatingPanel({ open, triggerRef, panelRef, onClose: close });
 
   return (
-    <div className="relative" ref={ref}>
+    <>
       <button
+        ref={triggerRef}
         onClick={() => setOpen((o) => !o)}
         title={title}
         aria-label={title}
-        className="flex h-8 w-8 flex-col items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-800 dark:hover:bg-ink-700 dark:hover:text-ink-100"
+        aria-expanded={open}
+        className="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-800 dark:hover:bg-ink-700 dark:hover:text-ink-100 sm:h-8 sm:w-8"
       >
         <Icon className="h-4 w-4" />
         <span className="mt-0.5 h-0.5 w-4 rounded-full" style={{ backgroundColor: activeColor || "transparent" }} />
       </button>
-      {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 flex items-center gap-1 rounded-lg border border-ink-200 bg-white p-1.5 shadow-panel dark:border-ink-700 dark:bg-ink-800">
-          {onClear && (
-            <button
-              onClick={() => {
-                onClear();
-                setOpen(false);
-              }}
-              title="Clear"
-              aria-label="Clear color"
-              className="flex h-5 w-5 items-center justify-center rounded-full border border-ink-300 text-ink-400 hover:border-ink-400 dark:border-ink-600"
-            >
-              <span className="h-px w-3 rotate-45 bg-ink-400" />
-            </button>
-          )}
-          {colors.map((c) => (
-            <button
-              key={c}
-              onClick={() => {
-                onPick(c);
-                setOpen(false);
-              }}
-              title={c}
-              aria-label={`Color ${c}`}
-              className="h-5 w-5 shrink-0 rounded-full ring-offset-1 hover:ring-2 hover:ring-ink-300"
-              style={{ backgroundColor: c }}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+      {open &&
+        createPortal(
+          <div
+            ref={panelRef}
+            style={style}
+            className="fixed z-[60] flex items-center gap-1 rounded-lg border border-ink-200 bg-white p-1.5 shadow-panel dark:border-ink-700 dark:bg-ink-800 touch:gap-2 touch:p-2"
+          >
+            {onClear && (
+              <button
+                onClick={() => {
+                  onClear();
+                  close();
+                }}
+                title="Clear"
+                aria-label="Clear color"
+                className="flex h-5 w-5 items-center justify-center rounded-full border border-ink-300 text-ink-400 hover:border-ink-400 dark:border-ink-600 touch:h-7 touch:w-7"
+              >
+                <span className="h-px w-3 rotate-45 bg-ink-400" />
+              </button>
+            )}
+            {colors.map((c) => (
+              <button
+                key={c}
+                onClick={() => {
+                  onPick(c);
+                  close();
+                }}
+                title={c}
+                aria-label={`Color ${c}`}
+                className="h-5 w-5 shrink-0 rounded-full ring-offset-1 hover:ring-2 hover:ring-ink-300 touch:h-7 touch:w-7"
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
 
@@ -113,7 +119,7 @@ export default function DocumentToolbar({ editor }) {
   if (!editor) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b border-ink-200 bg-white px-3 py-2 dark:border-ink-700 dark:bg-ink-900 print:hidden">
+    <div className="flex items-center gap-0.5 overflow-x-auto overscroll-x-contain border-b border-ink-200 bg-white px-2 py-1.5 [scrollbar-width:none] dark:border-ink-700 dark:bg-ink-900 sm:flex-wrap sm:overflow-visible sm:px-3 sm:py-2 print:hidden [&::-webkit-scrollbar]:hidden">
       <ToolButton Icon={Undo2} title="Undo" disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()} />
       <ToolButton Icon={Redo2} title="Redo" disabled={!editor.can().redo()} onClick={() => editor.chain().focus().redo().run()} />
 

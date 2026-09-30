@@ -106,6 +106,10 @@ function useElementSize() {
 
 // Google Meet-style circular icon buttons for the call bar — same layout/format,
 // LOFT's own brand color for the "active" state instead of Meet's blue.
+// Phone and tablet browsers have no screen capture, so the share button only
+// appears where it can work.
+const CAN_SHARE_SCREEN = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
+
 function ControlButton({ onClick, variant = "default", wide, title, children }) {
   const variants = {
     default: "bg-white/10 text-white hover:bg-white/20",
@@ -118,7 +122,7 @@ function ControlButton({ onClick, variant = "default", wide, title, children }) 
       onClick={onClick}
       title={title}
       aria-label={title}
-      className={`flex h-12 items-center justify-center rounded-full transition-colors ${wide ? "px-6" : "w-12"} ${variants[variant]}`}
+      className={`flex h-11 shrink-0 items-center justify-center rounded-full transition-colors sm:h-12 ${wide ? "px-5 sm:px-6" : "w-11 sm:w-12"} ${variants[variant]}`}
     >
       {children}
     </button>
@@ -289,8 +293,8 @@ export default function WorkspaceMeeting() {
   if (inAnotherWorkspacesCall) {
     const otherName = workspaces.find((w) => w.id === activeWorkspaceId)?.name || "another workspace";
     return (
-      <div className="flex h-full items-center justify-center bg-ink-900 p-6">
-        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
+      <div className="flex h-full items-center justify-center bg-ink-900 p-4 sm:p-6">
+        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-6 text-center sm:p-8">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/15 text-brand-400">
             <Video className="h-6 w-6" />
           </div>
@@ -306,8 +310,8 @@ export default function WorkspaceMeeting() {
 
   if (lobbyForThisWorkspace) {
     return (
-      <div className="flex h-full items-center justify-center bg-ink-900 p-6">
-        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+      <div className="flex h-full items-center justify-center bg-ink-900 p-4 sm:p-6">
+        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-5 text-center sm:p-6">
           <h2 className="text-lg font-semibold text-white">Check your camera and mic</h2>
           <p className="mt-1 text-sm text-white/50">Make sure you look and sound right before you join.</p>
 
@@ -347,8 +351,8 @@ export default function WorkspaceMeeting() {
 
   if (!inThisWorkspacesCall) {
     return (
-      <div className="flex h-full items-center justify-center bg-ink-900 p-6">
-        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
+      <div className="flex h-full items-center justify-center bg-ink-900 p-4 sm:p-6">
+        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-6 text-center sm:p-8">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/15 text-brand-400">
             <Video className="h-6 w-6" />
           </div>
@@ -419,8 +423,8 @@ export default function WorkspaceMeeting() {
     : null;
 
   return (
-    <div className="flex h-full">
-      <div className="flex h-full min-w-0 flex-1 flex-col bg-ink-900 p-4">
+    <div className="relative flex h-full">
+      <div className="flex h-full min-w-0 flex-1 flex-col bg-ink-900 p-2 sm:p-4">
         {primaryScreen ? (
           <div
             className={`flex min-h-0 flex-1 gap-3 ${
@@ -469,7 +473,11 @@ export default function WorkspaceMeeting() {
               </div>
             </div>
 
-            <div className={`flex shrink-0 gap-2 ${pipDock === "left" || pipDock === "right" ? "flex-col items-center" : "flex-row justify-center"}`}>
+            <div
+              className={`flex shrink-0 gap-2 ${
+                pipDock === "left" || pipDock === "right" ? "flex-col items-center overflow-y-auto" : "flex-row overflow-x-auto sm:justify-center"
+              }`}
+            >
               <div className={pipDock === "left" || pipDock === "right" ? "w-28 shrink-0" : "w-32 shrink-0"}>
                 <VideoTile
                   stream={localStream}
@@ -546,7 +554,7 @@ export default function WorkspaceMeeting() {
           </div>
         )}
 
-        <div className="mt-4 flex items-center justify-center gap-3">
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-2 sm:mt-4 sm:gap-3">
           <ControlButton
             onClick={micAvailable ? toggleMic : promptEnableMic}
             variant={!micAvailable ? "off" : micOn ? "default" : "off"}
@@ -557,13 +565,15 @@ export default function WorkspaceMeeting() {
           <ControlButton onClick={toggleCam} variant={camOn ? "default" : "off"} title={camOn ? "Turn off camera" : "Turn on camera"}>
             {camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
           </ControlButton>
-          <ControlButton
-            onClick={sharingScreen ? stopScreenShare : startScreenShare}
-            variant={sharingScreen ? "active" : "default"}
-            title={sharingScreen ? "Stop sharing" : "Share screen"}
-          >
-            {sharingScreen ? <ScreenShareOff className="h-5 w-5" /> : <ScreenShare className="h-5 w-5" />}
-          </ControlButton>
+          {(CAN_SHARE_SCREEN || sharingScreen) && (
+            <ControlButton
+              onClick={sharingScreen ? stopScreenShare : startScreenShare}
+              variant={sharingScreen ? "active" : "default"}
+              title={sharingScreen ? "Stop sharing" : "Share screen"}
+            >
+              {sharingScreen ? <ScreenShareOff className="h-5 w-5" /> : <ScreenShare className="h-5 w-5" />}
+            </ControlButton>
+          )}
           <ControlButton
             onClick={() => setChatOpen((o) => !o)}
             variant={chatOpen ? "active" : "default"}
@@ -587,15 +597,16 @@ export default function WorkspaceMeeting() {
         <ScheduleMeetingModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} workspaceId={workspaceId} meetLink={meetLink} />
       </div>
 
+      {/* Phones: the chat covers the call rather than squeezing it into a sliver. */}
       {chatOpen && (
-        <div className="flex h-full min-h-0 w-80 shrink-0 flex-col border-l border-ink-200 bg-white dark:border-ink-700 dark:bg-ink-800">
+        <div className="absolute inset-0 z-30 flex h-full min-h-0 w-full flex-col bg-white dark:bg-ink-800 md:static md:z-auto md:w-80 md:shrink-0 md:border-l md:border-ink-200 md:dark:border-ink-700">
           {chatConversation ? (
             <ChatThread
               conversation={chatConversation}
               headerExtra={
                 <button
                   onClick={() => setChatOpen(false)}
-                  className="shrink-0 rounded-lg p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-200"
+                  className="shrink-0 rounded-lg p-2 text-ink-400 sm:p-1 hover:bg-ink-100 hover:text-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-200"
                   aria-label="Close chat"
                 >
                   <X className="h-4 w-4" />

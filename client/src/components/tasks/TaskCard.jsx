@@ -51,7 +51,7 @@ export default function TaskCard({ task, onClick, onEdit, dragHandlers, dragging
                 onEdit();
               }}
               title="Edit task"
-              className="rounded-md p-1 text-ink-300 opacity-0 transition-opacity hover:bg-ink-100 hover:text-ink-600 group-hover:opacity-100 focus:opacity-100 dark:hover:bg-ink-700 dark:hover:text-ink-100"
+              className="rounded-md p-1 text-ink-300 opacity-0 transition-opacity hover:bg-ink-100 hover:text-ink-600 group-hover:opacity-100 focus:opacity-100 touch:p-1.5 touch:opacity-100 dark:hover:bg-ink-700 dark:hover:text-ink-100"
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>

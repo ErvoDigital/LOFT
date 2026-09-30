@@ -30,9 +30,9 @@ export default function MiniCallPlayer() {
     // instead of overlapping the sidebar's own navigation.
     <div
       onClick={() => navigate(meetingPath)}
-      className="absolute bottom-4 left-4 z-40 w-56 cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-ink-900 shadow-panel print:hidden"
+      className="absolute bottom-3 left-3 z-40 w-44 cursor-pointer sm:bottom-4 sm:left-4 sm:w-56 overflow-hidden rounded-2xl border border-white/10 bg-ink-900 shadow-panel print:hidden"
     >
-      <div className="h-32 w-full">
+      <div className="h-24 w-full sm:h-32">
         <VideoTile stream={localStream} name={user.name} avatarColor={user.avatarColor} isLocal camOn={camOn} large />
       </div>
       <div className="flex items-center justify-between gap-2 px-3 py-2">

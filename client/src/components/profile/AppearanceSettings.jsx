@@ -26,7 +26,7 @@ export default function AppearanceSettings() {
   const isCustom = accent.startsWith("#");
 
   return (
-    <div className="card p-6">
+    <div className="card p-5 sm:p-6">
       <h2 className="text-base font-semibold text-ink-800 dark:text-ink-100">Appearance</h2>
       <p className="mb-5 mt-0.5 text-xs text-ink-500 dark:text-ink-400">
         Changes apply right away and are saved on this device.

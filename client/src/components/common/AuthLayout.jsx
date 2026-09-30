@@ -9,7 +9,7 @@ export default function AuthLayout({ title, subtitle, children }) {
           <h1 className="text-xl font-semibold text-ink-900 dark:text-ink-50">{title}</h1>
           {subtitle && <p className="mt-1 text-center text-sm text-ink-500">{subtitle}</p>}
         </div>
-        <div className="card p-6 shadow-glass-lg">{children}</div>
+        <div className="card p-5 shadow-glass-lg sm:p-6">{children}</div>
       </div>
     </div>
   );

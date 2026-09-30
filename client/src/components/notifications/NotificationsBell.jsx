@@ -28,10 +28,10 @@ export default function NotificationsBell() {
   }, []);
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative max-sm:static" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700"
+        className="relative flex h-10 w-10 items-center justify-center rounded-xl lg:h-9 lg:w-9 lg:rounded-lg text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700"
       >
         <Bell className="h-[18px] w-[18px]" />
         {unreadCount > 0 && (
@@ -42,7 +42,7 @@ export default function NotificationsBell() {
       </button>
 
       {open && (
-        <div className="dropdown-panel absolute right-0 z-20 mt-2 w-80 animate-slide-fade-in p-2">
+        <div className="dropdown-panel absolute right-0 z-20 mt-2 w-80 animate-slide-fade-in p-2 max-sm:inset-x-2 max-sm:top-full max-sm:w-auto">
           <div className="flex items-center justify-between px-2 py-1">
             <p className="text-sm font-semibold text-ink-800 dark:text-ink-100">Notifications</p>
             {unreadCount > 0 && (
@@ -51,7 +51,7 @@ export default function NotificationsBell() {
               </button>
             )}
           </div>
-          <div className="max-h-96 overflow-y-auto">
+          <div className="max-h-96 overflow-y-auto overscroll-contain max-sm:max-h-[70vh]">
             {notifications.length === 0 && <p className="px-2 py-6 text-center text-sm text-ink-400">You're all caught up.</p>}
             {notifications.map((n) => (
               <button

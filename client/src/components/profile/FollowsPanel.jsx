@@ -72,7 +72,7 @@ export default function FollowsPanel() {
   }
 
   return (
-    <div className="card p-6">
+    <div className="card p-5 sm:p-6">
       <h2 className="mb-1 text-base font-semibold text-ink-800 dark:text-ink-100">People</h2>
       <p className="mb-4 text-xs text-ink-400">
         Following is mutual. Whoever you follow shows up when you start a new message.

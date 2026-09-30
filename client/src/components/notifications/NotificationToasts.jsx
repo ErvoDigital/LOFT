@@ -30,7 +30,7 @@ function NotificationToast({ toast, onDismiss }) {
         onDismiss(toast.id);
         if (toast.link) navigate(toast.link);
       }}
-      className="animate-toast-in relative flex w-80 cursor-pointer items-start gap-2.5 overflow-hidden rounded-xl border border-ink-200 bg-white p-3 pb-3.5 shadow-panel dark:border-ink-700 dark:bg-ink-800"
+      className="animate-toast-in relative flex w-full cursor-pointer items-start gap-2.5 overflow-hidden rounded-xl border border-ink-200 bg-white p-3 pb-3.5 shadow-panel dark:border-ink-700 dark:bg-ink-800"
     >
       <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300">
         <Icon className="h-4 w-4" />
@@ -69,7 +69,7 @@ export default function NotificationToasts() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed right-6 top-16 z-50 flex w-80 flex-col gap-2">
+    <div className="fixed inset-x-2 top-16 z-50 flex flex-col gap-2 sm:inset-x-auto sm:right-6 sm:w-80">
       {toasts.map((t) => (
         <NotificationToast key={t.id} toast={t} onDismiss={dismissToast} />
       ))}

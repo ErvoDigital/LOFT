@@ -128,7 +128,7 @@ export default function WorkspaceProfileCard({ workspace, canEdit, onSaved }) {
     <section className="card overflow-hidden">
       <Cover color={draft.color} TypeIcon={type.Icon} />
 
-      <div className="px-6 pb-6 lg:px-8">
+      <div className="px-4 pb-5 sm:px-6 sm:pb-6 lg:px-8">
         <div className="flex items-end justify-between gap-4">
           <div className="relative -mt-10 shrink-0 lg:-mt-12">
             <WorkspaceMark

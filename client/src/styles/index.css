@@ -5,6 +5,11 @@
 @layer base {
   html {
     font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    /* Phones: no grey flash over tapped controls (they have their own
+       active states), and no text inflation when rotated to landscape. */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   body {
     @apply text-ink-800 antialiased dark:text-ink-100;
@@ -12,6 +17,18 @@
   }
   .dark body {
     background-color: rgb(var(--ink-950));
+  }
+
+  /* iOS Safari zooms the page into any field whose text is smaller than
+     16px as it takes focus, and leaves it zoomed. Touch screens get 16px
+     fields; the `!important` is what lets this outrank the text-sm/text-xs
+     utilities the fields carry for desktop. */
+  @media (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
   }
 
   /* Scrollbars: a slim thumb only a shade off the surface, on a clear track,
@@ -103,9 +120,10 @@
   }
   /* Menus hanging off the topbar. The header's own backdrop-blur means a
      nested blur can only sample the header, not the page beneath, so the
-     panel needs a near-opaque fill rather than the translucent glass. */
+     panel needs a solid fill rather than the translucent glass. Even at 95%
+     the page text beneath showed through clearly in Chromium. */
   .dropdown-panel {
-    @apply rounded-2xl border border-white/60 bg-white/95 shadow-glass-lg dark:border-white/[0.08] dark:bg-ink-900/95;
+    @apply rounded-2xl border border-white/60 bg-white shadow-glass-lg dark:border-white/[0.08] dark:bg-ink-900;
   }
   .card-hover {
     @apply transition-all duration-200 hover:border-brand-400/50 hover:bg-white/85 hover:shadow-glass-lg dark:hover:border-brand-400/30 dark:hover:bg-ink-800/90;

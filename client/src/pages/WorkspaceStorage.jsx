@@ -282,10 +282,10 @@ export default function WorkspaceStorage() {
       onDragLeave={handlePageDragLeave}
       onDrop={handlePageDrop}
     >
-      <div className="mx-auto max-w-6xl space-y-4 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-1 text-sm">
+      <div className="mx-auto max-w-6xl space-y-4 p-4 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm">
               <button onClick={() => navigate(null)} className="font-semibold text-ink-900 hover:text-brand-600 dark:text-ink-50 dark:hover:text-brand-400">
                 Storage
               </button>
@@ -298,14 +298,14 @@ export default function WorkspaceStorage() {
                 </span>
               ))}
             </div>
-            <p className="text-xs text-ink-400">Drag a new take onto an existing file to save it as the next version.</p>
+            <p className="text-xs text-ink-400 touch:hidden">Drag a new take onto an existing file to save it as the next version.</p>
           </div>
           <div className="flex gap-2">
-            <button className="btn-secondary" onClick={() => setFolderModal({ parentId: currentFolderId })}>
+            <button className="btn-secondary flex-1 sm:flex-none" onClick={() => setFolderModal({ parentId: currentFolderId })}>
               <FolderPlus className="mr-1.5 inline h-4 w-4" />
               New folder
             </button>
-            <button className="btn-primary" onClick={() => fileInputRef.current?.click()}>
+            <button className="btn-primary flex-1 sm:flex-none" onClick={() => fileInputRef.current?.click()}>
               + Upload
             </button>
           </div>
@@ -324,7 +324,7 @@ export default function WorkspaceStorage() {
 
         {childAssets.length === 0 && (
           <div
-            className={`flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-6 text-center text-sm transition-colors ${
+            className={`flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-6 text-center text-sm transition-colors touch:hidden ${
               dropzoneActive ? "border-brand-400 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "border-ink-200 bg-white text-ink-400 dark:border-ink-700 dark:bg-ink-800"
             }`}
           >
@@ -345,7 +345,7 @@ export default function WorkspaceStorage() {
                     {childFolders.length} folder{childFolders.length === 1 ? "" : "s"}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
                   {childFolders.map((f) => (
                     <FolderCard
                       key={f.id}
