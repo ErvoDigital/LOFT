@@ -39,7 +39,9 @@ const accessSchema = z.object({
   permissions: z.array(z.enum(PERMISSIONS)).optional(),
 });
 
-function workspaceSummary(ws) {
+// The invite code lets anyone holding it walk in, so only admins are sent it.
+// Everyone else invites by asking an admin, who can email an invite instead.
+export function workspaceSummary(ws, role = ws.members?.[0]?.role) {
   return {
     id: ws.id,
     name: ws.name,
@@ -47,11 +49,11 @@ function workspaceSummary(ws) {
     type: ws.type,
     color: ws.color,
     logoUrl: ws.logoUrl,
-    inviteCode: ws.inviteCode,
+    inviteCode: role === "ADMIN" ? ws.inviteCode : undefined,
     ownerId: ws.ownerId,
     createdAt: ws.createdAt,
     memberCount: ws._count?.members,
-    myRole: ws.members?.[0]?.role,
+    myRole: role,
     myPermissions: ws.members?.[0] ? permissionsOf(ws.members[0]) : undefined,
   };
 }
@@ -122,7 +124,7 @@ export async function getWorkspace(req, res) {
 
   res.json({
     workspace: {
-      ...workspaceSummary(workspace),
+      ...workspaceSummary(workspace, req.membership.role),
       myRole: req.membership.role,
       myPermissions: permissionsOf(req.membership),
       members: workspace.members.map(serializeMember),
@@ -249,7 +251,59 @@ export async function updateWorkspace(req, res) {
     where: { id: req.params.workspaceId },
     data,
   });
-  res.json({ workspace: workspaceSummary({ ...workspace, _count: { members: 0 } }) });
+  res.json({ workspace: workspaceSummary({ ...workspace, _count: { members: 0 } }, req.membership.role) });
+}
+
+// Swaps the invite code for a fresh one, and the old code stops working at
+// once. It's for a code that has got around further than meant (before codes
+// were admin-only, every member could see it). People already in stay in, and
+// emailed invites don't use the code, so they keep working.
+export async function resetInviteCode(req, res) {
+  const workspace = await prisma.workspace.update({
+    where: { id: req.params.workspaceId },
+    data: { inviteCode: generateInviteCode() },
+  });
+  res.json({ inviteCode: workspace.inviteCode });
+}
+
+// Adds someone to a workspace as a MEMBER, the one way in for both an invite
+// code and an emailed invite. They land in the General channel, any invite
+// still waiting on their address is cleared (it has done its job), and
+// whoever looks after the member list hears about a new face in it.
+export async function admitMember(workspace, userId) {
+  const joiner = await prisma.user.findUnique({ where: { id: userId } });
+
+  await prisma.workspaceMember.create({
+    data: { workspaceId: workspace.id, userId, role: "MEMBER" },
+  });
+
+  const defaultChannel = await prisma.conversation.findFirst({
+    where: { workspaceId: workspace.id, isDefault: true },
+  });
+  if (defaultChannel) {
+    await prisma.conversationParticipant.upsert({
+      where: { conversationId_userId: { conversationId: defaultChannel.id, userId } },
+      update: {},
+      create: { conversationId: defaultChannel.id, userId },
+    });
+  }
+
+  await prisma.workspaceInvite.deleteMany({
+    where: { workspaceId: workspace.id, email: joiner.email.toLowerCase() },
+  });
+
+  const members = await prisma.workspaceMember.findMany({ where: { workspaceId: workspace.id } });
+  await Promise.all(
+    members
+      .filter((m) => m.userId !== userId && can(m, "members.manage"))
+      .map((m) =>
+        notify(m.userId, {
+          type: "WORKSPACE_INVITE",
+          title: `${joiner.name} joined ${workspace.name}`,
+          link: `/workspaces/${workspace.id}`,
+        })
+      )
+  );
 }
 
 export async function joinWorkspace(req, res) {
@@ -263,37 +317,9 @@ export async function joinWorkspace(req, res) {
   });
   if (existing) throw new ApiError(409, "You are already a member of this workspace");
 
-  await prisma.workspaceMember.create({
-    data: { workspaceId: workspace.id, userId: req.userId, role: "MEMBER" },
-  });
+  await admitMember(workspace, req.userId);
 
-  const defaultChannel = await prisma.conversation.findFirst({
-    where: { workspaceId: workspace.id, isDefault: true },
-  });
-  if (defaultChannel) {
-    await prisma.conversationParticipant.upsert({
-      where: { conversationId_userId: { conversationId: defaultChannel.id, userId: req.userId } },
-      update: {},
-      create: { conversationId: defaultChannel.id, userId: req.userId },
-    });
-  }
-
-  // Whoever looks after the member list hears about a new face in it.
-  const members = await prisma.workspaceMember.findMany({ where: { workspaceId: workspace.id } });
-  const joiner = await prisma.user.findUnique({ where: { id: req.userId } });
-  await Promise.all(
-    members
-      .filter((m) => m.userId !== req.userId && can(m, "members.manage"))
-      .map((m) =>
-        notify(m.userId, {
-          type: "WORKSPACE_INVITE",
-          title: `${joiner.name} joined ${workspace.name}`,
-          link: `/workspaces/${workspace.id}`,
-        })
-      )
-  );
-
-  res.status(201).json({ workspace: workspaceSummary(workspace) });
+  res.status(201).json({ workspace: workspaceSummary(workspace, "MEMBER") });
 }
 
 export async function leaveWorkspace(req, res) {

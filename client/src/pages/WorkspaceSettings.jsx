@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { KeyRound, LogOut, UserMinus } from "lucide-react";
+import { formatDistanceToNowStrict } from "date-fns";
+import { Check, KeyRound, Link2, LogOut, Mail, UserMinus, UserPlus, X } from "lucide-react";
 import * as workspacesApi from "../api/workspaces.js";
 import { apiErrorMessage } from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -12,7 +13,14 @@ import { RoleBadge } from "../components/common/Badges.jsx";
 import Spinner from "../components/common/Spinner.jsx";
 import WorkspaceProfileCard from "../components/workspace/WorkspaceProfileCard.jsx";
 import MemberAccessModal from "../components/workspace/MemberAccessModal.jsx";
+import InviteMembersModal from "../components/workspace/InviteMembersModal.jsx";
 import { can } from "../lib/access.js";
+
+// Short enough for the narrow invite column: "Sent just now", "Sent 2 days ago".
+function sentLabel(date) {
+  if (Date.now() - new Date(date).getTime() < 60 * 1000) return "Sent just now";
+  return `Sent ${formatDistanceToNowStrict(new Date(date), { addSuffix: true })}`;
+}
 
 export default function WorkspaceSettings() {
   const { workspaceId } = useParams();
@@ -25,12 +33,23 @@ export default function WorkspaceSettings() {
   const openProfile = useMemberProfile();
   const [copied, setCopied] = useState(false);
   const [accessMemberId, setAccessMemberId] = useState(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [invites, setInvites] = useState([]);
+  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [inviteFlash, setInviteFlash] = useState(null); // { id, label } shown briefly on one pending row
 
+  const applyInvites = useCallback((data) => {
+    setInvites(data.invites);
+    setEmailEnabled(data.emailEnabled);
+  }, []);
+
+  // Only admins can invite, so only they load the pending list.
   const load = useCallback(() => {
     workspacesApi.getWorkspace(workspaceId).then((w) => {
       setWorkspace(w);
+      if (w.myRole === "ADMIN") workspacesApi.listInvites(workspaceId).then(applyInvites).catch(() => {});
     });
-  }, [workspaceId]);
+  }, [workspaceId, applyInvites]);
 
   useEffect(() => {
     load();
@@ -64,11 +83,59 @@ export default function WorkspaceSettings() {
     setWorkspace((w) => ({ ...w, members: w.members.map((m) => (m.id === saved.id ? saved : m)) }));
   }
 
+  function flashInvite(id, label) {
+    setInviteFlash({ id, label });
+    setTimeout(() => setInviteFlash((f) => (f?.id === id ? null : f)), 1800);
+  }
+
+  function copyInviteLink(invite) {
+    navigator.clipboard.writeText(invite.link);
+    flashInvite(invite.id, "Link copied");
+  }
+
+  async function resendInvite(invite) {
+    try {
+      const data = await workspacesApi.sendInvites(workspaceId, [invite.email]);
+      applyInvites(data);
+      flashInvite(invite.id, data.results[0]?.emailed ? "Sent again" : "Renewed for 7 days");
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
+  }
+
+  async function replaceInviteCode() {
+    const ok = await confirm({
+      title: "Replace the workspace code?",
+      subject: workspace.inviteCode,
+      message:
+        "The current code stops working right away. Everyone already in stays in, and emailed invites keep working.",
+      confirmLabel: "Replace code",
+      icon: KeyRound,
+    });
+    if (!ok) return;
+    try {
+      const inviteCode = await workspacesApi.resetInviteCode(workspaceId);
+      setWorkspace((w) => ({ ...w, inviteCode }));
+      setCopied(false);
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
+  }
+
+  async function withdrawInvite(invite) {
+    try {
+      await workspacesApi.revokeInvite(workspaceId, invite.id);
+      setInvites((list) => list.filter((i) => i.id !== invite.id));
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    }
+  }
+
   async function removeMember(memberId) {
     const ok = await confirm({
       title: "Remove this member?",
       subject: workspace.members.find((m) => m.id === memberId)?.user.name,
-      message: "They'll lose access to this workspace right away and need an invite code to rejoin.",
+      message: "They'll lose access to this workspace right away and need a new invite to rejoin.",
       confirmLabel: "Remove member",
       icon: UserMinus,
     });
@@ -85,7 +152,7 @@ export default function WorkspaceSettings() {
     const ok = await confirm({
       title: "Leave this workspace?",
       subject: workspace.name,
-      message: "You'll lose access to its tasks, documents, files and chat, and need an invite code to rejoin.",
+      message: "You'll lose access to its tasks, documents, files and chat, and need a new invite to rejoin.",
       confirmLabel: "Leave workspace",
       icon: LogOut,
     });
@@ -187,25 +254,117 @@ export default function WorkspaceSettings() {
         </div>
 
         <div className="space-y-6">
-          <div className="card p-5 sm:p-6">
-            <h2 className="mb-1 text-base font-semibold text-ink-800 dark:text-ink-100">Invite people</h2>
-            <p className="mb-3 text-sm text-ink-400">Share this code so others can join.</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 rounded-lg border border-dashed border-ink-200 bg-ink-50 px-3 py-2 text-center text-lg font-semibold tracking-widest text-ink-700 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200">
-                {workspace.inviteCode}
-              </code>
-              <button
-                className="btn-secondary"
-                onClick={() => {
-                  navigator.clipboard.writeText(workspace.inviteCode);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1500);
-                }}
-              >
-                {copied ? "Copied!" : "Copy"}
+          {isAdmin ? (
+            <div className="card p-5 sm:p-6">
+              <h2 className="mb-1 text-base font-semibold text-ink-800 dark:text-ink-100">Invite people</h2>
+              <p className="mb-4 text-sm text-ink-400">Email someone an invite, or share the workspace code.</p>
+              <button type="button" className="btn-primary w-full" onClick={() => setInviteOpen(true)}>
+                <UserPlus className="h-4 w-4" />
+                Invite by email
               </button>
+
+              <p className="section-label mb-2 mt-6">Workspace code</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 rounded-lg border border-dashed border-ink-200 bg-ink-50 px-3 py-2 text-center text-lg font-semibold tracking-widest text-ink-700 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200">
+                  {workspace.inviteCode}
+                </code>
+                <button
+                  className="btn-secondary"
+                  onClick={() => {
+                    navigator.clipboard.writeText(workspace.inviteCode);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  }}
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+              <div className="mt-2 flex items-start justify-between gap-3">
+                <p className="text-xs text-ink-400">Anyone with the code can join. Only admins can see it.</p>
+                <button
+                  type="button"
+                  onClick={replaceInviteCode}
+                  className="shrink-0 text-xs font-medium text-brand-600 hover:underline dark:text-brand-400"
+                >
+                  New code
+                </button>
+              </div>
+
+              {invites.length > 0 && (
+                <>
+                  <div className="mb-1 mt-6 flex items-center gap-2">
+                    <p className="section-label">Pending invites</p>
+                    <span className="chip !py-0 tabular-nums">{invites.length}</span>
+                  </div>
+                  <ul className="-mx-2 max-h-80 overflow-y-auto overscroll-contain">
+                    {invites.map((invite) => {
+                      const flash = inviteFlash?.id === invite.id ? inviteFlash.label : null;
+                      return (
+                        <li
+                          key={invite.id}
+                          className="flex items-center gap-1 rounded-xl px-2 py-1.5 hover:bg-ink-50 dark:hover:bg-ink-700/60"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-ink-700 dark:text-ink-200" title={invite.email}>
+                              {invite.email}
+                            </p>
+                            <p className="truncate text-xs text-ink-400">
+                              {flash ? (
+                                <span className="text-brand-600 dark:text-brand-400">{flash}</span>
+                              ) : invite.expired ? (
+                                <span className="text-amber-700 dark:text-amber-300">Expired</span>
+                              ) : (
+                                sentLabel(invite.sentAt)
+                              )}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyInviteLink(invite)}
+                            aria-label={`Copy invite link for ${invite.email}`}
+                            title="Copy invite link"
+                            className="shrink-0 rounded-lg p-2 text-ink-400 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-700 dark:hover:bg-white/[0.08] dark:hover:text-ink-100 sm:p-1.5"
+                          >
+                            {flash === "Link copied" ? (
+                              <Check className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+                            ) : (
+                              <Link2 className="h-4 w-4" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => resendInvite(invite)}
+                            aria-label={`Send the invite to ${invite.email} again`}
+                            title={emailEnabled ? "Send again" : "Renew invite"}
+                            className="shrink-0 rounded-lg p-2 text-ink-400 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-700 dark:hover:bg-white/[0.08] dark:hover:text-ink-100 sm:p-1.5"
+                          >
+                            <Mail className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => withdrawInvite(invite)}
+                            aria-label={`Withdraw the invite to ${invite.email}`}
+                            title="Withdraw invite"
+                            className="shrink-0 rounded-lg p-2 text-ink-400 transition-colors hover:bg-red-500/10 hover:text-red-500 sm:p-1.5"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              )}
             </div>
-          </div>
+          ) : (
+            <div className="card p-5 sm:p-6">
+              <h2 className="mb-1 text-base font-semibold text-ink-800 dark:text-ink-100">Invite people</h2>
+              <p className="text-sm text-ink-400">
+                Admins invite new people to {workspace.name}. Ask one of them to send an invite to anyone you'd like to
+                add.
+              </p>
+            </div>
+          )}
 
           {workspace.ownerId !== user.id && (
             <div className="card border-red-100 p-5 sm:p-6">
@@ -218,6 +377,17 @@ export default function WorkspaceSettings() {
           )}
         </div>
       </div>
+
+      {isAdmin && (
+        <InviteMembersModal
+          open={inviteOpen}
+          onClose={() => setInviteOpen(false)}
+          workspace={workspace}
+          invites={invites}
+          emailEnabled={emailEnabled}
+          onSent={applyInvites}
+        />
+      )}
 
       {isAdmin && (
         <MemberAccessModal

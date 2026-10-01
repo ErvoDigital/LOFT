@@ -13,7 +13,7 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) {
       localStorage.removeItem("loft_token");
-      if (!location.pathname.startsWith("/login")) {
+      if (!location.pathname.startsWith("/login") && !location.pathname.startsWith("/invite/")) {
         location.href = "/login";
       }
     }

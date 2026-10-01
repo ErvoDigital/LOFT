@@ -48,13 +48,13 @@ No application code changes needed — the schema deliberately avoids SQLite-inc
 
 ### Password recovery in dev
 
-There's no email service wired up. `/api/auth/forgot-password` returns the reset token directly in the JSON response when `NODE_ENV !== "production"`, and the Forgot Password page surfaces it as a clickable link so the full flow is testable without SMTP.
+Email goes out over SMTP only for workspace invites (set the `SMTP_*` variables in `server/.env`, see `.env.example`); password recovery doesn't use it yet. `/api/auth/forgot-password` returns the reset token directly in the JSON response when `NODE_ENV !== "production"`, and the Forgot Password page surfaces it as a clickable link so the full flow is testable without SMTP.
 
 ## Feature status
 
 ### MVP — built and verified end-to-end
 1. **Accounts** — register/login (JWT), password recovery, profile editing, password change, workspace-scoped roles (Admin/Manager/Member)
-2. **Workspaces** — create, join via invite code, member management, role changes
+2. **Workspaces** — create, invite people by email (admins only; the invite link only works for the address it was sent to), join via an invite code only admins can see, member management, role changes
 3. **Shared calendar** — per-workspace month view, create/edit/cancel events, attendees, merged personal view via the dashboard, 15-minute reminder job
 4. **Tasks** — per-workspace kanban (To Do / In Progress / Completed) with native drag-and-drop reordering and cross-column moves (fractional `order` field, no library), priority, due dates, assignment, 24-hour due-soon reminders
 5. **Real-time chat** — one group chat per workspace + 1:1 direct messages, typing indicators, all over Socket.io

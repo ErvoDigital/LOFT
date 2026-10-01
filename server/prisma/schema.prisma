@@ -54,6 +54,7 @@ model User {
   documentAssignments  DocumentAssignee[]
   followsRequested     Follow[]                  @relation("FollowRequester")
   followsReceived      Follow[]                  @relation("FollowAddressee")
+  sentInvites          WorkspaceInvite[]         @relation("WorkspaceInviteSender")
 }
 
 model Workspace {
@@ -70,6 +71,7 @@ model Workspace {
 
   owner         User              @relation("WorkspaceOwner", fields: [ownerId], references: [id])
   members       WorkspaceMember[]
+  invites       WorkspaceInvite[]
   events        Event[]
   tasks         Task[]
   taskStatuses  TaskStatus[]
@@ -95,6 +97,28 @@ model WorkspaceMember {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, userId])
+}
+
+// An admin's emailed invitation to one address. The emailed link carries
+// `token`, and accepting it requires signing in with that same address, so a
+// forwarded email doesn't let someone else in (the workspace's inviteCode is
+// the shareable route, and only admins see it). A row only exists while the
+// invite is outstanding: accepting or withdrawing it deletes the row, and
+// inviting the same address again refreshes it rather than adding another.
+model WorkspaceInvite {
+  id          String   @id @default(uuid())
+  workspaceId String
+  email       String // always lowercased
+  token       String   @unique
+  invitedById String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy User      @relation("WorkspaceInviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, email])
 }
 
 model Event {

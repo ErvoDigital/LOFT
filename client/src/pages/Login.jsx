@@ -7,13 +7,15 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { apiErrorMessage } from "../api/client.js";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
+  const location = useLocation();
+  // An invite link sends people here with where to come back to and the
+  // address it was sent to, so that's the one filled in.
+  const [email, setEmail] = useState(location.state?.email || "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -59,7 +61,7 @@ export default function Login() {
       </div>
       <p className="mt-5 text-center text-sm text-ink-500">
         Don't have an account?{" "}
-        <Link to="/register" className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
+        <Link to="/register" state={location.state} className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
           Create one
         </Link>
       </p>

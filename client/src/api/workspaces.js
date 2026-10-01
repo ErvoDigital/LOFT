@@ -12,3 +12,14 @@ export const updateMemberAccess = (workspaceId, memberId, access) =>
   api.patch(`/workspaces/${workspaceId}/members/${memberId}`, access).then((r) => r.data.member);
 export const removeMember = (workspaceId, memberId) =>
   api.delete(`/workspaces/${workspaceId}/members/${memberId}`).then((r) => r.data);
+
+// Admin-only: swaps the invite code for a new one; the old code stops working.
+export const resetInviteCode = (id) => api.post(`/workspaces/${id}/invite-code`).then((r) => r.data.inviteCode);
+
+// Emailed invites, admin-only. Sending returns a per-address outcome plus the
+// refreshed list of outstanding invites.
+export const listInvites = (workspaceId) => api.get(`/workspaces/${workspaceId}/invites`).then((r) => r.data);
+export const sendInvites = (workspaceId, emails) =>
+  api.post(`/workspaces/${workspaceId}/invites`, { emails }).then((r) => r.data);
+export const revokeInvite = (workspaceId, inviteId) =>
+  api.delete(`/workspaces/${workspaceId}/invites/${inviteId}`).then((r) => r.data);

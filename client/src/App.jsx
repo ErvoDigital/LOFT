@@ -21,6 +21,7 @@ import WorkspaceSettings from "./pages/WorkspaceSettings.jsx";
 import Chat from "./pages/Chat.jsx";
 import Profile from "./pages/Profile.jsx";
 import Settings from "./pages/Settings.jsx";
+import AcceptInvite from "./pages/AcceptInvite.jsx";
 
 function PublicOnly({ children }) {
   const { user, loading } = useAuth();
@@ -36,6 +37,8 @@ export default function App() {
       <Route path="/register" element={<PublicOnly><Register /></PublicOnly>} />
       <Route path="/forgot-password" element={<PublicOnly><ForgotPassword /></PublicOnly>} />
       <Route path="/reset-password" element={<PublicOnly><ResetPassword /></PublicOnly>} />
+      {/* An emailed invite: readable signed out or in, so it sits outside both guards. */}
+      <Route path="/invite/:token" element={<AcceptInvite />} />
 
       <Route
         element={

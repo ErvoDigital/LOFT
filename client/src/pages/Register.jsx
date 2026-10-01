@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/common/AuthLayout.jsx";
 import GoogleSignInButton from "../components/common/GoogleSignInButton.jsx";
 import PasswordInput from "../components/common/PasswordInput.jsx";
@@ -8,9 +8,11 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { apiErrorMessage } from "../api/client.js";
 
 export default function Register() {
+  const location = useLocation();
+  const returnTo = location.state?.from || "/";
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(location.state?.email || "");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -32,7 +34,7 @@ export default function Register() {
     try {
       const name = `${firstName.trim()} ${lastName.trim()}`.trim();
       await register(name, email, phone, password);
-      navigate("/", { replace: true });
+      navigate(returnTo, { replace: true });
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {
@@ -100,14 +102,14 @@ export default function Register() {
       </form>
       <p className="mt-5 text-center text-sm text-ink-500">
         Already have an account?{" "}
-        <Link to="/login" className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
+        <Link to="/login" state={location.state} className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
           Login
         </Link>
       </p>
       <div className="my-5">
         <GoogleSignInButton
           onCredential={loginWithGoogle}
-          onSuccess={() => navigate("/", { replace: true })}
+          onSuccess={() => navigate(returnTo, { replace: true })}
           onError={setError}
         />
       </div>
