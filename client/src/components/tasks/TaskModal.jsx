@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Pin, Moon } from "lucide-react";
 import Modal from "../common/Modal.jsx";
 import { useConfirm } from "../../context/ConfirmContext.jsx";
-import { TIER_META, TierBadge } from "../common/Badges.jsx";
+import { PRIORITY_ORDER, TIER_META } from "../common/Badges.jsx";
 import Select from "../common/Select.jsx";
 import Avatar from "../common/Avatar.jsx";
 import { displayColor } from "../../lib/colors.js";
@@ -10,7 +10,6 @@ import * as tasksApi from "../../api/tasks.js";
 import { apiErrorMessage } from "../../api/client.js";
 import { DatePicker } from "../common/DatePicker.jsx";
 
-const TIERS = ["TIER_1", "TIER_2", "TIER_3", "TIER_4"];
 const DEFAULT_STATUSES = [
   { value: "TODO", label: "To do" },
   { value: "IN_PROGRESS", label: "In progress" },
@@ -30,9 +29,23 @@ function formatDuration(minutes) {
   return `${h}h ${rest}m`;
 }
 
-export default function TaskModal({ open, onClose, workspaceId, members, statuses, task, onSaved, onDeleted }) {
+// canChangeStatus: false locks the Status picker on an existing task — members
+// can only move tasks assigned to them (the server enforces it; see
+// tasks.controller.js's updateTask).
+export default function TaskModal({
+  open,
+  onClose,
+  workspaceId,
+  members,
+  statuses,
+  task,
+  canChangeStatus = true,
+  onSaved,
+  onDeleted,
+}) {
   const STATUSES = statuses && statuses.length > 0 ? statuses : DEFAULT_STATUSES;
   const isEdit = !!task;
+  const statusLocked = isEdit && !canChangeStatus;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [tier, setTier] = useState("TIER_3");
@@ -133,24 +146,37 @@ export default function TaskModal({ open, onClose, workspaceId, members, statuse
           <textarea className="input" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
         <div>
-          <label htmlFor="task-tier" className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">
-            Priority tier
-          </label>
-          <Select
-            id="task-tier"
-            value={tier}
-            onChange={setTier}
-            options={TIERS.map((t) => ({
-              value: t,
-              label: TIER_META[t].description,
-              // Fixed slot so labels line up despite the Tier 1 badge's extra pulse dot.
-              icon: (
-                <span className="flex w-[3.25rem]">
-                  <TierBadge tier={t} compact />
-                </span>
-              ),
-            }))}
-          />
+          <span id="task-priority" className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">
+            Priority
+          </span>
+          {/* All four in view, lowest to highest, so picking one is a single tap. */}
+          <div
+            role="group"
+            aria-labelledby="task-priority"
+            className="grid grid-cols-4 gap-1 rounded-xl border border-ink-400/70 bg-ink-900/[0.03] p-1 dark:border-white/[0.1] dark:bg-white/[0.03]"
+          >
+            {PRIORITY_ORDER.map((t) => {
+              const meta = TIER_META[t];
+              const selected = tier === t;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setTier(t)}
+                  className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 py-1.5 text-sm font-medium transition-colors ${
+                    selected
+                      ? "bg-white text-ink-900 shadow-glass ring-1 ring-ink-900/[0.08] dark:bg-white/[0.12] dark:text-ink-50 dark:ring-white/[0.1]"
+                      : "text-ink-500 hover:bg-ink-900/[0.05] hover:text-ink-800 dark:text-ink-400 dark:hover:bg-white/[0.06] dark:hover:text-ink-100"
+                  }`}
+                >
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${meta.dot}`} aria-hidden="true" />
+                  <span className="truncate">{meta.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1 text-xs text-ink-400">{TIER_META[tier].description}</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -161,12 +187,14 @@ export default function TaskModal({ open, onClose, workspaceId, members, statuse
               id="task-status"
               value={status}
               onChange={setStatus}
+              disabled={statusLocked}
               options={STATUSES.map((s) => ({
                 value: s.value,
                 label: s.label,
                 icon: s.color ? <StatusDot color={s.color} /> : undefined,
               }))}
             />
+            {statusLocked && <p className="mt-1 text-xs text-ink-400">Only its assignee, or someone given access, can change this.</p>}
           </div>
           <div>
             <label htmlFor="task-due" className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">

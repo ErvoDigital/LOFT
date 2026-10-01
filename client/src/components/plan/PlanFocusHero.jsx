@@ -106,8 +106,7 @@ export default function PlanFocusHero({ focus, todayHours, capacity, stats, onOp
               <p className="mt-2 text-sm text-brand-100">
                 {item.workspaceName}
                 <span className="text-brand-100/60"> · </span>
-                {tier.label}
-                <span className="hidden sm:inline">, {tier.description.toLowerCase()}</span>
+                {tier.label} priority
                 <span className="text-brand-100/60"> · </span>
                 {formatHours(item.hours)}
                 {item.dueDate && (
@@ -127,7 +126,7 @@ export default function PlanFocusHero({ focus, todayHours, capacity, stats, onOp
 
           <div className="mt-5 grid grid-cols-2 gap-1.5 min-[360px]:grid-cols-4 sm:flex sm:flex-wrap sm:gap-2">
             <Stat value={stats.open} label="open" dot="bg-brand-300" />
-            <Stat value={stats.critical} label="critical" dot={stats.critical ? "bg-red-400" : "bg-white/40"} />
+            <Stat value={stats.urgent} label="urgent" dot={stats.urgent ? "bg-red-400" : "bg-white/40"} />
             <Stat value={stats.overdue} label="overdue" dot={stats.overdue ? "bg-red-400" : "bg-white/40"} />
             <Stat value={stats.atRisk} label="at risk" dot={stats.atRisk ? "bg-accent-400" : "bg-white/40"} />
           </div>

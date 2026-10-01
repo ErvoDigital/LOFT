@@ -1,5 +1,6 @@
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
+import { can } from "../services/permissions.js";
 
 const MAX_QUERY_LENGTH = 100;
 const CATEGORY_LIMIT = 10;
@@ -33,7 +34,7 @@ export async function globalSearch(req, res) {
   // 1. Determine authorized workspaces and roles for the authenticated caller
   const memberships = await prisma.workspaceMember.findMany({
     where: { userId: req.userId },
-    select: { workspaceId: true, role: true },
+    select: { workspaceId: true, role: true, permissions: true },
   });
 
   if (memberships.length === 0) {
@@ -44,11 +45,12 @@ export async function globalSearch(req, res) {
   }
 
   const authorizedWorkspaceIds = memberships.map((m) => m.workspaceId);
-  const adminWorkspaceIds = memberships.filter((m) => m.role === "ADMIN").map((m) => m.workspaceId);
-  const memberWorkspaceIds = memberships.filter((m) => m.role !== "ADMIN").map((m) => m.workspaceId);
+  const adminWorkspaceIds = memberships.filter((m) => can(m, "files.viewAll")).map((m) => m.workspaceId);
+  const memberWorkspaceIds = memberships.filter((m) => !can(m, "files.viewAll")).map((m) => m.workspaceId);
 
   // Asset visibility conditions directly enforced in Prisma (semantically matching isFolderVisible):
-  // - In ADMIN workspaces: any asset in that workspace is discoverable.
+  // - Where the caller holds files.viewAll (every admin does): any asset in
+  //   that workspace is discoverable.
   // - In member workspaces: asset must have no folder, be in a WORKSPACE folder,
   //   be in a folder created by the caller, or caller is listed in FolderMember.
   const assetPermissionBranches = [];

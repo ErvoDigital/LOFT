@@ -79,11 +79,16 @@ model Workspace {
   documents     Document[]
 }
 
+// A member's access is their role plus, for a MEMBER, the admin abilities an
+// admin granted them (see services/permissions.js for the keys). MANAGER used
+// to sit between the two; it became a MEMBER holding `members.manage`.
 model WorkspaceMember {
   id          String   @id @default(uuid())
   workspaceId String
   userId      String
-  role        String   @default("MEMBER") // ADMIN | MANAGER | MEMBER
+  role        String   @default("MEMBER") // ADMIN | MEMBER
+  title       String? // shown in place of the role, e.g. "Team lead"; null shows the role
+  permissions String   @default("") // comma-separated ability keys; ignored for ADMINs, who hold them all
   joinedAt    DateTime @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

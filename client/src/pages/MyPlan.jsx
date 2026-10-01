@@ -49,7 +49,7 @@ export default function MyPlan() {
   const [editorOpen, setEditorOpen] = useState(false);
   const requestId = useRef(0);
 
-  // Two loads can overlap (e.g. a tier edit's reload racing a socket-driven
+  // Two loads can overlap (e.g. a priority edit's reload racing a socket-driven
   // one) — only the most recently issued response is allowed to land, so a
   // slow, now-stale request can't clobber a fresher one.
   const load = useCallback(() => {
@@ -156,7 +156,7 @@ export default function MyPlan() {
   const todayLane = lanes.find((l) => l.kind === "day" && l.offset === 0);
   const stats = {
     open: items.length,
-    critical: items.filter((t) => t.tier === "TIER_1").length,
+    urgent: items.filter((t) => t.tier === "TIER_1").length,
     overdue: lanes.find((l) => l.kind === "overdue")?.items.length || 0,
     atRisk: atRisk.length,
   };

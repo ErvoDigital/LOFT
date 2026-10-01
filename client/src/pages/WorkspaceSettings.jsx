@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { LogOut, UserMinus } from "lucide-react";
+import { KeyRound, LogOut, UserMinus } from "lucide-react";
 import * as workspacesApi from "../api/workspaces.js";
 import { apiErrorMessage } from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -11,13 +11,8 @@ import Avatar from "../components/common/Avatar.jsx";
 import { RoleBadge } from "../components/common/Badges.jsx";
 import Spinner from "../components/common/Spinner.jsx";
 import WorkspaceProfileCard from "../components/workspace/WorkspaceProfileCard.jsx";
-import Select from "../components/common/Select.jsx";
-
-const ROLE_OPTIONS = [
-  { value: "ADMIN", label: "Admin" },
-  { value: "MANAGER", label: "Manager" },
-  { value: "MEMBER", label: "Member" },
-];
+import MemberAccessModal from "../components/workspace/MemberAccessModal.jsx";
+import { can } from "../lib/access.js";
 
 export default function WorkspaceSettings() {
   const { workspaceId } = useParams();
@@ -29,6 +24,7 @@ export default function WorkspaceSettings() {
   const confirm = useConfirm();
   const openProfile = useMemberProfile();
   const [copied, setCopied] = useState(false);
+  const [accessMemberId, setAccessMemberId] = useState(null);
 
   const load = useCallback(() => {
     workspacesApi.getWorkspace(workspaceId).then((w) => {
@@ -49,19 +45,23 @@ export default function WorkspaceSettings() {
   }
 
   const isAdmin = workspace.myRole === "ADMIN";
+  const accessMember = workspace.members.find((m) => m.id === accessMemberId) || null;
+
+  // Mirrors the server: never yourself or the owner, and an admin can only be
+  // removed by another admin, not by someone who was handed members.manage.
+  function canRemove(m) {
+    if (!can(workspace, "members.manage")) return false;
+    if (m.user.id === user.id || m.user.id === workspace.ownerId) return false;
+    return m.role !== "ADMIN" || isAdmin;
+  }
 
   async function handleProfileSaved() {
     await refresh();
     load();
   }
 
-  async function changeRole(memberId, role) {
-    try {
-      await workspacesApi.updateMemberRole(workspaceId, memberId, role);
-      load();
-    } catch (err) {
-      setError(apiErrorMessage(err));
-    }
+  function handleAccessSaved(saved) {
+    setWorkspace((w) => ({ ...w, members: w.members.map((m) => (m.id === saved.id ? saved : m)) }));
   }
 
   async function removeMember(memberId) {
@@ -99,48 +99,90 @@ export default function WorkspaceSettings() {
     <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
 
-      <WorkspaceProfileCard key={workspace.id} workspace={workspace} canEdit={isAdmin} onSaved={handleProfileSaved} />
+      <WorkspaceProfileCard
+        key={workspace.id}
+        workspace={workspace}
+        canEdit={can(workspace, "workspace.edit")}
+        onSaved={handleProfileSaved}
+      />
 
       {/* Members take the wide column; invite and leave stack to their right. */}
       <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
         <div className="card p-5 sm:p-6 lg:col-span-2">
-          <h2 className="mb-4 text-base font-semibold text-ink-800 dark:text-ink-100">Members ({workspace.members.length})</h2>
-          <div className="space-y-2">
-            {workspace.members.map((m) => (
-              <div key={m.id} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-ink-50 dark:hover:bg-ink-700">
-                <button
-                  type="button"
-                  onClick={() => openProfile(m.user.id, workspaceId)}
-                  title={`View ${m.user.name}'s profile`}
-                  className="group flex min-w-0 flex-1 items-center gap-3 text-left"
+          <div className="mb-4 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-ink-800 dark:text-ink-100">Members</h2>
+            <span className="chip !py-0.5 tabular-nums">{workspace.members.length}</span>
+          </div>
+          {isAdmin && (
+            <p className="-mt-2 mb-4 text-sm text-ink-400">Open Access to set someone's title, access level and abilities.</p>
+          )}
+          <div className="space-y-1">
+            {workspace.members.map((m) => {
+              const isOwner = m.user.id === workspace.ownerId;
+              const extra = m.role === "ADMIN" ? 0 : m.permissions?.length || 0;
+              return (
+                <div
+                  key={m.id}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-2 py-2 hover:bg-ink-50 dark:hover:bg-ink-700/60"
                 >
-                  <Avatar name={m.user.name} color={m.user.avatarColor} src={m.user.avatarUrl} size={32} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-ink-700 group-hover:text-brand-600 dark:text-ink-200 dark:group-hover:text-brand-300">
-                      {m.user.name} {m.user.id === user.id && <span className="text-ink-400">(you)</span>}
+                  <button
+                    type="button"
+                    onClick={() => openProfile(m.user.id, workspaceId)}
+                    title={`View ${m.user.name}'s profile`}
+                    className="group flex min-w-0 flex-1 basis-56 items-center gap-3 text-left"
+                  >
+                    <Avatar name={m.user.name} color={m.user.avatarColor} src={m.user.avatarUrl} size={36} />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate text-sm font-medium text-ink-700 group-hover:text-brand-600 dark:text-ink-200 dark:group-hover:text-brand-300">
+                          {m.user.name}
+                        </span>
+                        {m.user.id === user.id && <span className="shrink-0 text-sm text-ink-400">(you)</span>}
+                        {isOwner && (
+                          <span className="shrink-0 rounded-md bg-ink-900/[0.05] px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-ink-500 dark:bg-white/[0.07] dark:text-ink-400">
+                            Owner
+                          </span>
+                        )}
+                      </span>
+                      <span className="block truncate text-xs text-ink-400">{m.user.email}</span>
                     </span>
-                    <span className="block truncate text-xs text-ink-400">{m.user.email}</span>
-                  </span>
-                </button>
-                {isAdmin && m.user.id !== user.id ? (
-                  <div className="flex items-center gap-2">
-                    <Select
-                      size="sm"
-                      align="end"
-                      aria-label={`Role for ${m.user.name}`}
-                      value={m.role}
-                      onChange={(next) => changeRole(m.id, next)}
-                      options={ROLE_OPTIONS}
-                    />
-                    <button onClick={() => removeMember(m.id)} className="text-xs font-medium text-red-500 hover:underline">
-                      Remove
-                    </button>
+                  </button>
+
+                  <div className="ml-auto flex shrink-0 items-center gap-2">
+                    <span className="flex flex-col items-end gap-0.5">
+                      <RoleBadge role={m.role} title={m.title} />
+                      {isAdmin && extra > 0 && (
+                        <span className="text-[11px] text-ink-400">
+                          +{extra} {extra === 1 ? "ability" : "abilities"}
+                        </span>
+                      )}
+                    </span>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setAccessMemberId(m.id)}
+                        aria-label={`Access for ${m.user.name}`}
+                        className="btn-secondary !gap-1.5 !rounded-lg !px-2.5 !py-1.5 !text-xs"
+                      >
+                        <KeyRound className="h-3.5 w-3.5" />
+                        Access
+                      </button>
+                    )}
+                    {canRemove(m) && (
+                      <button
+                        type="button"
+                        onClick={() => removeMember(m.id)}
+                        aria-label={`Remove ${m.user.name}`}
+                        title="Remove from workspace"
+                        className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-red-500/10 hover:text-red-500"
+                      >
+                        <UserMinus className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
-                ) : (
-                  <RoleBadge role={m.role} />
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -176,6 +218,17 @@ export default function WorkspaceSettings() {
           )}
         </div>
       </div>
+
+      {isAdmin && (
+        <MemberAccessModal
+          open={!!accessMember}
+          onClose={() => setAccessMemberId(null)}
+          workspace={workspace}
+          member={accessMember}
+          currentUserId={user.id}
+          onSaved={handleAccessSaved}
+        />
+      )}
     </div>
   );
 }

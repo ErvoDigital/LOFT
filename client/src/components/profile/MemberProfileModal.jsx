@@ -11,8 +11,8 @@ import Avatar from "../common/Avatar.jsx";
 import Spinner from "../common/Spinner.jsx";
 import WorkspaceMark from "../common/WorkspaceMark.jsx";
 import { RoleBadge, TierBadge } from "../common/Badges.jsx";
+import { memberTitle } from "../../lib/access.js";
 
-const ROLE_LABELS = { ADMIN: "Admin", MANAGER: "Manager", MEMBER: "Member" };
 
 // Each state's button doubles as the way out of it: a sent request can be
 // withdrawn, and an accepted follow unfollowed, both through removeFollow.
@@ -163,7 +163,7 @@ export default function MemberProfileModal({ open, onClose, userId, workspaceId 
                 {supported && focus && <span aria-hidden="true">·</span>}
                 {focus && (
                   <span>
-                    {ROLE_LABELS[focus.role] || focus.role} in {focus.name}
+                    {memberTitle(focus)} in {focus.name}
                   </span>
                 )}
               </div>
@@ -236,8 +236,8 @@ export default function MemberProfileModal({ open, onClose, userId, workspaceId 
                           onClick={() => openBoard(t.workspaceId)}
                           className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-ink-900/[0.04] dark:hover:bg-white/[0.06]"
                         >
-                          {/* Fixed column: Tier 1's pulse dot makes its badge wider. */}
-                          <span className="flex w-14 shrink-0">
+                          {/* Fixed column: the Urgent badge's pulse dot makes it wider. */}
+                          <span className="flex w-[4.5rem] shrink-0">
                             <TierBadge tier={t.tier} compact />
                           </span>
                           <span className="min-w-0 flex-1">
@@ -268,7 +268,7 @@ export default function MemberProfileModal({ open, onClose, userId, workspaceId 
                       <span className="block truncate text-sm font-medium text-ink-700 dark:text-ink-200">{w.name}</span>
                       <span className="block text-[11px] text-ink-400">Since {monthYear(w.joinedAt)}</span>
                     </span>
-                    <RoleBadge role={w.role} />
+                    <RoleBadge role={w.role} title={w.title} />
                   </li>
                 ))}
               </ul>

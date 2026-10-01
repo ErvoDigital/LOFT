@@ -12,6 +12,7 @@ import Avatar from "../components/common/Avatar.jsx";
 import EmptyState from "../components/common/EmptyState.jsx";
 import Spinner from "../components/common/Spinner.jsx";
 import DocumentAccessModal from "../components/documents/DocumentAccessModal.jsx";
+import { can } from "../lib/access.js";
 
 const DOCUMENT_EVENTS = ["document:created", "document:renamed", "document:updated", "document:deleted"];
 
@@ -22,7 +23,7 @@ export default function WorkspaceDocuments() {
   const { socket } = useSocket();
 
   const [documents, setDocuments] = useState([]);
-  const [myRole, setMyRole] = useState("MEMBER");
+  const [access, setAccess] = useState(null);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -34,7 +35,7 @@ export default function WorkspaceDocuments() {
     Promise.all([documentsApi.listDocuments(workspaceId), workspacesApi.getWorkspace(workspaceId)])
       .then(([docs, ws]) => {
         setDocuments(docs);
-        setMyRole(ws.myRole);
+        setAccess(ws);
         setMembers(ws.members);
         setLoading(false);
       })
@@ -120,7 +121,7 @@ export default function WorkspaceDocuments() {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {documents.map((doc) => {
-            const canManage = myRole === "ADMIN" || doc.createdBy.id === user.id;
+            const canManage = can(access, "documents.manage") || doc.createdBy.id === user.id;
             return (
               <div
                 key={doc.id}

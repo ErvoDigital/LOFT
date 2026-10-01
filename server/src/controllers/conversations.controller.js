@@ -3,6 +3,7 @@ import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
 import { notify } from "../services/notification.service.js";
 import { emitToWorkspace } from "../sockets/io.js";
+import { can } from "../services/permissions.js";
 
 const participantSelect = { select: { id: true, name: true, avatarColor: true, avatarUrl: true } };
 
@@ -53,11 +54,11 @@ const createSchema = z.object({
   memberIds: z.array(z.string()).default([]),
 });
 
-// Admin-only: create an additional named channel within the workspace with
+// Takes channels.manage (every admin has it): create an additional named channel within the workspace with
 // a hand-picked member list (the default "General" channel already covers
 // everyone — this is for smaller groups within it).
 export async function createWorkspaceConversation(req, res) {
-  if (req.membership.role !== "ADMIN") throw new ApiError(403, "Only workspace admins can create group chats");
+  if (!can(req.membership, "channels.manage")) throw new ApiError(403, "You don't have permission to create channels");
 
   const { title, memberIds } = createSchema.parse(req.body);
   const workspaceId = req.params.workspaceId;
@@ -146,7 +147,7 @@ export async function getOrCreateMeetingChat(req, res) {
 }
 
 export async function deleteWorkspaceConversation(req, res) {
-  if (req.membership.role !== "ADMIN") throw new ApiError(403, "Only workspace admins can delete group chats");
+  if (!can(req.membership, "channels.manage")) throw new ApiError(403, "You don't have permission to delete channels");
 
   const conversation = await prisma.conversation.findUnique({ where: { id: req.params.conversationId } });
   if (!conversation || conversation.workspaceId !== req.params.workspaceId) {

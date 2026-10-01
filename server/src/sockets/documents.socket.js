@@ -67,7 +67,7 @@ export function registerDocumentHandlers(io, socket) {
         prisma.user.findUnique({ where: { id: socket.userId }, select: { id: true, name: true, avatarColor: true } }),
       ]);
       if (!member) return ack?.({ error: "Not a member of this workspace" });
-      if (!isDocumentVisible(socket.userId, member.role, doc)) {
+      if (!isDocumentVisible(socket.userId, member, doc)) {
         return ack?.({ error: "You don't have access to this document" });
       }
 

@@ -11,13 +11,14 @@ import Spinner from "../components/common/Spinner.jsx";
 import ChatThread from "../components/chat/ChatThread.jsx";
 import NewChannelModal from "../components/chat/NewChannelModal.jsx";
 import useMediaQuery, { TWO_PANE } from "../hooks/useMediaQuery.js";
+import { can } from "../lib/access.js";
 
 export default function WorkspaceChat() {
   const { workspaceId } = useParams();
   const { socket } = useSocket();
   const [conversations, setConversations] = useState([]);
   const [members, setMembers] = useState([]);
-  const [myRole, setMyRole] = useState("MEMBER");
+  const [access, setAccess] = useState(null);
   const [activeId, setActiveId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -33,7 +34,7 @@ export default function WorkspaceChat() {
       .then(([convos, workspace]) => {
         setConversations(convos);
         setMembers(workspace.members);
-        setMyRole(workspace.myRole);
+        setAccess(workspace);
         setLoading(false);
         setActiveId((prev) => {
           if (prev && convos.some((c) => c.id === prev)) return prev;
@@ -101,7 +102,7 @@ export default function WorkspaceChat() {
       >
         <div className="flex items-center justify-between border-b border-ink-200 p-4 dark:border-ink-700">
           <h2 className="text-sm font-semibold text-ink-800 dark:text-ink-100">Channels</h2>
-          {myRole === "ADMIN" && (
+          {can(access, "channels.manage") && (
             <button onClick={() => setChannelModalOpen(true)} className="btn-ghost !px-2 !py-1 text-xs">
               + New
             </button>
@@ -146,7 +147,7 @@ export default function WorkspaceChat() {
             )
           }
           headerExtra={
-            !active.isDefault && myRole === "ADMIN" ? (
+            !active.isDefault && can(access, "channels.manage") ? (
               <button
                 onClick={() => deleteChannel(active.id)}
                 title="Delete channel"

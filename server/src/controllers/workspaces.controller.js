@@ -5,6 +5,7 @@ import { notify } from "../services/notification.service.js";
 import { generateInviteCode } from "../utils/inviteCode.js";
 import { ensureWorkspaceStatuses } from "./taskStatuses.controller.js";
 import { isFolderVisible } from "../services/folderAccess.js";
+import { PERMISSIONS, can, parsePermissions, permissionsOf, serializePermissions } from "../services/permissions.js";
 import { imageDataUrlSchema } from "../utils/imageDataUrl.js";
 
 const createSchema = z.object({
@@ -24,7 +25,19 @@ const updateSchema = z.object({
 
 const joinSchema = z.object({ inviteCode: z.string().min(4).max(20) });
 
-const roleSchema = z.object({ role: z.enum(["ADMIN", "MANAGER", "MEMBER"]) });
+// Any subset may be sent; a field left out is left alone. permissions only
+// matter while the member is a MEMBER, so becoming an ADMIN clears them.
+const accessSchema = z.object({
+  role: z.enum(["ADMIN", "MEMBER"]).optional(),
+  title: z
+    .string()
+    .trim()
+    .max(40)
+    .nullable()
+    .optional()
+    .transform((t) => (t ? t : t === undefined ? undefined : null)),
+  permissions: z.array(z.enum(PERMISSIONS)).optional(),
+});
 
 function workspaceSummary(ws) {
   return {
@@ -39,6 +52,18 @@ function workspaceSummary(ws) {
     createdAt: ws.createdAt,
     memberCount: ws._count?.members,
     myRole: ws.members?.[0]?.role,
+    myPermissions: ws.members?.[0] ? permissionsOf(ws.members[0]) : undefined,
+  };
+}
+
+function serializeMember(m) {
+  return {
+    id: m.id,
+    role: m.role,
+    title: m.title,
+    permissions: parsePermissions(m.permissions),
+    joinedAt: m.joinedAt,
+    user: m.user,
   };
 }
 
@@ -99,12 +124,8 @@ export async function getWorkspace(req, res) {
     workspace: {
       ...workspaceSummary(workspace),
       myRole: req.membership.role,
-      members: workspace.members.map((m) => ({
-        id: m.id,
-        role: m.role,
-        joinedAt: m.joinedAt,
-        user: m.user,
-      })),
+      myPermissions: permissionsOf(req.membership),
+      members: workspace.members.map(serializeMember),
     },
   });
 }
@@ -114,7 +135,6 @@ export async function getWorkspace(req, res) {
 // a single workspace, so entering one lands on its own overview.
 export async function getWorkspaceDashboard(req, res) {
   const workspaceId = req.params.workspaceId;
-  const role = req.membership.role;
   const now = new Date();
   const horizon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const endOfToday = new Date(now);
@@ -210,7 +230,7 @@ export async function getWorkspaceDashboard(req, res) {
     // Same folder-visibility rule the storage page enforces — a restricted
     // folder's filenames must not leak into an overview panel.
     recentFiles: assets
-      .filter((a) => !a.folderId || isFolderVisible(req.userId, role, folderById.get(a.folderId)))
+      .filter((a) => !a.folderId || isFolderVisible(req.userId, req.membership, folderById.get(a.folderId)))
       .slice(0, 6)
       .map((a) => ({
         id: a.id,
@@ -258,18 +278,19 @@ export async function joinWorkspace(req, res) {
     });
   }
 
-  const admins = await prisma.workspaceMember.findMany({
-    where: { workspaceId: workspace.id, role: { in: ["ADMIN", "MANAGER"] } },
-  });
+  // Whoever looks after the member list hears about a new face in it.
+  const members = await prisma.workspaceMember.findMany({ where: { workspaceId: workspace.id } });
   const joiner = await prisma.user.findUnique({ where: { id: req.userId } });
   await Promise.all(
-    admins.map((m) =>
-      notify(m.userId, {
-        type: "WORKSPACE_INVITE",
-        title: `${joiner.name} joined ${workspace.name}`,
-        link: `/workspaces/${workspace.id}`,
-      })
-    )
+    members
+      .filter((m) => m.userId !== req.userId && can(m, "members.manage"))
+      .map((m) =>
+        notify(m.userId, {
+          type: "WORKSPACE_INVITE",
+          title: `${joiner.name} joined ${workspace.name}`,
+          link: `/workspaces/${workspace.id}`,
+        })
+      )
   );
 
   res.status(201).json({ workspace: workspaceSummary(workspace) });
@@ -290,17 +311,56 @@ export async function leaveWorkspace(req, res) {
   res.json({ message: "Left workspace" });
 }
 
-export async function updateMemberRole(req, res) {
-  const { role } = roleSchema.parse(req.body);
-  const member = await prisma.workspaceMember.update({
+// Loads a member of the workspace in the URL. A memberId is a global row id,
+// so without this check an admin of one workspace could reach into another.
+async function findWorkspaceMember(req) {
+  const member = await prisma.workspaceMember.findUnique({
     where: { id: req.params.memberId },
-    data: { role },
+    include: { workspace: { select: { ownerId: true } } },
   });
-  res.json({ member });
+  if (!member || member.workspaceId !== req.params.workspaceId) throw new ApiError(404, "Member not found");
+  return member;
+}
+
+// One admin-only endpoint for everything on the Access dialog: role, title and
+// abilities. The owner always stays an admin, and nobody changes their own
+// role here, so a workspace can't be left without an admin by accident.
+export async function updateMemberAccess(req, res) {
+  const data = accessSchema.parse(req.body);
+  const member = await findWorkspaceMember(req);
+
+  if (data.role && data.role !== member.role) {
+    if (member.userId === member.workspace.ownerId) {
+      throw new ApiError(400, "The workspace owner is always an admin");
+    }
+    if (member.userId === req.userId) throw new ApiError(400, "You can't change your own access level");
+  }
+
+  const role = data.role ?? member.role;
+  const update = { role };
+  if (data.title !== undefined) update.title = data.title;
+  if (role === "ADMIN") update.permissions = "";
+  else if (data.permissions) update.permissions = serializePermissions(data.permissions);
+
+  const updated = await prisma.workspaceMember.update({
+    where: { id: member.id },
+    data: update,
+    include: { user: { select: { id: true, name: true, email: true, avatarColor: true, avatarUrl: true } } },
+  });
+  res.json({ member: serializeMember(updated) });
 }
 
 export async function removeMember(req, res) {
-  const member = await prisma.workspaceMember.delete({ where: { id: req.params.memberId } });
+  const target = await findWorkspaceMember(req);
+  if (target.userId === target.workspace.ownerId) throw new ApiError(400, "The workspace owner can't be removed");
+  if (target.userId === req.userId) throw new ApiError(400, "Use Leave workspace to remove yourself");
+  // members.manage is handed out to non-admins, and it mustn't become a way
+  // to push an admin out.
+  if (target.role === "ADMIN" && req.membership.role !== "ADMIN") {
+    throw new ApiError(403, "Only admins can remove an admin");
+  }
+
+  const member = await prisma.workspaceMember.delete({ where: { id: target.id } });
   await prisma.conversationParticipant.deleteMany({
     where: { userId: member.userId, conversation: { workspaceId: member.workspaceId } },
   });

@@ -2,7 +2,10 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
-export default function Modal({ open, onClose, title, children, width = "max-w-md" }) {
+// `header` replaces the plain title line (pass a string `title` too, so the
+// dialog keeps an accessible name); `footer` stays pinned under the scrolling
+// body, for actions that must stay in reach on a long form.
+export default function Modal({ open, onClose, title, header, footer, children, width = "max-w-md" }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => e.key === "Escape" && onClose();
@@ -29,8 +32,12 @@ export default function Modal({ open, onClose, title, children, width = "max-w-m
         className={`card relative flex max-h-[92vh] w-full flex-col rounded-b-none shadow-glass-lg max-sm:animate-sheet-up supports-[height:100dvh]:max-h-[92dvh] sm:max-h-[calc(100vh-2rem)] sm:animate-slide-fade-in sm:rounded-2xl ${width}`}
       >
         <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-ink-900/15 dark:bg-white/15 sm:hidden" aria-hidden="true" />
-        <div className="flex shrink-0 items-center justify-between gap-3 px-5 pb-3 pt-3 sm:px-6 sm:pb-4 sm:pt-6">
-          <h2 className="min-w-0 truncate text-lg font-semibold tracking-tight text-ink-900 dark:text-ink-50">{title}</h2>
+        <div
+          className={`flex shrink-0 items-center justify-between gap-3 px-5 pb-3 pt-3 sm:px-6 sm:pb-4 sm:pt-6 ${
+            header ? "border-b border-ink-900/[0.07] dark:border-white/[0.06] sm:pb-5" : ""
+          }`}
+        >
+          {header || <h2 className="min-w-0 truncate text-lg font-semibold tracking-tight text-ink-900 dark:text-ink-50">{title}</h2>}
           <button
             onClick={onClose}
             aria-label="Close"
@@ -39,9 +46,18 @@ export default function Modal({ open, onClose, title, children, width = "max-w-m
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-6">
+        <div
+          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 sm:px-6 ${header ? "pt-5" : ""} ${
+            footer ? "pb-5" : "pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-6"
+          }`}
+        >
           {children}
         </div>
+        {footer && (
+          <div className="shrink-0 border-t border-ink-900/[0.07] px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 dark:border-white/[0.06] sm:px-6 sm:pb-5">
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body

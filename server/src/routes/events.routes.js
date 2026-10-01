@@ -1,6 +1,6 @@
 import { Router } from "express";
 import * as eventsController from "../controllers/events.controller.js";
-import { requireAuth, requireWorkspaceMember } from "../middleware/auth.js";
+import { requireAuth, requireWorkspaceMember, requirePermission } from "../middleware/auth.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -11,12 +11,13 @@ const workspaceRouter = Router({ mergeParams: true });
 workspaceRouter.use(requireWorkspaceMember());
 workspaceRouter.get("/", eventsController.listWorkspaceEvents);
 workspaceRouter.post("/", eventsController.createEvent);
-// Changing a shared calendar is admin-only — any member can still add an
-// event, but only an admin can edit or cancel one once it's on there. The
-// calendar's details card hides both actions for everyone else; this is what
-// actually enforces it.
-workspaceRouter.patch("/:eventId", requireWorkspaceMember(["ADMIN"]), eventsController.updateEvent);
-workspaceRouter.delete("/:eventId", requireWorkspaceMember(["ADMIN"]), eventsController.cancelEvent);
+// Changing a shared calendar takes the events.manage ability (admins, plus
+// anyone an admin granted it to) — any member can still add an event, but
+// only those people can edit or cancel one once it's on there. The calendar's
+// details card hides both actions for everyone else; this is what actually
+// enforces it.
+workspaceRouter.patch("/:eventId", requirePermission("events.manage"), eventsController.updateEvent);
+workspaceRouter.delete("/:eventId", requirePermission("events.manage"), eventsController.cancelEvent);
 
 export default router;
 export { workspaceRouter as workspaceEventsRouter };

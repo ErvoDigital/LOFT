@@ -170,7 +170,7 @@ function buildMetrics({ today, pendingTasks, upcomingEvents }) {
   const overdue = pendingTasks
     .filter((t) => t.dueDate && new Date(t.dueDate) < startOfToday)
     .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
-  const critical = pendingTasks.filter((t) => t.tier === "TIER_1").length;
+  const urgent = pendingTasks.filter((t) => t.tier === "TIER_1").length;
   const nextMeeting = upcomingEvents[0];
   const meetingToShow = meetingsToday[0] || nextMeeting;
 
@@ -211,10 +211,10 @@ function buildMetrics({ today, pendingTasks, upcomingEvents }) {
       icon: ListChecks,
       value: pendingTasks.length >= PENDING_TASK_CAP ? `${PENDING_TASK_CAP}+` : pendingTasks.length,
       to: "/plan",
-      detail: critical
-        ? `${critical} critical (Tier 1)`
+      detail: urgent
+        ? `${urgent} urgent`
         : pendingTasks.length
-          ? "None critical"
+          ? "None urgent"
           : "Nothing assigned to you",
     },
   ];
@@ -356,7 +356,7 @@ export default function Dashboard() {
         return (
           <ListPanel
             title="Your priorities"
-            subtitle="Assigned to you, most urgent tier first"
+            subtitle="Assigned to you, most urgent first"
             action={
               <Link to="/plan" className="shrink-0 text-xs font-medium text-brand-600 hover:underline dark:text-brand-300">
                 View my plan

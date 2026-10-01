@@ -25,6 +25,7 @@ import {
   whenLabel,
   withDayOfMonth,
 } from "../components/calendar/calendarDates.js";
+import { can } from "../lib/access.js";
 
 const VIEW_KEY = "loft_calendar_view";
 
@@ -113,7 +114,7 @@ export default function WorkspaceCalendar() {
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [events, setEvents] = useState([]);
   const [members, setMembers] = useState([]);
-  const [myRole, setMyRole] = useState("MEMBER");
+  const [access, setAccess] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
@@ -129,7 +130,7 @@ export default function WorkspaceCalendar() {
       ([evts, workspace]) => {
         setEvents(evts);
         setMembers(workspace.members);
-        setMyRole(workspace.myRole);
+        setAccess(workspace);
         setLoading(false);
       }
     );
@@ -237,7 +238,7 @@ export default function WorkspaceCalendar() {
   }
 
   const detailsEvent = detailsId ? events.find((e) => e.id === detailsId) : null;
-  const canManageEvents = myRole === "ADMIN";
+  const canManageEvents = can(access, "events.manage");
 
   const [rangeStart, rangeEnd] =
     view === "week"

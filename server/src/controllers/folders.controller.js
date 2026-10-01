@@ -46,7 +46,7 @@ export async function listFolders(req, res) {
     include: folderInclude,
     orderBy: { name: "asc" },
   });
-  const visible = folders.filter((f) => isFolderVisible(req.userId, req.membership.role, f));
+  const visible = folders.filter((f) => isFolderVisible(req.userId, req.membership, f));
   res.json({ folders: visible.map(serializeFolder) });
 }
 
@@ -57,7 +57,7 @@ export async function createFolder(req, res) {
   if (data.parentId) {
     const parent = await prisma.folder.findUnique({ where: { id: data.parentId }, include: { members: true } });
     if (!parent || parent.workspaceId !== workspaceId) throw new ApiError(404, "Parent folder not found");
-    if (!isFolderVisible(req.userId, req.membership.role, parent)) {
+    if (!isFolderVisible(req.userId, req.membership, parent)) {
       throw new ApiError(403, "You don't have access to this folder");
     }
   }
@@ -84,9 +84,9 @@ export async function createFolder(req, res) {
 
 export async function updateFolder(req, res) {
   const { workspaceId, folderId } = req.params;
-  const folder = await prisma.folder.findUnique({ where: { id: folderId } });
+  const folder = await prisma.folder.findUnique({ where: { id: folderId }, include: { members: true } });
   if (!folder || folder.workspaceId !== workspaceId) throw new ApiError(404, "Folder not found");
-  if (!canManageFolder(req.userId, req.membership.role, folder)) {
+  if (!canManageFolder(req.userId, req.membership, folder)) {
     throw new ApiError(403, "You do not have permission to manage this folder");
   }
 
@@ -129,10 +129,10 @@ export async function deleteFolder(req, res) {
   const { workspaceId, folderId } = req.params;
   const folder = await prisma.folder.findUnique({
     where: { id: folderId },
-    include: { _count: { select: { assets: true, children: true } } },
+    include: { members: true, _count: { select: { assets: true, children: true } } },
   });
   if (!folder || folder.workspaceId !== workspaceId) throw new ApiError(404, "Folder not found");
-  if (!canManageFolder(req.userId, req.membership.role, folder)) {
+  if (!canManageFolder(req.userId, req.membership, folder)) {
     throw new ApiError(403, "You do not have permission to manage this folder");
   }
   if (folder._count.assets > 0 || folder._count.children > 0) {

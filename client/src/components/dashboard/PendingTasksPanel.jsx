@@ -17,7 +17,7 @@ function formatDue(dueDate) {
   return `Due ${d.toLocaleDateString([], { month: "short", day: "numeric" })}`;
 }
 
-// Importance first, then date: what the tier scheme says to do next, which
+// Importance first, then date: what the priority scheme says to do next, which
 // the time-ordered agenda beside it can't show.
 function byPriority(a, b) {
   const tier = (TIER_RANK[a.tier] ?? 2) - (TIER_RANK[b.tier] ?? 2);
@@ -52,8 +52,8 @@ export default function PendingTasksPanel({ tasks }) {
               to={`/workspaces/${t.workspaceId}/tasks`}
               className="group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-brand-500/[0.07]"
             >
-              {/* Wide enough for the Tier 1 badge's pulse dot, so titles align. */}
-              <span className="flex w-[3.75rem] shrink-0">
+              {/* Wide enough for the Urgent badge and its pulse dot, so titles align. */}
+              <span className="flex w-[4.5rem] shrink-0">
                 <TierBadge tier={t.tier} compact />
               </span>
               <div className="min-w-0 flex-1">

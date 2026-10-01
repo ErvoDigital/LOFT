@@ -7,7 +7,8 @@ export const getWorkspaceDashboard = (id) => api.get(`/workspaces/${id}/dashboar
 export const updateWorkspace = (id, data) => api.patch(`/workspaces/${id}`, data).then((r) => r.data.workspace);
 export const joinWorkspace = (inviteCode) => api.post("/workspaces/join", { inviteCode }).then((r) => r.data.workspace);
 export const leaveWorkspace = (id) => api.post(`/workspaces/${id}/leave`).then((r) => r.data);
-export const updateMemberRole = (workspaceId, memberId, role) =>
-  api.patch(`/workspaces/${workspaceId}/members/${memberId}`, { role }).then((r) => r.data.member);
+// access: any of { role, title, permissions }; admin-only on the server.
+export const updateMemberAccess = (workspaceId, memberId, access) =>
+  api.patch(`/workspaces/${workspaceId}/members/${memberId}`, access).then((r) => r.data.member);
 export const removeMember = (workspaceId, memberId) =>
   api.delete(`/workspaces/${workspaceId}/members/${memberId}`).then((r) => r.data);

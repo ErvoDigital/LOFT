@@ -59,7 +59,7 @@ export async function getDashboard(req, res) {
       prisma.notification.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 10 }),
       prisma.notification.count({ where: { userId, isRead: false } }),
       // Over-fetched, then narrowed by folder visibility below — the caller's
-      // role differs per workspace, so this can't be filtered in the query.
+      // access differs per workspace, so this can't be filtered in the query.
       prisma.asset.findMany({
         where: { workspaceId: { in: workspaceIds } },
         orderBy: { updatedAt: "desc" },
@@ -74,10 +74,12 @@ export async function getDashboard(req, res) {
       prisma.workspaceMember.findMany({ where: { userId, workspaceId: { in: workspaceIds } } }),
     ]);
 
-  const roleByWorkspaceId = new Map(memberships.map((m) => [m.workspaceId, m.role]));
+  const membershipByWorkspaceId = new Map(memberships.map((m) => [m.workspaceId, m]));
   const folderById = new Map(visibleFolders.map((f) => [f.id, f]));
   const recentFiles = recentAssets
-    .filter((a) => !a.folderId || isFolderVisible(userId, roleByWorkspaceId.get(a.workspaceId), folderById.get(a.folderId)))
+    .filter(
+      (a) => !a.folderId || isFolderVisible(userId, membershipByWorkspaceId.get(a.workspaceId), folderById.get(a.folderId))
+    )
     .slice(0, 10)
     .map((a) => ({
       id: a.id,

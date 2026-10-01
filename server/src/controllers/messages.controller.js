@@ -3,6 +3,7 @@ import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
 import { notify } from "../services/notification.service.js";
 import { emitToUser } from "../sockets/io.js";
+import { can } from "../services/permissions.js";
 
 const sendSchema = z.object({
   content: z.string().max(4000).default(""),
@@ -268,7 +269,7 @@ export async function deleteMessage(req, res) {
           where: { workspaceId_userId: { workspaceId: conversation.workspaceId, userId: req.userId } },
         })
       : null;
-    if (membership?.role !== "ADMIN") throw new ApiError(403, "You can only delete your own messages");
+    if (!can(membership, "messages.moderate")) throw new ApiError(403, "You can only delete your own messages");
   }
 
   await prisma.message.delete({ where: { id: messageId } });
@@ -311,8 +312,8 @@ export async function deleteConversation(req, res) {
           where: { workspaceId_userId: { workspaceId: conversation.workspaceId, userId: req.userId } },
         })
       : null;
-    if (membership?.role !== "ADMIN") {
-      throw new ApiError(403, "Only workspace admins can delete a group chat for everyone");
+    if (!can(membership, "channels.manage")) {
+      throw new ApiError(403, "You don't have permission to delete this channel for everyone");
     }
   }
 

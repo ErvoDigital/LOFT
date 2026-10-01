@@ -28,6 +28,7 @@ import UploadProgressPanel from "../storage/UploadProgressPanel.jsx";
 import EmojiPicker from "./EmojiPicker.jsx";
 import { displayColor, textOn } from "../../lib/colors.js";
 import useMediaQuery from "../../hooks/useMediaQuery.js";
+import { can } from "../../lib/access.js";
 
 const DOCUMENT_MIME_TYPES = new Set([
   "application/pdf",
@@ -151,9 +152,10 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
   const conversationId = conversation.id;
   const workspaceId = conversation.workspaceId;
   const canAttach = !!workspaceId;
-  // Workspace admins can remove anyone's message in their workspace's
-  // channels; everyone else only their own. The server enforces the same rule.
-  const canModerate = !!workspaceId && workspaces.find((w) => w.id === workspaceId)?.myRole === "ADMIN";
+  // Admins, and anyone they gave messages.moderate, can remove anyone's
+  // message in the workspace's channels; everyone else only their own. The
+  // server enforces the same rule.
+  const canModerate = !!workspaceId && can(workspaces.find((w) => w.id === workspaceId), "messages.moderate");
   const mentionCandidates = (conversation.participants || []).filter((p) => p.id !== user.id);
   const filteredMentions = mentionState
     ? mentionCandidates.filter((c) => c.name.toLowerCase().startsWith(mentionState.query.toLowerCase())).slice(0, 6)

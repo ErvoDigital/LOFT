@@ -119,8 +119,8 @@ export function buildDayLanes(items, now = new Date()) {
 }
 
 // Week: seven days starting today (page 0), or `page` weeks after that. Every
-// task due in the window is ranked against the whole week at once, so a
-// Tier 1 due Friday can outrank a Tier 3 due today. Page 0 also carries
+// task due in the window is ranked against the whole week at once, so
+// an Urgent task due Friday can outrank a Medium one due today. Page 0 also carries
 // overdue tasks in, since this week is when they have to be dealt with.
 export function buildWeek(items, page = 0, now = new Date()) {
   const today = startOfDay(now);

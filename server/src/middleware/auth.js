@@ -1,6 +1,7 @@
 import { verifyToken } from "../utils/jwt.js";
 import { ApiError } from "../utils/ApiError.js";
 import { prisma } from "../db/prisma.js";
+import { can } from "../services/permissions.js";
 
 export function requireAuth(req, res, next) {
   const header = req.headers.authorization || "";
@@ -32,6 +33,17 @@ export function requireWorkspaceMember(allowedRoles) {
     }
 
     req.membership = membership;
+    next();
+  };
+}
+
+// Restricts a route to members holding one workspace ability (admins hold all
+// of them). Goes after requireWorkspaceMember(), which loads req.membership.
+export function requirePermission(permission) {
+  return (req, res, next) => {
+    if (!can(req.membership, permission)) {
+      throw new ApiError(403, "You do not have permission to perform this action");
+    }
     next();
   };
 }

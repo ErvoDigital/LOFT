@@ -4,6 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { notify } from "../services/notification.service.js";
 import { emitToWorkspace } from "../sockets/io.js";
 import { assertValidStatus, ensureWorkspaceStatuses } from "./taskStatuses.controller.js";
+import { can } from "../services/permissions.js";
 
 const TIERS = ["TIER_1", "TIER_2", "TIER_3", "TIER_4"];
 
@@ -115,6 +116,15 @@ export async function updateTask(req, res) {
   const data = taskSchema.partial().parse(req.body);
   const existing = await prisma.task.findUnique({ where: { id: req.params.taskId } });
   if (!existing || existing.workspaceId !== req.params.workspaceId) throw new ApiError(404, "Task not found");
+
+  // Moving a task to another status is its assignee's call; anyone else needs
+  // tasks.status (every admin has it). Checked against who it was assigned to
+  // before this edit, so reassigning and moving in one request can't skip it.
+  if (data.status !== undefined && data.status !== existing.status) {
+    if (existing.assigneeId !== req.userId && !can(req.membership, "tasks.status")) {
+      throw new ApiError(403, "You can only change the status of tasks assigned to you");
+    }
+  }
 
   if (data.status) {
     await assertValidStatus(req.params.workspaceId, data.status);

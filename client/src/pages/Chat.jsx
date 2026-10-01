@@ -13,6 +13,7 @@ import NewDmModal from "../components/chat/NewDmModal.jsx";
 import ChatThread from "../components/chat/ChatThread.jsx";
 import { displayColor, textOn } from "../lib/colors.js";
 import useMediaQuery, { TWO_PANE } from "../hooks/useMediaQuery.js";
+import { can } from "../lib/access.js";
 
 const COLLAPSE_KEY = "loft:messages-list-collapsed";
 
@@ -87,10 +88,10 @@ export default function Chat() {
   // Deleting a chat here is about your own list, not the chat itself — so the
   // dialog offers wiping the messages for everyone as a separate, unticked
   // box, and only where you're actually allowed to (your own DMs, or a
-  // workspace channel you administer; never the General channel).
+  // workspace channel you can manage; never the General channel).
   async function deleteConversation(conversation) {
     const workspace = conversation.isGroup ? workspaces.find((w) => w.id === conversation.workspaceId) : null;
-    const canPurge = conversation.isGroup ? !conversation.isDefault && workspace?.myRole === "ADMIN" : true;
+    const canPurge = conversation.isGroup ? !conversation.isDefault && can(workspace, "channels.manage") : true;
 
     const ok = await confirm({
       title: "Delete this chat?",

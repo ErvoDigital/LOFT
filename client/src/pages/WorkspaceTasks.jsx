@@ -5,19 +5,22 @@ import * as tasksApi from "../api/tasks.js";
 import * as workspacesApi from "../api/workspaces.js";
 import * as taskStatusesApi from "../api/taskStatuses.js";
 import { useSocket } from "../context/SocketContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 import TaskCard from "../components/tasks/TaskCard.jsx";
 import TaskModal from "../components/tasks/TaskModal.jsx";
 import TaskDetailsPanel from "../components/tasks/TaskDetailsPanel.jsx";
 import TaskStatusManagerModal from "../components/tasks/TaskStatusManagerModal.jsx";
 import Spinner from "../components/common/Spinner.jsx";
 import { displayColor } from "../lib/colors.js";
+import { can } from "../lib/access.js";
 
 export default function WorkspaceTasks() {
   const { workspaceId } = useParams();
   const { socket } = useSocket();
+  const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [access, setAccess] = useState(null);
   const [columns, setColumns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -37,7 +40,7 @@ export default function WorkspaceTasks() {
     ]).then(([t, workspace, statuses]) => {
       setTasks(t);
       setMembers(workspace.members);
-      setIsAdmin(workspace.myRole === "ADMIN");
+      setAccess(workspace);
       setColumns(statuses);
       setLoading(false);
     });
@@ -68,6 +71,20 @@ export default function WorkspaceTasks() {
 
   const detailsTask = detailsTaskId ? tasks.find((t) => t.id === detailsTaskId) : null;
 
+  const canEditStatuses = can(access, "statuses.manage");
+
+  // A member moves only their own tasks between columns; tasks.status (every
+  // admin has it) moves anyone's. The server enforces the same rule. Anyone
+  // can still reorder a task within the column it's in.
+  function canMoveTask(task) {
+    return can(access, "tasks.status") || task.assignee?.id === user.id;
+  }
+
+  function canDropIn(status) {
+    const dragged = tasks.find((t) => t.id === draggedId);
+    return !!dragged && (dragged.status === status || canMoveTask(dragged));
+  }
+
   function columnTasks(status) {
     return tasks.filter((t) => t.status === status).sort((a, b) => a.order - b.order);
   }
@@ -85,6 +102,7 @@ export default function WorkspaceTasks() {
 
   function handleCardDragOver(e, status, index) {
     if (!draggedId) return;
+    if (!canDropIn(status)) return setDropIndicator(null);
     e.preventDefault();
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
@@ -94,6 +112,7 @@ export default function WorkspaceTasks() {
 
   function handleColumnDragOver(e, status) {
     if (!draggedId) return;
+    if (!canDropIn(status)) return setDropIndicator(null);
     e.preventDefault();
     if (!dropIndicator || dropIndicator.status !== status) {
       setDropIndicator({ status, index: columnTasks(status).length });
@@ -109,7 +128,7 @@ export default function WorkspaceTasks() {
     if (!taskId || !indicator) return;
 
     const dragged = tasks.find((t) => t.id === taskId);
-    if (!dragged) return;
+    if (!dragged || (dragged.status !== status && !canMoveTask(dragged))) return;
 
     const targetList = columnTasks(status).filter((t) => t.id !== taskId);
     const insertAt = Math.min(indicator.index, targetList.length);
@@ -121,6 +140,8 @@ export default function WorkspaceTasks() {
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status, order: newOrder } : t)));
     try {
       await tasksApi.updateTask(workspaceId, taskId, { status, order: newOrder });
+    } catch {
+      load(); // put the card back where the server still has it
     } finally {
       setTimeout(() => (suppressReload.current = false), 300);
     }
@@ -140,7 +161,7 @@ export default function WorkspaceTasks() {
         <div className="flex shrink-0 items-center justify-between gap-3">
           <h2 className="text-xl font-semibold tracking-tight text-ink-900 dark:text-ink-50 sm:text-2xl">Tasks</h2>
           <div className="flex items-center gap-2">
-            {isAdmin && (
+            {canEditStatuses && (
               <button
                 className="btn-secondary max-sm:!px-2.5"
                 onClick={() => setStatusModalOpen(true)}
@@ -230,6 +251,7 @@ export default function WorkspaceTasks() {
         members={members}
         statuses={columns.map((c) => ({ value: c.id, label: c.label, color: c.color }))}
         task={editingTask}
+        canChangeStatus={!editingTask || canMoveTask(editingTask)}
         onSaved={(saved) => {
           setTasks((prev) => {
             const exists = prev.some((t) => t.id === saved.id);
@@ -254,7 +276,7 @@ export default function WorkspaceTasks() {
         }}
       />
 
-      {isAdmin && (
+      {canEditStatuses && (
         <TaskStatusManagerModal
           open={statusModalOpen}
           onClose={() => setStatusModalOpen(false)}

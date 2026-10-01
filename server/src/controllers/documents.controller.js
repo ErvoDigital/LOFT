@@ -37,7 +37,7 @@ export async function listWorkspaceDocuments(req, res) {
     select: documentSelect,
     orderBy: { updatedAt: "desc" },
   });
-  const visible = documents.filter((d) => isDocumentVisible(req.userId, req.membership.role, d));
+  const visible = documents.filter((d) => isDocumentVisible(req.userId, req.membership, d));
   res.json({ documents: visible.map(serializeDocument) });
 }
 
@@ -45,7 +45,7 @@ export async function getWorkspaceDocument(req, res) {
   const { workspaceId, documentId } = req.params;
   const document = await prisma.document.findUnique({ where: { id: documentId }, select: documentSelect });
   if (!document || document.workspaceId !== workspaceId) throw new ApiError(404, "Document not found");
-  if (!isDocumentVisible(req.userId, req.membership.role, document)) {
+  if (!isDocumentVisible(req.userId, req.membership, document)) {
     throw new ApiError(403, "You don't have access to this document");
   }
   res.json({ document: serializeDocument(document) });
@@ -75,7 +75,7 @@ export async function renameWorkspaceDocument(req, res) {
 
   const existing = await prisma.document.findUnique({ where: { id: documentId }, include: { assignees: true } });
   if (!existing || existing.workspaceId !== workspaceId) throw new ApiError(404, "Document not found");
-  if (!isDocumentVisible(req.userId, req.membership.role, existing)) {
+  if (!isDocumentVisible(req.userId, req.membership, existing)) {
     throw new ApiError(403, "You don't have access to this document");
   }
 
@@ -89,15 +89,16 @@ const accessSchema = z.object({
   assigneeIds: z.array(z.string()).optional(),
 });
 
-// Changing who a document is restricted to is creator-or-ADMIN only —
+// Changing who a document is restricted to takes canManageDocument (the
+// creator, or documents.manage) —
 // stricter than rename, same shape as Folder's updateFolder requiring
 // canManageFolder for visibility/memberIds changes, including the
 // delete-then-recreate approach to the allow-list rather than diffing it.
 export async function updateDocumentAccess(req, res) {
   const { workspaceId, documentId } = req.params;
-  const existing = await prisma.document.findUnique({ where: { id: documentId } });
+  const existing = await prisma.document.findUnique({ where: { id: documentId }, include: { assignees: true } });
   if (!existing || existing.workspaceId !== workspaceId) throw new ApiError(404, "Document not found");
-  if (!canManageDocument(req.userId, req.membership.role, existing)) {
+  if (!canManageDocument(req.userId, req.membership, existing)) {
     throw new ApiError(403, "You do not have permission to manage this document's access");
   }
 
@@ -124,9 +125,9 @@ export async function updateDocumentAccess(req, res) {
 
 export async function deleteWorkspaceDocument(req, res) {
   const { workspaceId, documentId } = req.params;
-  const document = await prisma.document.findUnique({ where: { id: documentId } });
+  const document = await prisma.document.findUnique({ where: { id: documentId }, include: { assignees: true } });
   if (!document || document.workspaceId !== workspaceId) throw new ApiError(404, "Document not found");
-  if (document.createdById !== req.userId && req.membership.role !== "ADMIN") {
+  if (!canManageDocument(req.userId, req.membership, document)) {
     throw new ApiError(403, "You do not have permission to delete this document");
   }
 

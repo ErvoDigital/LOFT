@@ -4,6 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { generateStoredName, uploadObject, deleteObject, presignDownloadUrl, assertStorageConfigured } from "../utils/uploads.js";
 import { emitToWorkspace } from "../sockets/io.js";
 import { isFolderVisible } from "../services/folderAccess.js";
+import { can } from "../services/permissions.js";
 import { folderInclude, serializeFolder } from "./folders.controller.js";
 
 function serialize(asset) {
@@ -37,7 +38,7 @@ const assetInclude = {
 async function assertAssetFolderAccess(req, asset) {
   if (!asset.folderId) return;
   const folder = await prisma.folder.findUnique({ where: { id: asset.folderId }, include: { members: true } });
-  if (!isFolderVisible(req.userId, req.membership.role, folder)) {
+  if (!isFolderVisible(req.userId, req.membership, folder)) {
     throw new ApiError(403, "You don't have access to this file");
   }
 }
@@ -50,7 +51,7 @@ export async function listAssets(req, res) {
   ]);
   const folderById = new Map(folders.map((f) => [f.id, f]));
   const visible = assets.filter(
-    (a) => !a.folderId || isFolderVisible(req.userId, req.membership.role, folderById.get(a.folderId))
+    (a) => !a.folderId || isFolderVisible(req.userId, req.membership, folderById.get(a.folderId))
   );
   res.json({ assets: visible.map(serialize) });
 }
@@ -65,7 +66,7 @@ export async function uploadAsset(req, res) {
   if (folderId) {
     const folder = await prisma.folder.findUnique({ where: { id: folderId }, include: { members: true } });
     if (!folder || folder.workspaceId !== workspaceId) throw new ApiError(404, "Folder not found");
-    if (!isFolderVisible(req.userId, req.membership.role, folder)) {
+    if (!isFolderVisible(req.userId, req.membership, folder)) {
       throw new ApiError(403, "You don't have access to this folder");
     }
   }
@@ -368,7 +369,7 @@ export async function deleteAsset(req, res) {
   const { workspaceId, assetId } = req.params;
   const asset = await prisma.asset.findUnique({ where: { id: assetId }, include: { versions: true } });
   if (!asset || asset.workspaceId !== workspaceId) throw new ApiError(404, "Asset not found");
-  if (asset.uploadedById !== req.userId && req.membership.role !== "ADMIN") {
+  if (asset.uploadedById !== req.userId && !can(req.membership, "files.manage")) {
     throw new ApiError(403, "You do not have permission to delete this file");
   }
   await assertAssetFolderAccess(req, asset);
@@ -388,7 +389,7 @@ export async function moveAsset(req, res) {
 
   const asset = await prisma.asset.findUnique({ where: { id: assetId } });
   if (!asset || asset.workspaceId !== workspaceId) throw new ApiError(404, "Asset not found");
-  if (asset.uploadedById !== req.userId && req.membership.role !== "ADMIN") {
+  if (asset.uploadedById !== req.userId && !can(req.membership, "files.manage")) {
     throw new ApiError(403, "You do not have permission to move this file");
   }
   await assertAssetFolderAccess(req, asset);
@@ -396,7 +397,7 @@ export async function moveAsset(req, res) {
   if (folderId) {
     const folder = await prisma.folder.findUnique({ where: { id: folderId }, include: { members: true } });
     if (!folder || folder.workspaceId !== workspaceId) throw new ApiError(404, "Folder not found");
-    if (!isFolderVisible(req.userId, req.membership.role, folder)) {
+    if (!isFolderVisible(req.userId, req.membership, folder)) {
       throw new ApiError(403, "You don't have access to this folder");
     }
   }

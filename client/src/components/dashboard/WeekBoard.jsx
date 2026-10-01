@@ -35,7 +35,7 @@ function TaskItem({ task, workspaceId }) {
   return (
     <Link
       to={`/workspaces/${workspaceId}/tasks`}
-      title={`${task.title} · ${tier.label}`}
+      title={`${task.title} · ${tier.label} priority`}
       className="flex min-w-0 items-center gap-1.5 rounded-lg bg-brand-500/[0.08] px-2 py-1 text-xs font-medium text-ink-700 transition-colors hover:bg-brand-500/[0.16] dark:text-ink-200"
     >
       <span className={`h-2 w-2 shrink-0 rounded-[2px] ${TIER_SWATCH[task.tier] || TIER_SWATCH.TIER_3}`} aria-hidden="true" />
@@ -114,7 +114,7 @@ function DayColumn({ day, workspaceId, color }) {
 }
 
 // The coming seven days as columns, each listing its events by start time
-// (edged in the workspace color) and the tasks due that day (marked by tier).
+// (edged in the workspace color) and the tasks due that day (marked by priority).
 export default function WeekBoard({ days, workspaceId, accentColor, className = "" }) {
   const color = displayColor(accentColor);
   const events = days.reduce((n, d) => n + d.meetings.length, 0);
@@ -146,7 +146,7 @@ export default function WeekBoard({ days, workspaceId, accentColor, className = 
                 <span className="h-2 w-2 rounded-[2px] bg-accent-500" />
                 <span className="h-2 w-2 rounded-[2px] bg-brand-500" />
               </span>
-              Task due, by tier
+              Task due, by priority
             </span>
           </div>
           <Link

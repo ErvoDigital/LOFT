@@ -197,7 +197,7 @@ export async function getUserProfile(req, res) {
 
   res.json({
     user: target,
-    sharedWorkspaces: shared.map((m) => ({ ...m.workspace, role: m.role, joinedAt: m.joinedAt })),
+    sharedWorkspaces: shared.map((m) => ({ ...m.workspace, role: m.role, title: m.title, joinedAt: m.joinedAt })),
     tasks,
     follow,
   });

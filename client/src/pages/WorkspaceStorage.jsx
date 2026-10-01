@@ -16,6 +16,7 @@ import PreviewModal from "../components/storage/PreviewModal.jsx";
 import UploadProgressPanel from "../components/storage/UploadProgressPanel.jsx";
 import EmptyState from "../components/common/EmptyState.jsx";
 import Spinner from "../components/common/Spinner.jsx";
+import { can } from "../lib/access.js";
 
 const ASSET_EVENTS = ["asset:created", "asset:updated", "asset:merged", "asset:deleted"];
 const FOLDER_EVENTS = ["folder:created", "folder:updated", "folder:deleted"];
@@ -30,7 +31,7 @@ export default function WorkspaceStorage() {
   const [assets, setAssets] = useState([]);
   const [folders, setFolders] = useState([]);
   const [members, setMembers] = useState([]);
-  const [myRole, setMyRole] = useState("MEMBER");
+  const [access, setAccess] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const confirm = useConfirm();
@@ -58,7 +59,7 @@ export default function WorkspaceStorage() {
       ([a, f, ws]) => {
         setAssets(a);
         setFolders(f);
-        setMyRole(ws.myRole);
+        setAccess(ws);
         setMembers(ws.members);
         setLoading(false);
       }
@@ -352,7 +353,7 @@ export default function WorkspaceStorage() {
                       folder={f}
                       materializing={materializeIds.has(f.id)}
                       glowing={glowFolderId === f.id}
-                      canManage={myRole === "ADMIN" || f.createdBy.id === user.id}
+                      canManage={can(access, "files.manage") || f.createdBy.id === user.id}
                       onOpen={navigate}
                       onEdit={(folder) => setFolderModal({ folder })}
                       onDelete={async (folderId) => {
@@ -392,7 +393,7 @@ export default function WorkspaceStorage() {
                       key={a.id}
                       asset={a}
                       materializing={materializeIds.has(a.id)}
-                      canManage={myRole === "ADMIN" || a.uploadedBy.id === user.id}
+                      canManage={can(access, "files.manage") || a.uploadedBy.id === user.id}
                       uploadProgress={versionUploads.get(a.id)}
                       onDropFile={(file) => uploadVersionFor(a.id, file)}
                       onMergeDrop={(sourceId) => merge(a.id, sourceId)}

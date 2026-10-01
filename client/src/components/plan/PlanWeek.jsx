@@ -198,7 +198,7 @@ export default function PlanWeek({ items, capacity, statusesByWorkspace, onStatu
           <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-ink-500 dark:text-ink-400">
             {Object.entries(TIER_META).map(([tier, meta]) => (
               <span key={tier} className="flex items-center gap-1.5">
-                <span className={`h-2.5 w-2.5 rounded-[3px] ${TIER_FILL[tier]}`} /> {meta.short} {meta.description.split(" / ")[0]}
+                <span className={`h-2.5 w-2.5 rounded-[3px] ${TIER_FILL[tier]}`} /> {meta.label}
               </span>
             ))}
           </div>

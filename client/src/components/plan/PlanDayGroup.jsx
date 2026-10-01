@@ -54,7 +54,7 @@ function DateTile({ lane, compact = false }) {
 
 function laneHeading(lane) {
   if (lane.kind === "overdue") return { title: "Overdue", subtitle: "Past their due date, ranked against each other" };
-  if (lane.kind === "undated") return { title: "No due date", subtitle: "No deadline, so ranked by tier" };
+  if (lane.kind === "undated") return { title: "No due date", subtitle: "No deadline, so ranked by priority" };
   const full = lane.date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
   const subtitle = lane.offset > 1 ? `${lane.date.toLocaleDateString([], { month: "long", day: "numeric" })} · in ${lane.offset} days` : full;
   return { title: relativeDayName(lane.offset, lane.date), subtitle };
