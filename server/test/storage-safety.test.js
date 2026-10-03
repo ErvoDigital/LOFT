@@ -393,7 +393,14 @@ describe("asset authorization", () => {
         findUnique: async () => existing,
         update: async () => existing,
       },
-      assetVersion: { create: async () => ({}) },
+      $transaction: async (operation) =>
+        operation({
+          assetVersion: {
+            findFirst: async () => null,
+            create: async () => ({}),
+          },
+          asset: { update: async () => existing },
+        }),
       realtimeEvent: { create: async () => ({}) },
     };
     setPrismaClient(fake);

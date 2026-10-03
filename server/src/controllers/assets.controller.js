@@ -1,13 +1,20 @@
 import { z } from "zod";
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
-import { generateStoredName, uploadObject, presignDownloadUrl, assertStorageConfigured } from "../utils/uploads.js";
+import { generateStoredName, presignDownloadUrl, assertStorageConfigured } from "../utils/uploads.js";
 import { emitToWorkspace } from "../sockets/io.js";
 import { isFolderVisible, resolveFolderAncestry } from "../services/folderAccess.js";
 import { can } from "../services/permissions.js";
 import { folderInclude, serializeFolder } from "./folders.controller.js";
 import { validateUploadedFile } from "../utils/uploadValidation.js";
 import { deleteStoredVersions } from "../services/assetStorage.js";
+import { uploadWithCompensation } from "../services/uploadCompensation.js";
+
+const VERSION_UPLOAD_MAX_ATTEMPTS = 4;
+
+function isRetryableVersionConflict(error) {
+  return error?.code === "P2002" || error?.code === "P2034";
+}
 
 function serializeVersion(version) {
   return {
@@ -97,26 +104,32 @@ export async function uploadAsset(req, res) {
   }
 
   const storedName = generateStoredName();
-  await uploadObject(workspaceId, storedName, req.file.buffer, file.mimeType);
-
-  const asset = await prisma.asset.create({
-    data: {
-      workspaceId,
-      folderId,
-      name,
-      uploadedById: req.userId,
-      versions: {
-        create: {
-          version: 1,
-          originalName: file.originalName,
-          storedName,
-          mimeType: file.mimeType,
-          size: req.file.size,
+  const asset = await uploadWithCompensation({
+    workspaceId,
+    storedName,
+    buffer: req.file.buffer,
+    mimeType: file.mimeType,
+    operationType: "workspace_asset",
+    persist: () =>
+      prisma.asset.create({
+        data: {
+          workspaceId,
+          folderId,
+          name,
           uploadedById: req.userId,
+          versions: {
+            create: {
+              version: 1,
+              originalName: file.originalName,
+              storedName,
+              mimeType: file.mimeType,
+              size: req.file.size,
+              uploadedById: req.userId,
+            },
+          },
         },
-      },
-    },
-    include: assetInclude,
+        include: assetInclude,
+      }),
   });
 
   emitToWorkspace(workspaceId, "asset:created", serialize(asset));
@@ -144,26 +157,32 @@ export async function uploadTaskAttachment(req, res) {
 
   const name = (req.body.name || file.originalName).trim().slice(0, 160);
   const storedName = generateStoredName();
-  await uploadObject(workspaceId, storedName, req.file.buffer, file.mimeType);
-
-  const asset = await prisma.asset.create({
-    data: {
-      workspaceId,
-      taskId,
-      name,
-      uploadedById: req.userId,
-      versions: {
-        create: {
-          version: 1,
-          originalName: file.originalName,
-          storedName,
-          mimeType: file.mimeType,
-          size: req.file.size,
+  const asset = await uploadWithCompensation({
+    workspaceId,
+    storedName,
+    buffer: req.file.buffer,
+    mimeType: file.mimeType,
+    operationType: "task_attachment",
+    persist: () =>
+      prisma.asset.create({
+        data: {
+          workspaceId,
+          taskId,
+          name,
           uploadedById: req.userId,
+          versions: {
+            create: {
+              version: 1,
+              originalName: file.originalName,
+              storedName,
+              mimeType: file.mimeType,
+              size: req.file.size,
+              uploadedById: req.userId,
+            },
+          },
         },
-      },
-    },
-    include: assetInclude,
+        include: assetInclude,
+      }),
   });
 
   emitToWorkspace(workspaceId, "task:attachment:created", { taskId, asset: serialize(asset) });
@@ -277,26 +296,32 @@ export async function uploadChatAttachment(req, res) {
 
   const name = (req.body.name || file.originalName).trim().slice(0, 160);
   const storedName = generateStoredName();
-  await uploadObject(workspaceId, storedName, req.file.buffer, file.mimeType);
-
-  const asset = await prisma.asset.create({
-    data: {
-      workspaceId,
-      folderId: folder.id,
-      name,
-      uploadedById: req.userId,
-      versions: {
-        create: {
-          version: 1,
-          originalName: file.originalName,
-          storedName,
-          mimeType: file.mimeType,
-          size: req.file.size,
+  const asset = await uploadWithCompensation({
+    workspaceId,
+    storedName,
+    buffer: req.file.buffer,
+    mimeType: file.mimeType,
+    operationType: "chat_attachment",
+    persist: () =>
+      prisma.asset.create({
+        data: {
+          workspaceId,
+          folderId: folder.id,
+          name,
           uploadedById: req.userId,
+          versions: {
+            create: {
+              version: 1,
+              originalName: file.originalName,
+              storedName,
+              mimeType: file.mimeType,
+              size: req.file.size,
+              uploadedById: req.userId,
+            },
+          },
         },
-      },
-    },
-    include: assetInclude,
+        include: assetInclude,
+      }),
   });
 
   emitToWorkspace(workspaceId, "asset:created", serialize(asset));
@@ -316,23 +341,51 @@ export async function uploadVersion(req, res) {
   }
   const file = await validateUploadedFile(req.file);
 
-  const nextVersion = Math.max(0, ...existing.versions.map((v) => v.version)) + 1;
-  const storedName = generateStoredName();
-  await uploadObject(workspaceId, storedName, req.file.buffer, file.mimeType);
-  await prisma.assetVersion.create({
-    data: {
-      assetId,
-      version: nextVersion,
-      originalName: file.originalName,
-      storedName,
-      mimeType: file.mimeType,
-      size: req.file.size,
-      uploadedById: req.userId,
-    },
-  });
-  await prisma.asset.update({ where: { id: assetId }, data: { updatedAt: new Date() } });
+  let asset;
+  for (let attempt = 1; attempt <= VERSION_UPLOAD_MAX_ATTEMPTS; attempt += 1) {
+    const storedName = generateStoredName();
+    try {
+      asset = await uploadWithCompensation({
+        workspaceId,
+        storedName,
+        buffer: req.file.buffer,
+        mimeType: file.mimeType,
+        operationType: "asset_version",
+        persist: () =>
+          prisma.$transaction(
+            async (tx) => {
+              const latest = await tx.assetVersion.findFirst({
+                where: { assetId },
+                orderBy: { version: "desc" },
+                select: { version: true },
+              });
+              const nextVersion = (latest?.version || 0) + 1;
+              await tx.assetVersion.create({
+                data: {
+                  assetId,
+                  version: nextVersion,
+                  originalName: file.originalName,
+                  storedName,
+                  mimeType: file.mimeType,
+                  size: req.file.size,
+                  uploadedById: req.userId,
+                },
+              });
+              return tx.asset.update({
+                where: { id: assetId },
+                data: { updatedAt: new Date() },
+                include: assetInclude,
+              });
+            },
+            { isolationLevel: "Serializable" }
+          ),
+      });
+      break;
+    } catch (error) {
+      if (!isRetryableVersionConflict(error) || attempt === VERSION_UPLOAD_MAX_ATTEMPTS) throw error;
+    }
+  }
 
-  const asset = await prisma.asset.findUnique({ where: { id: assetId }, include: assetInclude });
   emitToWorkspace(workspaceId, "asset:updated", serialize(asset));
   res.status(201).json({ asset: serialize(asset) });
 }

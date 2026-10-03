@@ -1,4 +1,5 @@
 import { ApiError } from "../utils/ApiError.js";
+import { logStructuredError, summarizeError } from "../utils/logger.js";
 
 export function notFoundHandler(req, res) {
   res.status(404).json({ error: "Not found" });
@@ -20,6 +21,6 @@ export function errorHandler(err, req, res, next) {
     return res.status(400).json({ error: "Invalid file upload" });
   }
 
-  console.error(err);
+  logStructuredError("http.unhandled_error", { error: summarizeError(err) });
   res.status(500).json({ error: "Internal server error" });
 }

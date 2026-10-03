@@ -79,7 +79,9 @@ export async function deleteObject(workspaceId, storedName) {
     );
   } catch (err) {
     if (err?.name === "NotFound" || err?.name === "NoSuchKey") return;
-    throw new ApiError(502, "Failed to delete stored object");
+    const deleteError = new ApiError(502, "Failed to delete stored object");
+    deleteError.code = "STORAGE_DELETE_FAILED";
+    throw deleteError;
   }
 }
 
