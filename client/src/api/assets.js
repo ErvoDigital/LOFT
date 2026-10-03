@@ -63,12 +63,37 @@ export const deleteAsset = (workspaceId, assetId) =>
 export const moveAsset = (workspaceId, assetId, folderId) =>
   api.patch(`/workspaces/${workspaceId}/assets/${assetId}/folder`, { folderId }).then((r) => r.data.asset);
 
-// Shared by download and preview — both need the raw bytes, auth'd the same
-// way; only what's done with the resulting blob differs.
-export const fetchVersionBlob = (workspaceId, assetId, version) =>
+export const getVersionDownloadUrl = (workspaceId, assetId, version) =>
   api
-    .get(`/workspaces/${workspaceId}/assets/${assetId}/versions/${version.id}/download`, { responseType: "blob" })
-    .then((r) => r.data);
+    .get(`/workspaces/${workspaceId}/assets/${assetId}/versions/${version.id}/download`)
+    .then((response) => {
+      const url = response.data?.url;
+      let protocol;
+      try {
+        protocol = new URL(url).protocol;
+      } catch {
+        throw new Error("File download link is unavailable");
+      }
+      if (protocol !== "https:" && protocol !== "http:") {
+        throw new Error("File download link is unavailable");
+      }
+      return url;
+    });
+
+// Authorization happens at the LOFT API first. The returned presigned URL is
+// then fetched directly so the browser sends the app's Origin to S3. LOFT's
+// bearer token is never forwarded to object storage.
+export async function fetchVersionBlob(workspaceId, assetId, version) {
+  const signedUrl = await getVersionDownloadUrl(workspaceId, assetId, version);
+  let response;
+  try {
+    response = await fetch(signedUrl, { credentials: "omit" });
+  } catch {
+    throw new Error("File could not be downloaded");
+  }
+  if (!response.ok) throw new Error("File could not be downloaded");
+  return response.blob();
+}
 
 export async function downloadVersion(workspaceId, assetId, version) {
   const blob = await fetchVersionBlob(workspaceId, assetId, version);
