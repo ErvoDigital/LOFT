@@ -444,7 +444,7 @@ export async function downloadVersion(req, res) {
   await assertAssetFolderAccess(req, version.asset);
 
   const url = await presignDownloadUrl(workspaceId, version.storedName, version.originalName);
-  res.redirect(url);
+  res.json({ url });
 }
 
 export async function deleteAsset(req, res) {
