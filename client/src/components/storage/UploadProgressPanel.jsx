@@ -8,8 +8,8 @@ function formatSize(bytes) {
 }
 
 // A file's size determines how long it visibly spends at each percentage —
-// a 20MB image finishes almost instantly, a 400MB video crawls through the
-// bar — so no extra logic is needed to make the "effect" depend on size:
+// a small text file finishes almost instantly, while a 25 MiB document spends
+// longer moving through the bar — no extra timing logic is needed:
 // real byte progress from the upload already behaves that way.
 export default function UploadProgressPanel({ uploads }) {
   if (uploads.length === 0) return null;

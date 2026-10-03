@@ -4,6 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { notify } from "../services/notification.service.js";
 import { emitToWorkspace } from "../sockets/io.js";
 import { can } from "../services/permissions.js";
+import { purgeConversationAndAttachments } from "../services/conversationPurge.js";
 
 const participantSelect = { select: { id: true, name: true, avatarColor: true, avatarUrl: true } };
 
@@ -155,7 +156,7 @@ export async function deleteWorkspaceConversation(req, res) {
   }
   if (conversation.isDefault) throw new ApiError(400, "The General channel can't be deleted");
 
-  await prisma.conversation.delete({ where: { id: conversation.id } });
+  await purgeConversationAndAttachments(conversation);
   emitToWorkspace(req.params.workspaceId, "conversation:deleted", { id: conversation.id });
   res.json({ message: "Channel deleted" });
 }

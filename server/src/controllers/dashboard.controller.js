@@ -61,7 +61,7 @@ export async function getDashboard(req, res) {
       // Over-fetched, then narrowed by folder visibility below — the caller's
       // access differs per workspace, so this can't be filtered in the query.
       prisma.asset.findMany({
-        where: { workspaceId: { in: workspaceIds } },
+        where: { workspaceId: { in: workspaceIds }, taskId: null },
         orderBy: { updatedAt: "desc" },
         take: 40,
         include: {
@@ -78,7 +78,7 @@ export async function getDashboard(req, res) {
   const folderById = new Map(visibleFolders.map((f) => [f.id, f]));
   const recentFiles = recentAssets
     .filter(
-      (a) => !a.folderId || isFolderVisible(userId, membershipByWorkspaceId.get(a.workspaceId), folderById.get(a.folderId))
+      (a) => !a.folderId || isFolderVisible(userId, membershipByWorkspaceId.get(a.workspaceId), folderById.get(a.folderId), folderById)
     )
     .slice(0, 10)
     .map((a) => ({

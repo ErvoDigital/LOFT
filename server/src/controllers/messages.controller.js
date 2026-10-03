@@ -4,6 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { notify } from "../services/notification.service.js";
 import { emitToUser } from "../sockets/io.js";
 import { can } from "../services/permissions.js";
+import { purgeConversationAndAttachments } from "../services/conversationPurge.js";
 
 const sendSchema = z.object({
   content: z.string().max(4000).default(""),
@@ -318,7 +319,7 @@ export async function deleteConversation(req, res) {
   }
 
   const participants = await prisma.conversationParticipant.findMany({ where: { conversationId: conversation.id } });
-  await prisma.conversation.delete({ where: { id: conversation.id } });
+  await purgeConversationAndAttachments(conversation);
   for (const p of participants) {
     emitToUser(p.userId, "conversation:deleted", { id: conversation.id });
   }

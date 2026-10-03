@@ -17,6 +17,7 @@ import UploadProgressPanel from "../components/storage/UploadProgressPanel.jsx";
 import EmptyState from "../components/common/EmptyState.jsx";
 import Spinner from "../components/common/Spinner.jsx";
 import { can } from "../lib/access.js";
+import { ACCEPTED_UPLOAD_TYPES } from "../lib/uploads.js";
 
 const ASSET_EVENTS = ["asset:created", "asset:updated", "asset:merged", "asset:deleted"];
 const FOLDER_EVENTS = ["folder:created", "folder:updated", "folder:deleted"];
@@ -313,6 +314,7 @@ export default function WorkspaceStorage() {
           <input
             ref={fileInputRef}
             type="file"
+            accept={ACCEPTED_UPLOAD_TYPES}
             className="hidden"
             onChange={(e) => {
               if (e.target.files[0]) uploadNew(e.target.files[0]);
@@ -330,7 +332,7 @@ export default function WorkspaceStorage() {
             }`}
           >
             <UploadCloud className="h-5 w-5" />
-            Drop a video or file here to upload
+            Drop a supported document or image here to upload
           </div>
         )}
 

@@ -6,6 +6,7 @@ import PreviewModal from "../storage/PreviewModal.jsx";
 import * as assetsApi from "../../api/assets.js";
 import { apiErrorMessage } from "../../api/client.js";
 import { displayColor } from "../../lib/colors.js";
+import { ACCEPTED_UPLOAD_TYPES } from "../../lib/uploads.js";
 
 function formatDuration(minutes) {
   const m = Number(minutes) || 0;
@@ -255,7 +256,14 @@ export default function TaskDetailsPanel({ open, task, workspaceId, statuses, on
                   {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
                   {uploading ? "Uploading…" : "Add file"}
                 </button>
-                <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFilesSelected} />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={ACCEPTED_UPLOAD_TYPES}
+                  multiple
+                  className="hidden"
+                  onChange={handleFilesSelected}
+                />
               </div>
 
               {attachmentsError && <p className="mb-2 text-xs text-red-500">{attachmentsError}</p>}

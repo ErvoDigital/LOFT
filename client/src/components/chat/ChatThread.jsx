@@ -29,6 +29,7 @@ import EmojiPicker from "./EmojiPicker.jsx";
 import { displayColor, textOn } from "../../lib/colors.js";
 import useMediaQuery from "../../hooks/useMediaQuery.js";
 import { can } from "../../lib/access.js";
+import { ACCEPTED_UPLOAD_TYPES } from "../../lib/uploads.js";
 
 const DOCUMENT_MIME_TYPES = new Set([
   "application/pdf",
@@ -587,7 +588,7 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
             type="button"
             onClick={() => canAttach && fileInputRef.current?.click()}
             disabled={!canAttach || !!attachmentUpload}
-            title={canAttach ? "Attach a file or video" : "File sharing is only available in workspace channels"}
+            title={canAttach ? "Attach a supported document or image" : "File sharing is only available in workspace channels"}
             className="btn-ghost shrink-0 !px-2.5 !py-2 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Paperclip className="h-4 w-4" />
@@ -595,6 +596,7 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
           <input
             ref={fileInputRef}
             type="file"
+            accept={ACCEPTED_UPLOAD_TYPES}
             className="hidden"
             onChange={(e) => {
               if (e.target.files[0]) startAttachmentUpload(e.target.files[0]);

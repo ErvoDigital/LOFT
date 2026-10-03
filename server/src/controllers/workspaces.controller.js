@@ -166,7 +166,7 @@ export async function getWorkspaceDashboard(req, res) {
       include: { sender: { select: { id: true, name: true, avatarColor: true } } },
     }),
     prisma.asset.findMany({
-      where: { workspaceId },
+      where: { workspaceId, taskId: null },
       orderBy: { updatedAt: "desc" },
       take: 30,
       include: {
@@ -232,7 +232,7 @@ export async function getWorkspaceDashboard(req, res) {
     // Same folder-visibility rule the storage page enforces — a restricted
     // folder's filenames must not leak into an overview panel.
     recentFiles: assets
-      .filter((a) => !a.folderId || isFolderVisible(req.userId, req.membership, folderById.get(a.folderId)))
+      .filter((a) => !a.folderId || isFolderVisible(req.userId, req.membership, folderById.get(a.folderId), folderById))
       .slice(0, 6)
       .map((a) => ({
         id: a.id,
@@ -328,12 +328,17 @@ export async function leaveWorkspace(req, res) {
     throw new ApiError(400, "The owner cannot leave the workspace. Transfer ownership or delete it instead.");
   }
 
-  await prisma.workspaceMember.delete({
-    where: { workspaceId_userId: { workspaceId: req.params.workspaceId, userId: req.userId } },
-  });
-  await prisma.conversationParticipant.deleteMany({
-    where: { userId: req.userId, conversation: { workspaceId: req.params.workspaceId } },
-  });
+  await prisma.$transaction([
+    prisma.folderMember.deleteMany({
+      where: { userId: req.userId, folder: { workspaceId: req.params.workspaceId } },
+    }),
+    prisma.conversationParticipant.deleteMany({
+      where: { userId: req.userId, conversation: { workspaceId: req.params.workspaceId } },
+    }),
+    prisma.workspaceMember.delete({
+      where: { workspaceId_userId: { workspaceId: req.params.workspaceId, userId: req.userId } },
+    }),
+  ]);
   res.json({ message: "Left workspace" });
 }
 
@@ -386,9 +391,14 @@ export async function removeMember(req, res) {
     throw new ApiError(403, "Only admins can remove an admin");
   }
 
-  const member = await prisma.workspaceMember.delete({ where: { id: target.id } });
-  await prisma.conversationParticipant.deleteMany({
-    where: { userId: member.userId, conversation: { workspaceId: member.workspaceId } },
-  });
+  const [, , member] = await prisma.$transaction([
+    prisma.folderMember.deleteMany({
+      where: { userId: target.userId, folder: { workspaceId: target.workspaceId } },
+    }),
+    prisma.conversationParticipant.deleteMany({
+      where: { userId: target.userId, conversation: { workspaceId: target.workspaceId } },
+    }),
+    prisma.workspaceMember.delete({ where: { id: target.id } }),
+  ]);
   res.json({ message: "Member removed" });
 }

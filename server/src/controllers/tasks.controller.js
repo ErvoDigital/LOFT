@@ -5,6 +5,7 @@ import { notify } from "../services/notification.service.js";
 import { emitToWorkspace } from "../sockets/io.js";
 import { assertValidStatus, ensureWorkspaceStatuses } from "./taskStatuses.controller.js";
 import { can } from "../services/permissions.js";
+import { deleteStoredVersions } from "../services/assetStorage.js";
 
 const TIERS = ["TIER_1", "TIER_2", "TIER_3", "TIER_4"];
 
@@ -164,9 +165,16 @@ export async function updateTask(req, res) {
 }
 
 export async function deleteTask(req, res) {
-  const existing = await prisma.task.findUnique({ where: { id: req.params.taskId } });
+  const existing = await prisma.task.findUnique({
+    where: { id: req.params.taskId },
+    include: { attachments: { include: { versions: true } } },
+  });
   if (!existing || existing.workspaceId !== req.params.workspaceId) throw new ApiError(404, "Task not found");
 
+  await deleteStoredVersions(
+    existing.workspaceId,
+    existing.attachments.flatMap((attachment) => attachment.versions)
+  );
   await prisma.task.delete({ where: { id: req.params.taskId } });
   emitToWorkspace(req.params.workspaceId, "task:deleted", { id: req.params.taskId });
   res.json({ message: "Task deleted" });
