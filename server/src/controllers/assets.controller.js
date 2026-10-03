@@ -1,11 +1,32 @@
 import { z } from "zod";
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
-import { generateStoredName, uploadObject, deleteObject, presignDownloadUrl, assertStorageConfigured } from "../utils/uploads.js";
+import { generateStoredName, presignDownloadUrl, assertStorageConfigured } from "../utils/uploads.js";
 import { emitToWorkspace } from "../sockets/io.js";
-import { isFolderVisible } from "../services/folderAccess.js";
+import { isFolderVisible, resolveFolderAncestry } from "../services/folderAccess.js";
 import { can } from "../services/permissions.js";
 import { folderInclude, serializeFolder } from "./folders.controller.js";
+import { validateUploadedFile } from "../utils/uploadValidation.js";
+import { deleteStoredVersions } from "../services/assetStorage.js";
+import { uploadWithCompensation } from "../services/uploadCompensation.js";
+
+const VERSION_UPLOAD_MAX_ATTEMPTS = 4;
+
+function isRetryableVersionConflict(error) {
+  return error?.code === "P2002" || error?.code === "P2034";
+}
+
+function serializeVersion(version) {
+  return {
+    id: version.id,
+    version: version.version,
+    originalName: version.originalName,
+    mimeType: version.mimeType,
+    size: version.size,
+    uploadedBy: version.uploadedBy,
+    createdAt: version.createdAt,
+  };
+}
 
 function serialize(asset) {
   const versions = [...asset.versions].sort((a, b) => b.version - a.version);
@@ -18,9 +39,9 @@ function serialize(asset) {
     uploadedBy: asset.uploadedBy,
     createdAt: asset.createdAt,
     updatedAt: asset.updatedAt,
-    latestVersion: versions[0],
+    latestVersion: versions[0] ? serializeVersion(versions[0]) : null,
     versionCount: versions.length,
-    versions,
+    versions: versions.map(serializeVersion),
   };
 }
 
@@ -35,10 +56,16 @@ const assetInclude = {
 // Fetches the folder an asset belongs to (with members, for isFolderVisible)
 // and throws if the caller can't act on it — used before any read/write on
 // an existing asset so folder restriction can't be bypassed by id-guessing.
-async function assertAssetFolderAccess(req, asset) {
+async function loadFolderAccessMap(workspaceId) {
+  const folders = await prisma.folder.findMany({ where: { workspaceId }, include: { members: true } });
+  return new Map(folders.map((folder) => [folder.id, folder]));
+}
+
+async function assertAssetFolderAccess(req, asset, folderById = null) {
   if (!asset.folderId) return;
-  const folder = await prisma.folder.findUnique({ where: { id: asset.folderId }, include: { members: true } });
-  if (!isFolderVisible(req.userId, req.membership, folder)) {
+  const folders = folderById || (await loadFolderAccessMap(asset.workspaceId));
+  const folder = folders.get(asset.folderId);
+  if (!isFolderVisible(req.userId, req.membership, folder, folders)) {
     throw new ApiError(403, "You don't have access to this file");
   }
 }
@@ -46,52 +73,63 @@ async function assertAssetFolderAccess(req, asset) {
 export async function listAssets(req, res) {
   const workspaceId = req.params.workspaceId;
   const [assets, folders] = await Promise.all([
-    prisma.asset.findMany({ where: { workspaceId }, include: assetInclude, orderBy: { updatedAt: "desc" } }),
+    prisma.asset.findMany({ where: { workspaceId, taskId: null }, include: assetInclude, orderBy: { updatedAt: "desc" } }),
     prisma.folder.findMany({ where: { workspaceId }, include: { members: true } }),
   ]);
   const folderById = new Map(folders.map((f) => [f.id, f]));
   const visible = assets.filter(
-    (a) => !a.folderId || isFolderVisible(req.userId, req.membership, folderById.get(a.folderId))
+    (a) => !a.folderId || isFolderVisible(req.userId, req.membership, folderById.get(a.folderId), folderById)
   );
   res.json({ assets: visible.map(serialize) });
 }
 
 export async function uploadAsset(req, res) {
-  assertStorageConfigured();
-  if (!req.file) throw new ApiError(400, "No file uploaded");
+  const file = await validateUploadedFile(req.file);
   const workspaceId = req.params.workspaceId;
-  const name = (req.body.name || req.file.originalname).slice(0, 160);
+  const name = (req.body.name || file.originalName).trim().slice(0, 160);
   const folderId = req.body.folderId || null;
 
   if (folderId) {
-    const folder = await prisma.folder.findUnique({ where: { id: folderId }, include: { members: true } });
-    if (!folder || folder.workspaceId !== workspaceId) throw new ApiError(404, "Folder not found");
-    if (!isFolderVisible(req.userId, req.membership, folder)) {
+    const folderById = await loadFolderAccessMap(workspaceId);
+    const folder = folderById.get(folderId);
+    if (!folder) throw new ApiError(404, "Folder not found");
+    const ancestry = resolveFolderAncestry(folder, folderById);
+    if (!ancestry) throw new ApiError(400, "Destination folder hierarchy is invalid");
+    if (!isFolderVisible(req.userId, req.membership, folder, folderById)) {
       throw new ApiError(403, "You don't have access to this folder");
+    }
+    if (ancestry.some((ancestor) => ancestor.chatConversationId)) {
+      throw new ApiError(400, "Files cannot be uploaded through a managed chat folder");
     }
   }
 
-  const storedName = generateStoredName(req.file.originalname);
-  await uploadObject(workspaceId, storedName, req.file.buffer, req.file.mimetype);
-
-  const asset = await prisma.asset.create({
-    data: {
-      workspaceId,
-      folderId,
-      name,
-      uploadedById: req.userId,
-      versions: {
-        create: {
-          version: 1,
-          originalName: req.file.originalname,
-          storedName,
-          mimeType: req.file.mimetype,
-          size: req.file.size,
+  const storedName = generateStoredName();
+  const asset = await uploadWithCompensation({
+    workspaceId,
+    storedName,
+    buffer: req.file.buffer,
+    mimeType: file.mimeType,
+    operationType: "workspace_asset",
+    persist: () =>
+      prisma.asset.create({
+        data: {
+          workspaceId,
+          folderId,
+          name,
           uploadedById: req.userId,
+          versions: {
+            create: {
+              version: 1,
+              originalName: file.originalName,
+              storedName,
+              mimeType: file.mimeType,
+              size: req.file.size,
+              uploadedById: req.userId,
+            },
+          },
         },
-      },
-    },
-    include: assetInclude,
+        include: assetInclude,
+      }),
   });
 
   emitToWorkspace(workspaceId, "asset:created", serialize(asset));
@@ -112,34 +150,39 @@ export async function listTaskAttachments(req, res) {
 }
 
 export async function uploadTaskAttachment(req, res) {
-  assertStorageConfigured();
-  if (!req.file) throw new ApiError(400, "No file uploaded");
+  const file = await validateUploadedFile(req.file);
   const { workspaceId, taskId } = req.params;
   const task = await prisma.task.findUnique({ where: { id: taskId } });
   if (!task || task.workspaceId !== workspaceId) throw new ApiError(404, "Task not found");
 
-  const name = (req.body.name || req.file.originalname).slice(0, 160);
-  const storedName = generateStoredName(req.file.originalname);
-  await uploadObject(workspaceId, storedName, req.file.buffer, req.file.mimetype);
-
-  const asset = await prisma.asset.create({
-    data: {
-      workspaceId,
-      taskId,
-      name,
-      uploadedById: req.userId,
-      versions: {
-        create: {
-          version: 1,
-          originalName: req.file.originalname,
-          storedName,
-          mimeType: req.file.mimetype,
-          size: req.file.size,
+  const name = (req.body.name || file.originalName).trim().slice(0, 160);
+  const storedName = generateStoredName();
+  const asset = await uploadWithCompensation({
+    workspaceId,
+    storedName,
+    buffer: req.file.buffer,
+    mimeType: file.mimeType,
+    operationType: "task_attachment",
+    persist: () =>
+      prisma.asset.create({
+        data: {
+          workspaceId,
+          taskId,
+          name,
           uploadedById: req.userId,
+          versions: {
+            create: {
+              version: 1,
+              originalName: file.originalName,
+              storedName,
+              mimeType: file.mimeType,
+              size: req.file.size,
+              uploadedById: req.userId,
+            },
+          },
         },
-      },
-    },
-    include: assetInclude,
+        include: assetInclude,
+      }),
   });
 
   emitToWorkspace(workspaceId, "task:attachment:created", { taskId, asset: serialize(asset) });
@@ -236,8 +279,7 @@ async function getOrCreateChatFolder(conversation, userId) {
 // "can this user share files in this conversation" (only participants get a
 // folder for it in the first place).
 export async function uploadChatAttachment(req, res) {
-  assertStorageConfigured();
-  if (!req.file) throw new ApiError(400, "No file uploaded");
+  const file = await validateUploadedFile(req.file);
   const workspaceId = req.params.workspaceId;
   const { conversationId } = req.body;
   if (!conversationId) throw new ApiError(400, "conversationId is required");
@@ -252,28 +294,34 @@ export async function uploadChatAttachment(req, res) {
 
   const folder = await getOrCreateChatFolder(conversation, req.userId);
 
-  const name = (req.body.name || req.file.originalname).slice(0, 160);
-  const storedName = generateStoredName(req.file.originalname);
-  await uploadObject(workspaceId, storedName, req.file.buffer, req.file.mimetype);
-
-  const asset = await prisma.asset.create({
-    data: {
-      workspaceId,
-      folderId: folder.id,
-      name,
-      uploadedById: req.userId,
-      versions: {
-        create: {
-          version: 1,
-          originalName: req.file.originalname,
-          storedName,
-          mimeType: req.file.mimetype,
-          size: req.file.size,
+  const name = (req.body.name || file.originalName).trim().slice(0, 160);
+  const storedName = generateStoredName();
+  const asset = await uploadWithCompensation({
+    workspaceId,
+    storedName,
+    buffer: req.file.buffer,
+    mimeType: file.mimeType,
+    operationType: "chat_attachment",
+    persist: () =>
+      prisma.asset.create({
+        data: {
+          workspaceId,
+          folderId: folder.id,
+          name,
           uploadedById: req.userId,
+          versions: {
+            create: {
+              version: 1,
+              originalName: file.originalName,
+              storedName,
+              mimeType: file.mimeType,
+              size: req.file.size,
+              uploadedById: req.userId,
+            },
+          },
         },
-      },
-    },
-    include: assetInclude,
+        include: assetInclude,
+      }),
   });
 
   emitToWorkspace(workspaceId, "asset:created", serialize(asset));
@@ -283,31 +331,61 @@ export async function uploadChatAttachment(req, res) {
 // Adds a new version directly to an existing asset — used when a file is
 // dropped from the OS straight onto an existing card.
 export async function uploadVersion(req, res) {
-  assertStorageConfigured();
-  if (!req.file) throw new ApiError(400, "No file uploaded");
   const { workspaceId, assetId } = req.params;
 
   const existing = await prisma.asset.findUnique({ where: { id: assetId }, include: { versions: true } });
   if (!existing || existing.workspaceId !== workspaceId) throw new ApiError(404, "Asset not found");
   await assertAssetFolderAccess(req, existing);
+  if (existing.uploadedById !== req.userId && !can(req.membership, "files.manage")) {
+    throw new ApiError(403, "You do not have permission to add a version to this file");
+  }
+  const file = await validateUploadedFile(req.file);
 
-  const nextVersion = Math.max(0, ...existing.versions.map((v) => v.version)) + 1;
-  const storedName = generateStoredName(req.file.originalname);
-  await uploadObject(workspaceId, storedName, req.file.buffer, req.file.mimetype);
-  await prisma.assetVersion.create({
-    data: {
-      assetId,
-      version: nextVersion,
-      originalName: req.file.originalname,
-      storedName,
-      mimeType: req.file.mimetype,
-      size: req.file.size,
-      uploadedById: req.userId,
-    },
-  });
-  await prisma.asset.update({ where: { id: assetId }, data: { updatedAt: new Date() } });
+  let asset;
+  for (let attempt = 1; attempt <= VERSION_UPLOAD_MAX_ATTEMPTS; attempt += 1) {
+    const storedName = generateStoredName();
+    try {
+      asset = await uploadWithCompensation({
+        workspaceId,
+        storedName,
+        buffer: req.file.buffer,
+        mimeType: file.mimeType,
+        operationType: "asset_version",
+        persist: () =>
+          prisma.$transaction(
+            async (tx) => {
+              const latest = await tx.assetVersion.findFirst({
+                where: { assetId },
+                orderBy: { version: "desc" },
+                select: { version: true },
+              });
+              const nextVersion = (latest?.version || 0) + 1;
+              await tx.assetVersion.create({
+                data: {
+                  assetId,
+                  version: nextVersion,
+                  originalName: file.originalName,
+                  storedName,
+                  mimeType: file.mimeType,
+                  size: req.file.size,
+                  uploadedById: req.userId,
+                },
+              });
+              return tx.asset.update({
+                where: { id: assetId },
+                data: { updatedAt: new Date() },
+                include: assetInclude,
+              });
+            },
+            { isolationLevel: "Serializable" }
+          ),
+      });
+      break;
+    } catch (error) {
+      if (!isRetryableVersionConflict(error) || attempt === VERSION_UPLOAD_MAX_ATTEMPTS) throw error;
+    }
+  }
 
-  const asset = await prisma.asset.findUnique({ where: { id: assetId }, include: assetInclude });
   emitToWorkspace(workspaceId, "asset:updated", serialize(asset));
   res.status(201).json({ asset: serialize(asset) });
 }
@@ -319,6 +397,10 @@ const mergeSchema = z.object({ sourceAssetId: z.string().min(1) });
 export async function mergeAssets(req, res) {
   const { sourceAssetId } = mergeSchema.parse(req.body);
   const { workspaceId, assetId: targetAssetId } = req.params;
+
+  if (!can(req.membership, "files.manage")) {
+    throw new ApiError(403, "You do not have permission to merge files");
+  }
 
   if (sourceAssetId === targetAssetId) throw new ApiError(400, "Cannot merge an asset into itself");
 
@@ -369,12 +451,13 @@ export async function deleteAsset(req, res) {
   const { workspaceId, assetId } = req.params;
   const asset = await prisma.asset.findUnique({ where: { id: assetId }, include: { versions: true } });
   if (!asset || asset.workspaceId !== workspaceId) throw new ApiError(404, "Asset not found");
+  if (req.params.taskId && asset.taskId !== req.params.taskId) throw new ApiError(404, "Task attachment not found");
   if (asset.uploadedById !== req.userId && !can(req.membership, "files.manage")) {
     throw new ApiError(403, "You do not have permission to delete this file");
   }
   await assertAssetFolderAccess(req, asset);
 
-  await Promise.all(asset.versions.map((v) => deleteObject(workspaceId, v.storedName)));
+  await deleteStoredVersions(workspaceId, asset.versions);
   await prisma.asset.delete({ where: { id: assetId } });
 
   emitToWorkspace(workspaceId, "asset:deleted", { id: assetId });
@@ -387,18 +470,38 @@ export async function moveAsset(req, res) {
   const { workspaceId, assetId } = req.params;
   const { folderId } = moveSchema.parse(req.body);
 
-  const asset = await prisma.asset.findUnique({ where: { id: assetId } });
+  const asset = await prisma.asset.findUnique({
+    where: { id: assetId },
+    include: { chatMessages: { select: { id: true }, take: 1 } },
+  });
   if (!asset || asset.workspaceId !== workspaceId) throw new ApiError(404, "Asset not found");
   if (asset.uploadedById !== req.userId && !can(req.membership, "files.manage")) {
     throw new ApiError(403, "You do not have permission to move this file");
   }
-  await assertAssetFolderAccess(req, asset);
+
+  const folderById = asset.folderId || folderId ? await loadFolderAccessMap(workspaceId) : new Map();
+  const sourceFolder = asset.folderId ? folderById.get(asset.folderId) : null;
+  const sourceAncestry = sourceFolder ? resolveFolderAncestry(sourceFolder, folderById) : [];
+  if (asset.folderId && (!sourceAncestry || !isFolderVisible(req.userId, req.membership, sourceFolder, folderById))) {
+    throw new ApiError(403, "You don't have access to this file");
+  }
+  if (asset.chatMessages?.length || sourceAncestry.some((folder) => folder.chatConversationId)) {
+    throw new ApiError(400, "Chat attachments cannot be moved from their managed folder");
+  }
+  if (!folderId && sourceAncestry.some((folder) => folder.visibility === "RESTRICTED")) {
+    throw new ApiError(400, "Restricted files cannot be moved to the workspace root");
+  }
 
   if (folderId) {
-    const folder = await prisma.folder.findUnique({ where: { id: folderId }, include: { members: true } });
-    if (!folder || folder.workspaceId !== workspaceId) throw new ApiError(404, "Folder not found");
-    if (!isFolderVisible(req.userId, req.membership, folder)) {
+    const folder = folderById.get(folderId);
+    if (!folder) throw new ApiError(404, "Folder not found");
+    const destinationAncestry = resolveFolderAncestry(folder, folderById);
+    if (!destinationAncestry) throw new ApiError(400, "Destination folder hierarchy is invalid");
+    if (!isFolderVisible(req.userId, req.membership, folder, folderById)) {
       throw new ApiError(403, "You don't have access to this folder");
+    }
+    if (destinationAncestry.some((ancestor) => ancestor.chatConversationId)) {
+      throw new ApiError(400, "Files cannot be moved into a managed chat folder");
     }
   }
 

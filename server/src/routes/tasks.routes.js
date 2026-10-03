@@ -1,13 +1,8 @@
 import { Router } from "express";
-import multer from "multer";
 import * as tasksController from "../controllers/tasks.controller.js";
 import * as assetsController from "../controllers/assets.controller.js";
 import { requireAuth, requireWorkspaceMember } from "../middleware/auth.js";
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB, generous for video
-});
+import { requireStorageConfigured, singleFileUpload } from "../middleware/storageUpload.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -21,7 +16,7 @@ workspaceRouter.post("/", tasksController.createTask);
 workspaceRouter.patch("/:taskId", tasksController.updateTask);
 workspaceRouter.delete("/:taskId", tasksController.deleteTask);
 workspaceRouter.get("/:taskId/attachments", assetsController.listTaskAttachments);
-workspaceRouter.post("/:taskId/attachments", upload.single("file"), assetsController.uploadTaskAttachment);
+workspaceRouter.post("/:taskId/attachments", requireStorageConfigured, singleFileUpload, assetsController.uploadTaskAttachment);
 workspaceRouter.delete("/:taskId/attachments/:assetId", assetsController.deleteAsset);
 
 export default router;

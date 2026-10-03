@@ -1,6 +1,6 @@
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
-import { can } from "../services/permissions.js";
+import { isFolderVisible } from "../services/folderAccess.js";
 
 const MAX_QUERY_LENGTH = 100;
 const CATEGORY_LIMIT = 10;
@@ -45,29 +45,28 @@ export async function globalSearch(req, res) {
   }
 
   const authorizedWorkspaceIds = memberships.map((m) => m.workspaceId);
-  const adminWorkspaceIds = memberships.filter((m) => can(m, "files.viewAll")).map((m) => m.workspaceId);
-  const memberWorkspaceIds = memberships.filter((m) => !can(m, "files.viewAll")).map((m) => m.workspaceId);
-
-  // Asset visibility conditions directly enforced in Prisma (semantically matching isFolderVisible):
-  // - Where the caller holds files.viewAll (every admin does): any asset in
-  //   that workspace is discoverable.
-  // - In member workspaces: asset must have no folder, be in a WORKSPACE folder,
-  //   be in a folder created by the caller, or caller is listed in FolderMember.
-  const assetPermissionBranches = [];
-  if (adminWorkspaceIds.length > 0) {
-    assetPermissionBranches.push({ workspaceId: { in: adminWorkspaceIds } });
-  }
-  if (memberWorkspaceIds.length > 0) {
-    assetPermissionBranches.push({
-      workspaceId: { in: memberWorkspaceIds },
-      OR: [
-        { folderId: null },
-        { folder: { visibility: "WORKSPACE" } },
-        { folder: { createdById: req.userId } },
-        { folder: { members: { some: { userId: req.userId } } } },
-      ],
-    });
-  }
+  const folders = await prisma.folder.findMany({
+    where: { workspaceId: { in: authorizedWorkspaceIds } },
+    include: { members: true },
+  });
+  const folderById = new Map(folders.map((folder) => [folder.id, folder]));
+  const assetPermissionBranches = memberships.map((membership) => ({
+    workspaceId: membership.workspaceId,
+    OR: [
+      { folderId: null },
+      {
+        folderId: {
+          in: folders
+            .filter(
+              (folder) =>
+                folder.workspaceId === membership.workspaceId &&
+                isFolderVisible(req.userId, membership, folder, folderById)
+            )
+            .map((folder) => folder.id),
+        },
+      },
+    ],
+  }));
 
   // 2. Parallel scoped database queries across Tasks, Messages, Assets, and Users
   const [tasks, messages, assets, users] = await Promise.all([
@@ -109,6 +108,7 @@ export async function globalSearch(req, res) {
     prisma.asset.findMany({
       where: {
         name: { contains: queryStr, mode: "insensitive" },
+        taskId: null,
         OR: assetPermissionBranches,
       },
       take: CATEGORY_LIMIT,

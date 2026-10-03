@@ -1,20 +1,15 @@
 import { Router } from "express";
-import multer from "multer";
 import * as assetsController from "../controllers/assets.controller.js";
 import { requireAuth, requireWorkspaceMember } from "../middleware/auth.js";
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB, generous for video
-});
+import { requireStorageConfigured, singleFileUpload } from "../middleware/storageUpload.js";
 
 const router = Router({ mergeParams: true });
 router.use(requireAuth, requireWorkspaceMember());
 
 router.get("/", assetsController.listAssets);
-router.post("/", upload.single("file"), assetsController.uploadAsset);
-router.post("/chat-attachment", upload.single("file"), assetsController.uploadChatAttachment);
-router.post("/:assetId/versions", upload.single("file"), assetsController.uploadVersion);
+router.post("/", requireStorageConfigured, singleFileUpload, assetsController.uploadAsset);
+router.post("/chat-attachment", requireStorageConfigured, singleFileUpload, assetsController.uploadChatAttachment);
+router.post("/:assetId/versions", requireStorageConfigured, singleFileUpload, assetsController.uploadVersion);
 router.post("/:assetId/merge", assetsController.mergeAssets);
 router.patch("/:assetId/folder", assetsController.moveAsset);
 router.get("/:assetId/versions/:versionId/download", assetsController.downloadVersion);

@@ -11,3 +11,6 @@ server/uploads/
 .vercel
 .env*
 .neon
+
+# macOS metadata
+.DS_Store
