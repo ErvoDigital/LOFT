@@ -233,10 +233,7 @@ export default function MyPlan() {
             )}
 
             {hasConflicts && (
-              <section>
-                <h3 className="section-label mb-2">Cross-workspace conflicts</h3>
-                <ConflictsPanel conflicts={plan.conflicts} />
-              </section>
+              <ConflictsPanel title="Cross-workspace conflicts" conflicts={plan.conflicts} />
             )}
 
             {hasTasks && (

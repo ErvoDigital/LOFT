@@ -118,7 +118,7 @@ function OverviewPanel({ firstName, workspaceCount, days, conflictCount, onRevie
   );
 }
 
-function ClashesPanel({ conflicts, editing }) {
+function ClashesPanel({ conflicts }) {
   if (!conflicts?.length) {
     // Only drawn while editing the layout; otherwise the widget is left out
     // until there's a clash to show.
@@ -136,14 +136,7 @@ function ClashesPanel({ conflicts, editing }) {
       </section>
     );
   }
-  return (
-    // No card padding of its own, so while editing it makes room for the
-    // frame's chips above the heading.
-    <section id={CLASHES_ID} className={`scroll-mt-6 @container ${editing ? "pt-4" : ""}`}>
-      <h3 className="section-label mb-2">Clashes across workspaces</h3>
-      <ConflictsPanel conflicts={conflicts} listClassName="grid grid-cols-1 gap-2 @3xl:grid-cols-2" />
-    </section>
-  );
+  return <ConflictsPanel id={CLASHES_ID} conflicts={conflicts} />;
 }
 
 // A titled card whose body scrolls when the dashboard gives it less height
@@ -330,7 +323,7 @@ export default function Dashboard() {
     panel.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
   };
 
-  const renderWidget = (id, editing) => {
+  const renderWidget = (id) => {
     switch (id) {
       case "overview":
         return (
@@ -347,7 +340,7 @@ export default function Dashboard() {
       case "metrics":
         return <MetricStrip metrics={metrics} />;
       case "clashes":
-        return <ClashesPanel conflicts={data?.conflicts} editing={editing} />;
+        return <ClashesPanel conflicts={data?.conflicts} />;
       case "agenda":
         return (
           <AgendaPanel days={days} selectedKey={selectedDay} onShowAll={() => setSelectedDay(null)} colorFor={colorFor} />
