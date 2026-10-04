@@ -5,6 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { uploadObject, isStorageConfigured } from "../src/utils/uploads.js";
+import { splitName } from "../src/utils/userName.js";
 
 dotenv.config({ path: fileURLToPath(new URL("../.env", import.meta.url)), quiet: true });
 const outputDirectory = new URL("../.seed-accounts/", import.meta.url);
@@ -91,7 +92,7 @@ export async function seedDemoAccounts() {
       const credential = manifest?.accounts?.find((p) => p.id === user.id);
       if (expected?.id !== user.id || !credential || credential.email !== user.email || !await bcrypt.compare(credential.password, user.passwordHash || "")) throw new Error("A demo identity already exists with different credentials. Refusing to replace it or reset passwords.");
     }
-    const users = await Promise.all(fixtures.users.map(async ({ group, role, ...person }) => ({ ...person, passwordHash: await bcrypt.hash(manifest.accounts.find((p) => p.id === person.id).password, 10) })));
+    const users = await Promise.all(fixtures.users.map(async ({ group, role, ...person }) => ({ ...person, ...splitName(person.name), passwordHash: await bcrypt.hash(manifest.accounts.find((p) => p.id === person.id).password, 10) })));
     // Add only these namespaced fixtures; preserve existing users and edits on rerun.
     await prisma.$transaction(async (tx) => {
       await tx.user.createMany({ data: users, skipDuplicates: true });

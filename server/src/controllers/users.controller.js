@@ -8,9 +8,23 @@ import { notify } from "../services/notification.service.js";
 import { publicUser } from "../utils/publicUser.js";
 import { findFollowRow, followState } from "./follows.controller.js";
 import { imageDataUrlSchema } from "../utils/imageDataUrl.js";
+import { displayName } from "../utils/userName.js";
+
+// Blank clears the field.
+const optionalNamePart = z
+  .string()
+  .trim()
+  .max(40)
+  .transform((s) => s || null)
+  .nullable()
+  .optional();
+
+const NAME_FIELDS = ["firstName", "lastName", "nickname"];
 
 const updateSchema = z.object({
-  name: z.string().min(2).max(80).optional(),
+  firstName: z.string().trim().min(1).max(40).optional(),
+  lastName: optionalNamePart,
+  nickname: optionalNamePart,
   avatarColor: z.string().min(3).max(20).optional(),
   avatarUrl: imageDataUrlSchema,
 });
@@ -41,6 +55,12 @@ function isCodeValid(user, code) {
 
 export async function updateProfile(req, res) {
   const data = updateSchema.parse(req.body);
+  if (NAME_FIELDS.some((field) => field in data)) {
+    const me = await prisma.user.findUnique({ where: { id: req.userId } });
+    const merged = { ...me, ...data };
+    if (!merged.firstName) throw new ApiError(400, "First name is required");
+    data.name = displayName(merged);
+  }
   const user = await prisma.user.update({ where: { id: req.userId }, data });
   res.json({ user: publicUser(user) });
 }
@@ -210,7 +230,10 @@ export async function searchUsers(req, res) {
   const users = await prisma.user.findMany({
     where: {
       OR: [
+        // Also the real name, so someone going by a nickname is still findable.
         { name: { contains: q, mode: "insensitive" } },
+        { firstName: { contains: q, mode: "insensitive" } },
+        { lastName: { contains: q, mode: "insensitive" } },
         { email: { contains: q, mode: "insensitive" } },
       ],
     },

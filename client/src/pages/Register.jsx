@@ -32,8 +32,7 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      const name = `${firstName.trim()} ${lastName.trim()}`.trim();
-      await register(name, email, phone, password);
+      await register(firstName.trim(), lastName.trim(), email, phone, password);
       navigate(returnTo, { replace: true });
     } catch (err) {
       setError(apiErrorMessage(err));

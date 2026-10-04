@@ -6,13 +6,19 @@ import { signToken } from "../utils/jwt.js";
 import { ApiError } from "../utils/ApiError.js";
 import { verifyGoogleCredential } from "../utils/googleAuth.js";
 import { publicUser } from "../utils/publicUser.js";
+import { displayName, splitName } from "../utils/userName.js";
 
-const registerSchema = z.object({
-  name: z.string().min(2).max(80),
-  email: z.string().email(),
-  phone: z.string().trim().max(30).optional(),
-  password: z.string().min(8).max(200),
-});
+const registerSchema = z
+  .object({
+    firstName: z.string().trim().min(1).max(40).optional(),
+    lastName: z.string().trim().max(40).optional(),
+    // Clients from before first/last name were split out send one combined name.
+    name: z.string().trim().min(2).max(80).optional(),
+    email: z.string().email(),
+    phone: z.string().trim().max(30).optional(),
+    password: z.string().min(8).max(200),
+  })
+  .refine((d) => d.firstName || d.name, { message: "First name is required", path: ["firstName"] });
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -29,7 +35,8 @@ const resetSchema = z.object({
 });
 
 export async function register(req, res) {
-  const { name, email, phone, password } = registerSchema.parse(req.body);
+  const { firstName, lastName, name, email, phone, password } = registerSchema.parse(req.body);
+  const nameParts = firstName ? { firstName, lastName: lastName || null } : splitName(name);
 
   const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
   if (existing) throw new ApiError(409, "An account with this email already exists");
@@ -38,7 +45,8 @@ export async function register(req, res) {
   const colors = ["#134A3C", "#1F9B7D", "#E76F51", "#E9A23B", "#5EEAD4", "#C44569"];
   const user = await prisma.user.create({
     data: {
-      name,
+      ...nameParts,
+      name: displayName(nameParts),
       email: email.toLowerCase(),
       phone: phone || null,
       passwordHash,
@@ -86,9 +94,13 @@ export async function googleAuth(req, res) {
 
   if (!user) {
     const colors = ["#134A3C", "#1F9B7D", "#E76F51", "#E9A23B", "#5EEAD4", "#C44569"];
+    const nameParts = payload.given_name
+      ? { firstName: payload.given_name, lastName: payload.family_name || null }
+      : splitName(payload.name || email.split("@")[0]);
     user = await prisma.user.create({
       data: {
-        name: payload.name || email.split("@")[0],
+        ...nameParts,
+        name: displayName(nameParts),
         email,
         googleId: payload.sub,
         avatarUrl: payload.picture || null,
