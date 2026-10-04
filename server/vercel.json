@@ -1,4 +1,4 @@
 {
-  "buildCommand": "npx prisma migrate deploy && npx prisma generate",
+  "buildCommand": "sh scripts/vercel-build.sh",
   "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
 }
