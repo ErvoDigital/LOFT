@@ -72,6 +72,18 @@ User -> LOFT Assistant UI -> authenticated LOFT API
 - **LOFT backend:** authenticate, authorize, validate inputs/results, retrieve data, compute priorities/conflicts, prepare confirmations, and execute final changes through existing workflows.
 - **LOFT UI:** show context and progress, clarify ambiguity, preview actions, collect approval, and refresh affected views after backend success.
 
+### Explicit intent and caller authority
+
+The assistant is request-driven. Act only on what the interacting user explicitly asks, and ask a focused clarification before preparing an action when intent or material details are missing or ambiguous. Advice, a conflict report, a summary, an inferred next step, or a prior assistant suggestion does not authorize a new action. No autonomous follow-ups, background actions, or unsolicited task/meeting proposals are allowed. Relevant authorized reads may support the requested answer.
+
+Resolve workspace, target, assignee, priority, requested deadline, meeting times/duration and attendees from explicit instructions or unambiguous active context. "Me" resolves to the authenticated caller; a clearly selected workspace resolves workspace context. Do not silently choose an assignee, priority, duration or recipients. Optional descriptions and unrequested deadlines may be omitted. If a requested date lacks a needed time, ask. A conversational "yes" cannot bypass the exact preview and Confirm control.
+
+The assistant acts **as the interacting member**, using their verified session identity and current workspace membership, role, delegated abilities and resource access. Never use a master admin key, admin impersonation or a shared privileged LOFT account for tool execution. An admin role in one team never grants access in another. Gateway/provider credentials authenticate infrastructure only; they grant no LOFT data authority. Database access remains inside LOFT's backend with caller-scoped authorization on every operation.
+
+The runtime supplies a server-generated context envelope with active workspace role and effective permissions. Workspace discovery returns current roles/abilities for each team. Each active-context tool call reloads membership; global reads use live membership predicates; proposals and confirmation revalidate the caller and affected people. Current task/event creation is available to any member, matching normal routes. Future tools must reproduce all route middleware permission and resource checks before calling controllers, and repeat them at confirmation. Model claims, browser fields, history or an old signed proposal cannot establish current authority.
+
+Intent interpretation and clarification are model instructions, not a deterministic proof that every proposed field was requested. Required task assignee/priority, strict schemas, scoped queries, backend authorization and explicit confirmation enforce the runtime boundary. Verify clarification and resistance to unsolicited proposals with live adversarial tests before release.
+
 The browser talks only to LOFT. Provider credentials stay on the gateway; the gateway token stays server-side. Neither the model nor gateway receives database credentials or LOFT login tokens. Keep existing local Docker and separate Lightsail deployment options described in the operational guides.
 
 ## 5. V1 tool contract
@@ -81,7 +93,7 @@ These are target capabilities, not claims that all tools already exist. Preserve
 | Target capability | Contract and implementation direction |
 | --- | --- |
 | `get_my_agenda` | Validated date/range and `single_workspace` or `all_workspaces` scope. Return caller tasks, relevant meetings, and requested workload/conflict/priority information. Extend current list tools with filters; disclose truncation and paginate where needed. |
-| `create_task` | Reuse `propose_task` plus confirmation. Align fields with LOFT: `workspaceId`, `title`, optional `description`, `assigneeId`, offset-aware `dueDate`, and `tier` (`TIER_1`–`TIER_4`). Default assignee is the caller. |
+| `create_task` | Reuse `propose_task` plus confirmation. Require resolved `workspaceId`, `title`, `assigneeId`, and `tier` (`TIER_1`–`TIER_4`); optional `description` and offset-aware `dueDate`. Clarify missing assignee/priority instead of silently defaulting them. |
 | `update_task` | Prepare a record-specific patch for approval: title, description, deadline, tier, valid workspace status, assignee, estimated effort, pin/snooze. Implement an explicit allowlist and existing controller permissions. |
 | `create_meeting` | Reuse `propose_event` plus confirmation: `workspaceId`, title, offset-aware `startTime`/`endTime`, explicit `attendeeIds`. Resolve duration and “the team” into validated times/member IDs. |
 | `update_meeting` | Prepare supported title/time/duration/attendee changes against a specific calendar event. Recheck permissions and the current record before applying. |
@@ -96,7 +108,7 @@ Map natural urgency wording to existing tiers using a documented mapping or clar
 
 ## 6. Context, scope, and efficiency
 
-Target server-generated envelope:
+Implemented server-generated envelope (global context uses a null role and empty grants; discover roles separately for each team):
 
 ```json
 {
@@ -104,11 +116,13 @@ Target server-generated envelope:
   "active_workspace_id": "validated-workspace-or-null",
   "scope": "single_workspace",
   "current_timestamp_utc": "server-generated-ISO-8601",
-  "user_time_zone": "Asia/Manila"
+  "user_time_zone": "Asia/Manila",
+  "workspace_role": "MEMBER",
+  "workspace_permissions": ["events.manage"]
 }
 ```
 
-The current instructions already include identity, workspace, server UTC time, and validated browser time zone. Formalize the envelope without trusting user-supplied identity or dates. Resolve “today”, “tomorrow”, and “next Friday” using local calendar boundaries converted to UTC; clarify ambiguous times. Existing conflict detection and plan day grouping use host-local dates, so time-zone consistency remains work.
+The current instructions include this envelope with identity, workspace, role/abilities, server UTC time, and validated browser time zone. Never trust user-supplied identity or dates. Resolve “today”, “tomorrow”, and “next Friday” using local calendar boundaries converted to UTC; clarify ambiguous times. Existing conflict detection and plan day grouping use host-local dates, so time-zone consistency remains work.
 
 Workspace context restricts reads and mutations to that workspace. Global context aggregates caller memberships. A request about another team while scoped to one should prompt a context switch, not silently widen access. An active workspace never proves authorization. Check membership at every tool execution and confirmation.
 
@@ -222,6 +236,8 @@ Build order: verify the existing gateway/model first; finish Smart Priority expl
 - [ ] Show meeting summary/action-item drafts; approve one and reject another, creating only the approved task.
 - [ ] Query across permitted teams in global context; deny unauthorized workspaces/restricted content, including after membership changes.
 - [ ] Exercise ambiguous names/dates, injected instructions in retrieved text, unavailable gateway, failed tools, expired/stale proposals, duplicate confirmations, and cancellation.
+- [ ] Ask for advice or a summary; verify no unsolicited proposals or writes. Clarify vague requests and missing assignee, priority, times and recipients before proposals.
+- [ ] Compare a member, delegated member and admin across teams; verify no cross-team privilege inheritance, forged roles or master-account fallback. Revoke membership during inference and before confirmation; deny further access.
 - [ ] Repeat the full demo without manual database repair or duplicate writes.
 
 Run existing contracts with `npm run ai:test`, and `npm run build` for UI changes. Add focused tests for new score/reason logic, access checks, date filtering, updates/idempotency, and structured summary validation. Mock tests do not prove live model behavior; rehearse against a real gateway/model in a test workspace.

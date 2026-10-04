@@ -8,7 +8,7 @@ import jwt from "jsonwebtoken";
 process.env.JWT_SECRET = "assistant-test-secret-only";
 process.env.OPENCLAW_GATEWAY_TOKEN = "private-test-gateway-token";
 const { runOpenClaw } = await import("../src/services/openclaw.service.js");
-const { answerAssistant, signAction, verifyAction, confirmAction, eventAction } = await import("../src/services/assistant.service.js");
+const { answerAssistant, signAction, verifyAction, confirmAction, eventAction, taskAction } = await import("../src/services/assistant.service.js");
 const { setPrismaClient, clearPrismaClient } = await import("../src/db/prisma.js");
 const { createApp } = await import("../src/app.js");
 const { signToken, verifyToken } = await import("../src/utils/jwt.js");
@@ -27,16 +27,18 @@ function fakeDatabase() {
   const queries = [];
   let revoked = false;
   let creates = 0;
+  let role = "MEMBER";
+  let permissions = "";
   const db = {
     workspaceMember: {
       async findUnique({ where }) {
         const pair = where.workspaceId_userId;
         if (revoked || ![workspaceId, otherWorkspaceId].includes(pair.workspaceId) || ![userId, partnerId].includes(pair.userId)) return null;
-        return { ...pair, role: "MEMBER", workspace: { name: "School" }, user: { name: pair.userId === userId ? "Tester" : "Partner" } };
+        return { ...pair, role, permissions, workspace: { name: "School" }, user: { name: pair.userId === userId ? "Tester" : "Partner" } };
       },
       async findMany() { return [{ user: { id: userId, name: "Tester" } }, { user: { id: partnerId, name: "Partner" } }]; },
     },
-    workspace: { async findMany(query) { queries.push(query); return [{ id: workspaceId, name: "School" }]; } },
+    workspace: { async findMany(query) { queries.push(query); return revoked ? [] : [{ id: workspaceId, name: "School", members: [{ role, permissions }] }]; } },
     taskStatus: { async findMany(query) { queries.push(query); return [{ id: "done", isDone: true }, { id: "todo", isDone: false }]; } },
     realtimeEvent: { async create() { return {}; } },
     notification: { async create({ data }) { return { id: "notice", ...data }; } },
@@ -53,7 +55,7 @@ function fakeDatabase() {
       return record;
     },
   };
-  return { db, records, queries, revoke() { revoked = true; }, get creates() { return creates; } };
+  return { db, records, queries, revoke() { revoked = true; }, access(nextRole, nextPermissions = "") { role = nextRole; permissions = nextPermissions; }, get creates() { return creates; } };
 }
 
 test("OpenClaw continuation uses server-only auth and an isolated session", async () => {
@@ -135,10 +137,58 @@ test("Unauthorized workspace is rejected before contacting the gateway", async (
   await assert.rejects(answerAssistant({ userId, workspaceId: inaccessible }, fakeDatabase().db, async () => assert.fail("Unauthorized inference")), (e) => e.statusCode === 403);
 });
 
+test("Task proposals require resolved assignee and priority without silent defaults", async () => {
+  for (const field of ["assigneeId", "tier"]) {
+    const incomplete = { ...taskData };
+    delete incomplete[field];
+    assert.equal(taskAction.safeParse(incomplete).success, false);
+    const fake = fakeDatabase();
+    const result = await answerAssistant({ userId, workspaceId, message: "Add a task" }, fake.db, async ({ executeTool }) => {
+      await assert.rejects(executeTool("propose_task", incomplete));
+      return "Who should own it and what priority should it have?";
+    });
+    assert.deepEqual(result.actions, []);
+    assert.equal(fake.creates, 0);
+  }
+});
+
+test("Every active-context tool call rejects membership revoked during inference", async () => {
+  const fake = fakeDatabase();
+  await answerAssistant({ userId, workspaceId, message: "My tasks?" }, fake.db, async ({ executeTool }) => {
+    fake.revoke();
+    for (const name of ["list_workspaces", "list_my_tasks", "list_upcoming_events", "find_conflicts", "list_workspace_members", "propose_task", "propose_event"]) {
+      await assert.rejects(executeTool(name, { workspaceId }), (e) => e.statusCode === 403);
+    }
+    return "Your access has changed.";
+  });
+  assert.deepEqual(fake.queries, []);
+});
+
+test("Caller context and discovery use live workspace roles and grants", async () => {
+  const fake = fakeDatabase();
+  fake.access("MEMBER", "events.manage,files.viewAll,invalid.grant");
+  await answerAssistant({ userId, workspaceId, message: "Which team?", timeZone: "Asia/Manila" }, fake.db, async ({ instructions, executeTool }) => {
+    const context = JSON.parse(instructions.split("Server-verified caller context: ")[1].split(".\n")[0]);
+    assert.equal(context.authenticated_user_id, userId);
+    assert.equal(context.workspace_role, "MEMBER");
+    assert.deepEqual(context.workspace_permissions, ["events.manage", "files.viewAll"]);
+    assert.match(instructions, /Act only on the interacting user's explicit request/);
+    assert.match(instructions, /ask a focused clarification before proposing/);
+    assert.match(instructions, /never as a master admin or service account/);
+    let teams = await executeTool("list_workspaces", {});
+    assert.deepEqual(teams[0].permissions, ["events.manage", "files.viewAll"]);
+    fake.access("MEMBER");
+    teams = await executeTool("list_workspaces", {});
+    assert.deepEqual(teams[0].permissions, []);
+    await assert.rejects(executeTool("list_my_tasks", { userId: partnerId }));
+    return "Here is your current access.";
+  });
+});
+
 test("Proposals do not write records, are caller-bound, and hide tokens from the model", async () => {
   const fake = fakeDatabase();
   const result = await answerAssistant({ userId, workspaceId, message: "Create", history: [], timeZone: "Asia/Manila" }, fake.db, async ({ executeTool }) => {
-    const output = await executeTool("propose_task", { workspaceId, title: "Presentation" });
+    const output = await executeTool("propose_task", taskData);
     assert.equal(output.status, "awaiting_user_confirmation");
     assert.equal(output.token, undefined);
     assert.equal(output.data.assigneeId, userId);
@@ -208,7 +258,7 @@ test("HTTP assistant routes require auth and reject client authority/history inj
     if (!body.previous_response_id) {
       assert.equal(body.input.at(-1).content, "Prepare a presentation task");
       assert.ok(body.tools.some((t) => t.name === "propose_task"));
-      output = { id: "mock-first", output: [{ type: "function_call", call_id: "proposal", name: "propose_task", arguments: JSON.stringify({ workspaceId, title: "Presentation" }) }] };
+      output = { id: "mock-first", output: [{ type: "function_call", call_id: "proposal", name: "propose_task", arguments: JSON.stringify(taskData) }] };
     } else {
       assert.equal(body.previous_response_id, "mock-first");
       assert.equal(JSON.parse(body.input[0].output).status, "awaiting_user_confirmation");
