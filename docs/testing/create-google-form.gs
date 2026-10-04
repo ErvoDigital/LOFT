@@ -1,413 +1,815 @@
 /**
- * Paste this whole file into Code.gs at https://script.google.com/.
- * Run createLoftTesterForm once. Each run creates a new unpublished draft.
- * Review the draft, test a response, then publish it in Google Forms.
- * Uses only Google's built-in Forms and Sheets services; no API key required.
+ * LOFT Website Usability Test
+ * Google Forms Generator
+ *
+ * Run: createLOFTUsabilityTestForm()
  */
-const LOFT_FORM_CONFIG = {
-  websiteUrl: '[Insert the LOFT test website URL before sharing]',
-  buildLabel: '[Insert the tested build/version before sharing]',
-  createResponseSheet: true
-};
 
-const LOFT_OUTCOMES = [
-  "It all worked without help",
-  "It all worked with help",
-  "Some steps did not work",
-  "I tried but could not finish",
-  "I was missing something needed for this activity",
-  "I did not try it"
-];
+function createLOFTUsabilityTestForm() {
+  const form = FormApp.create("LOFT Website Usability Test");
 
-const LOFT_QUESTIONNAIRE = {
-  "title": "LOFT Website Test and Feedback",
-  "description": "Try LOFT and tell us what works and what needs fixing. Allow about 45-60 minutes to try it and 8-12 minutes to answer this form. Use the test details we give you. Do not share passwords or private information. Taking part is your choice. You can stop at any time. Our team will use your answers to improve LOFT. Please send one response per test session.",
-  "consent": {
-    "title": "Do you agree to take part and let us use your answers to improve LOFT?",
-    "yes": "Yes, I agree",
-    "no": "No, I do not agree"
-  },
-  "sections": [
-    {
-      "id": "background",
-      "title": "1. About you and your device",
-      "description": "Keep this form open in one tab and LOFT in another. We will give you the website link, test codes, and a partner.",
-      "questions": [
-        {
-          "type": "text",
-          "title": "What is your tester code?",
-          "help": "Enter the code we gave you, such as T01. Do not enter your full name.",
-          "required": true
-        },
-        {
-          "type": "text",
-          "title": "What is your test session code?",
-          "help": "Enter the session code we gave you.",
-          "required": true
-        },
-        {
-          "type": "choice",
-          "title": "Which device are you using for this test?",
-          "choices": [
-            "Laptop or desktop",
-            "Phone",
-            "Tablet"
-          ],
-          "other": true,
-          "required": true
-        },
-        {
-          "type": "text",
-          "title": "What browser are you using, and on what device?",
-          "help": "For example: Chrome on Windows 11, or Safari on iPhone. If you are unsure, ask us for help.",
-          "required": true
-        },
-        {
-          "type": "choice",
-          "title": "How many teams or groups are you part of?",
-          "choices": [
-            "0",
-            "1",
-            "2",
-            "3 or more"
-          ],
-          "required": true
-        },
-        {
-          "type": "choice",
-          "title": "How often do you use apps for tasks, schedules, or team work?",
-          "choices": [
-            "Never",
-            "Less than once a week",
-            "Every week",
-            "Every day"
-          ],
-          "required": true
-        },
-        {
-          "type": "paragraph",
-          "title": "How do you keep track of your tasks and schedules now?",
-          "help": "Name the apps or methods you use. What is difficult about them?",
-          "required": false
-        }
-      ]
-    },
-    {
-      "id": "tasks-a",
-      "title": "2. Try the basics",
-      "description": "Try each activity, then tell us how it went. Choose \"It all worked\" only if everything under \"Check\" is true. Say if you needed help. If something you need is missing, choose that answer. If you are stuck for 5 minutes, move on and tell us later. A workspace is a separate space for a team. Use your tester code in the names below.",
-      "tasks": [
-        {
-          "id": "T01",
-          "name": "Sign in and out",
-          "action": "1. Create an account with the test email we gave you.\n2. Sign out, then sign in again.\n3. If you already have a test account, just sign in and out. Tell us later that you did not try signing up.",
-          "expected": "You can sign in and out. After signing out, you must sign in again to open your dashboard."
-        },
-        {
-          "id": "T02",
-          "name": "Create and join a team space",
-          "action": "1. Create a workspace named TEST-[your code].\n2. Invite your partner and ask them to join.\n3. Join the other workspace using the invitation we gave you.\n4. Switch between the two workspaces.",
-          "expected": "The right people appear in each workspace. Each workspace shows its own name and content."
-        },
-        {
-          "id": "T03",
-          "name": "Add and update a task",
-          "action": "1. Create Task-[your code] in your test workspace.\n2. Assign it to yourself. Set a priority and a due date in the next 7 days.\n3. Move it from To Do to In Progress, then Completed.\n4. Reload the page and open the task again.",
-          "expected": "The task is in Completed. Its name, assigned person, priority, due date, and status are still correct."
-        },
-        {
-          "id": "T04",
-          "name": "Add and change an event",
-          "action": "1. Create Event-[your code] for a date in the next 7 days.\n2. Set a start and end time. Use the time zone we agreed on.\n3. Add your partner as an attendee. Ask them to check the event.\n4. Change the time and reload the page.",
-          "expected": "Both of you see the right event, date, time, and attendees. The new time stays after reloading."
-        }
-      ],
-      "questions": [
-        {
-          "type": "scale",
-          "title": "How easy was this part of the test?",
-          "low": 1,
-          "high": 5,
-          "left": "Very hard",
-          "right": "Very easy",
-          "required": false
-        }
-      ]
-    },
-    {
-      "id": "tasks-b",
-      "title": "3. Find work from different teams",
-      "description": "Use the School and Organization workspaces we prepared. We will tell you which tasks, events, and dates to use. Use the unfinished tasks we gave you.",
-      "tasks": [
-        {
-          "id": "T05",
-          "name": "Find work from both teams",
-          "action": "1. Open the main dashboard and My Plan.\n2. In both places, find the unfinished tasks and upcoming events we prepared for both teams.\n3. Use the links to open a task and an event.",
-          "expected": "Both teams appear with the right task and event details. The links open the right task or calendar."
-        },
-        {
-          "id": "T06",
-          "name": "Find meetings at the same time",
-          "action": "1. Find tomorrow's School event at 10:00-11:00 and Organization event at 10:30-11:30. Use the agreed time zone.\n2. Find the warning about these meetings.\n3. Open both event links.\n4. Tell us which meetings overlap.",
-          "expected": "The warning names both events and teams. Both links open the right calendars. You do not need to change the meeting times."
-        },
-        {
-          "id": "T07",
-          "name": "Find tasks due on the same day",
-          "action": "1. Find the two unfinished tasks we gave you, one in each workspace. Both are assigned to you and due on the same day.\n2. Find the warning about their due dates.\n3. Change one task to the new date we gave you.\n4. Reload the dashboard or My Plan.",
-          "expected": "The warning shows both tasks at first. After the date change and reload, that warning is gone. Other warnings may stay."
-        },
-        {
-          "id": "T08",
-          "name": "Check a new alert",
-          "action": "1. Stay signed in. Ask your partner to assign Notification-[your code] to you.\n2. Open the bell icon, then the new task alert.\n3. Mark it as read.",
-          "expected": "The alert names the right task and team. Its link opens the task or its task board. It shows as read after you mark it."
-        }
-      ],
-      "questions": [
-        {
-          "type": "scale",
-          "title": "How easy was this part of the test?",
-          "low": 1,
-          "high": 5,
-          "left": "Very hard",
-          "right": "Very easy",
-          "required": false
-        }
-      ]
-    },
-    {
-      "id": "tasks-c",
-      "title": "4. Work with your partner",
-      "description": "Use separate accounts, each on your own browser or device. For the video call, allow camera and microphone access. Use headphones if you have them. If your partner or equipment is unavailable, choose the answer about something missing.",
-      "tasks": [
-        {
-          "id": "T09",
-          "name": "Send messages",
-          "action": "1. Send Message-[your code] in the team chat. Ask your partner to reply.\n2. Send your partner a private message. Ask for a reply.\n3. Reload both chats.",
-          "expected": "Messages appear without reloading first. The names and messages are correct. Messages stay after reloading."
-        },
-        {
-          "id": "T10",
-          "name": "Upload and download files",
-          "action": "1. Upload the first sample file we gave you.\n2. Download it and open it.\n3. Add the second sample as a new version of that file.\n4. Open the version list and download both versions.",
-          "expected": "The first download has the right content. Both versions are under one file entry. You can download both, and each has the right content."
-        },
-        {
-          "id": "T11",
-          "name": "Write together in a document",
-          "action": "1. Create Doc-[your code] and write a short sentence.\n2. Keep it open. Ask your partner to open it and add another sentence.\n3. Wait until both sentences appear.\n4. Close and reopen the document.",
-          "expected": "Both of you see both sentences without reloading. The name and both sentences stay after reopening. No text is lost or replaced."
-        },
-        {
-          "id": "T12",
-          "name": "Try a video call",
-          "action": "1. Join the same workspace call as your partner.\n2. Check that you can both hear and see each other.\n3. Turn your microphone and camera off and on. Ask your partner to check each change.\n4. Leave the call.",
-          "expected": "Both of you can hear and see each other. Turning the microphone or camera off stops your sound or video; turning it on brings it back. Your partner can see that you left."
-        }
-      ],
-      "questions": [
-        {
-          "type": "scale",
-          "title": "How easy was this part of the test?",
-          "low": 1,
-          "high": 5,
-          "left": "Very hard",
-          "right": "Very easy",
-          "required": false
-        },
-        {
-          "type": "choice",
-          "title": "About how long did you spend trying the website?",
-          "choices": [
-            "Under 30 minutes",
-            "30–44 minutes",
-            "45–60 minutes",
-            "Over 60 minutes",
-            "I do not know"
-          ],
-          "required": true
-        }
-      ]
-    },
-    {
-      "id": "issues",
-      "title": "5. Tell us about any problems",
-      "description": "Tell us what went wrong or why you skipped an activity. Include its code, such as T03. Do not share passwords or private information.",
-      "questions": [
-        {
-          "type": "choice",
-          "title": "What was your biggest problem?",
-          "choices": [
-            "No problems",
-            "A small issue with how something looked or worked",
-            "Something was confusing or slow, or I needed help",
-            "I could not finish an important activity",
-            "My work was lost or someone could see private content",
-            "I was missing an account, access, partner, or equipment"
-          ],
-          "required": true
-        },
-        {
-          "type": "paragraph",
-          "title": "What went wrong, or what could you not try?",
-          "help": "For each problem, tell us:\n1. Which activity was it?\n2. What did you do?\n3. What should have happened?\n4. What happened instead?\n5. Did you need help? Did it happen again?\nIf you skipped something, say why. For the video call, say whether you used the same Wi-Fi or different connections. Write \"None\" if there were no problems.",
-          "required": true
-        },
-        {
-          "type": "paragraph",
-          "title": "Was anything confusing, hard to find, or slow?",
-          "help": "Tell us where it happened. If it was slow, about how long did you wait? Did it happen again? Write \"None\" if there were no problems.",
-          "required": true
-        },
-        {
-          "type": "text",
-          "title": "Link to a screenshot or video (optional)",
-          "help": "Paste a link we can open. Remove private information first. You can leave this blank.",
-          "required": false
-        }
-      ]
-    },
-    {
-      "id": "value",
-      "title": "6. What do you think of LOFT?",
-      "description": "Tell us what you think based on what you tried today.",
-      "questions": [
-        {
-          "type": "scale",
-          "title": "How easy was it to find what you needed in LOFT?",
-          "low": 1,
-          "high": 5,
-          "left": "Very hard",
-          "right": "Very easy",
-          "required": true
-        },
-        {
-          "type": "choice",
-          "title": "Would seeing all your teams' tasks and events in one place help you?",
-          "choices": [
-            "1 - Not useful",
-            "2 - A little useful",
-            "3 - Somewhat useful",
-            "4 - Very useful",
-            "5 - Extremely useful",
-            "This does not apply to me"
-          ],
-          "required": true
-        },
-        {
-          "type": "choice",
-          "title": "Would alerts about meetings at the same time or tasks due on the same day help you?",
-          "choices": [
-            "1 - Not useful",
-            "2 - A little useful",
-            "3 - Somewhat useful",
-            "4 - Very useful",
-            "5 - Extremely useful",
-            "I could not test this properly",
-            "This does not apply to me"
-          ],
-          "required": true
-        },
-        {
-          "type": "choice",
-          "title": "Would you use LOFT for a real team or group project?",
-          "choices": [
-            "Yes, as it is now",
-            "Yes, after some problems are fixed",
-            "I am not sure",
-            "No",
-            "This does not apply to me"
-          ],
-          "required": true
-        },
-        {
-          "type": "paragraph",
-          "title": "Why did you choose that answer?",
-          "help": "Tell us why you would or would not use LOFT. What needs fixing first?",
-          "required": true
-        },
-        {
-          "type": "paragraph",
-          "title": "What should we improve first?",
-          "help": "Suggest one change and say how it would help. Write \"None\" if you have no suggestion.",
-          "required": true
-        },
-        {
-          "type": "paragraph",
-          "title": "What part of LOFT helped you the most, and why?",
-          "required": false
-        },
-        {
-          "type": "paragraph",
-          "title": "Anything else you want to tell us?",
-          "required": false
-        }
-      ]
-    }
-  ]
-};
+  form.setDescription(
+    "Thank you for testing LOFT!\n\n" +
+    "During this session, you will use LOFT while a developer observes " +
+    "how you interact with the website. The developer may help if you get " +
+    "stuck, but please try each activity on your own first.\n\n" +
+    "We are testing LOFT, not you. There are no right or wrong answers.\n\n" +
+    "As you explore the website, please tell us whenever something is " +
+    "confusing, difficult to find, useful, unnecessary, or different from " +
+    "what you expected.\n\n" +
+    "Your feedback will help us determine which features are useful, what " +
+    "needs improvement, and what you would like to see in future versions " +
+    "of LOFT."
+  );
 
-function createLoftTesterForm() {
-  const form = FormApp.create(LOFT_QUESTIONNAIRE.title, false);
-  // Log immediately so the draft remains findable if a later step fails.
-  Logger.log('Draft edit URL: ' + form.getEditUrl());
-  form.setDescription(LOFT_QUESTIONNAIRE.description + '\n\nWebsite: ' + LOFT_FORM_CONFIG.websiteUrl + '\nWebsite version: ' + LOFT_FORM_CONFIG.buildLabel);
-  form.setCollectEmail(false);
-  form.setLimitOneResponsePerUser(false);
-  form.setShuffleQuestions(false);
+  form.setConfirmationMessage(
+    "Thank you for testing LOFT!\n\n" +
+    "Your feedback will help us understand which features are most useful, " +
+    "what needs improvement, and what we should consider adding in future " +
+    "versions.\n\n" +
+    "Your responses will be reviewed together with observations made during " +
+    "the testing session."
+  );
+
   form.setProgressBar(true);
-  form.setPublishingSummary(false);
-  form.setConfirmationMessage('Thank you! Your feedback will help us improve LOFT. If you chose not to take part, you do not need to do anything else.');
+  form.setShuffleQuestions(false);
 
-  const consentItem = form.addMultipleChoiceItem()
-    .setTitle(LOFT_QUESTIONNAIRE.consent.title)
+  // =========================================================
+  // SECTION 1 — FIRST IMPRESSIONS
+  // =========================================================
+
+  addSection(
+    form,
+    "1. First Impressions",
+    "Sign in using the test account provided to you. Spend a few minutes " +
+    "exploring LOFT before answering these questions."
+  );
+
+  addScale(
+    form,
+    "After signing in, was it clear where you should start?",
+    "Not clear at all",
+    "Very clear",
+    true
+  );
+
+  addParagraph(
+    form,
+    "What was the first feature or part of LOFT that caught your attention?",
+    true
+  );
+
+  addParagraph(
+    form,
+    "Why did it catch your attention?",
+    false
+  );
+
+  addParagraph(
+    form,
+    "Was there anything on the first screen that you did not understand?",
+    true,
+    'Write "None" if everything was clear.'
+  );
+
+  // =========================================================
+  // SECTION 2 — WORKSPACES
+  // =========================================================
+
+  addSection(
+    form,
+    "2. Workspaces",
+    "Complete the workspace activity given to you by the facilitator before " +
+    "answering these questions."
+  );
+
+  addScale(
+    form,
+    "How easy was it to understand and switch between different workspaces?",
+    "Very difficult",
+    "Very easy",
+    true
+  );
+
+  addMultipleChoice(
+    form,
+    "Was it clear which workspace you were currently viewing?",
+    [
+      "Very clear",
+      "Clear",
+      "Neither clear nor unclear",
+      "Unclear",
+      "Very unclear"
+    ],
+    true
+  );
+
+  addMultipleChoice(
+    form,
+    "Would you use separate LOFT workspaces for different teams, classes, organizations, or projects?",
+    [
+      "Definitely",
+      "Probably",
+      "Maybe",
+      "Probably not",
+      "Definitely not"
+    ],
+    true
+  );
+
+  addParagraph(
+    form,
+    "Why or why not?",
+    true
+  );
+
+  // =========================================================
+  // SECTION 3 — TASKS
+  // =========================================================
+
+  addSection(
+    form,
+    "3. Tasks",
+    "Complete the task management activity before answering."
+  );
+
+  addScale(
+    form,
+    "How easy was it to create and manage a task?",
+    "Very difficult",
+    "Very easy",
+    true
+  );
+
+  addMultipleChoice(
+    form,
+    "Would you use LOFT's task system to keep track of your actual work?",
+    [
+      "Definitely",
+      "Probably",
+      "Maybe",
+      "Probably not",
+      "Definitely not"
+    ],
+    true
+  );
+
+  addParagraph(
+    form,
+    "Why or why not?",
+    true
+  );
+
+  addParagraph(
+    form,
+    "Is there anything you wish you could do with tasks that you could not do during the test?",
+    false,
+    "For example: subtasks, recurring tasks, reminders, dependencies, " +
+    "attachments, different task views, or anything else you would find useful."
+  );
+
+  // =========================================================
+  // SECTION 4 — CALENDAR AND EVENTS
+  // =========================================================
+
+  addSection(
+    form,
+    "4. Calendar and Events",
+    "Complete the calendar and event activity before answering."
+  );
+
+  addScale(
+    form,
+    "How easy was it to create and manage an event?",
+    "Very difficult",
+    "Very easy",
+    true
+  );
+
+  addMultipleChoice(
+    form,
+    "Would you use LOFT's calendar for your actual team schedules?",
+    [
+      "Definitely",
+      "Probably",
+      "Maybe",
+      "Probably not",
+      "Definitely not"
+    ],
+    true
+  );
+
+  addParagraph(
+    form,
+    "Why or why not?",
+    true
+  );
+
+  addParagraph(
+    form,
+    "What would you want LOFT's calendar to do that it currently does not?",
+    false
+  );
+
+  // =========================================================
+  // SECTION 5 — DASHBOARD AND MY PLAN
+  // =========================================================
+
+  addSection(
+    form,
+    "5. Dashboard and My Plan",
+    "Use LOFT to find your upcoming work, deadlines, and events from the " +
+    "different workspaces provided to you."
+  );
+
+  addScale(
+    form,
+    "How easy was it to find everything you needed to do?",
+    "Very difficult",
+    "Very easy",
+    true
+  );
+
+  addScale(
+    form,
+    "How useful is having tasks and events from different workspaces together in one place?",
+    "Not useful",
+    "Extremely useful",
+    true
+  );
+
+  addMultipleChoice(
+    form,
+    "Would this make it easier for you to manage work from multiple teams or groups?",
+    [
+      "Definitely",
+      "Probably",
+      "Maybe",
+      "Probably not",
+      "Definitely not"
+    ],
+    true
+  );
+
+  addParagraph(
+    form,
+    "What other information would you want to see on your dashboard or My Plan?",
+    false
+  );
+
+  // =========================================================
+  // SECTION 6 — CONFLICTS AND WORKLOAD
+  // =========================================================
+
+  addSection(
+    form,
+    "6. Conflicts and Workload",
+    "Complete the meeting conflict and task conflict activities before answering."
+  );
+
+  addScale(
+    form,
+    "How useful would warnings about overlapping meetings be to you?",
+    "Not useful",
+    "Extremely useful",
+    true
+  );
+
+  addParagraph(
+    form,
+    "What would you want LOFT to do after detecting a meeting conflict?",
+    false
+  );
+
+  addScale(
+    form,
+    "How useful would warnings about important tasks being due at the same time be to you?",
+    "Not useful",
+    "Extremely useful",
+    true
+  );
+
+  addParagraph(
+    form,
+    "What would you want LOFT to do when it notices that you have too much work due at the same time?",
+    false
+  );
+
+  // =========================================================
+  // SECTION 7 — NOTIFICATIONS
+  // =========================================================
+
+  addSection(
+    form,
+    "7. Notifications",
+    "Complete the notification activity before answering."
+  );
+
+  addMultipleChoice(
+    form,
+    "Was it clear what the notification was about?",
+    [
+      "Very clear",
+      "Clear",
+      "Somewhat clear",
+      "Unclear",
+      "Very unclear"
+    ],
+    true
+  );
+
+  addCheckboxes(
+    form,
+    "What kinds of notifications would you want LOFT to send you?",
+    [
+      "New task assigned to me",
+      "Upcoming task deadline",
+      "Overdue task",
+      "New meeting or event",
+      "Upcoming meeting reminder",
+      "Meeting schedule conflict",
+      "Task workload conflict",
+      "New team message",
+      "New private message",
+      "File added or updated",
+      "Document edited",
+      "Changes to a task I'm involved in"
+    ],
+    false,
+    true
+  );
+
+  addParagraph(
+    form,
+    "Are there any notifications you would NOT want to receive?",
+    false
+  );
+
+  // =========================================================
+  // SECTION 8 — MESSAGING
+  // =========================================================
+
+  addSection(
+    form,
+    "8. Messaging",
+    "Complete the team and private messaging activities before answering."
+  );
+
+  addScale(
+    form,
+    "How easy was it to communicate with another person using LOFT?",
+    "Very difficult",
+    "Very easy",
+    true
+  );
+
+  addMultipleChoice(
+    form,
+    "Would you use LOFT's messaging for your team or group projects?",
+    [
+      "Definitely",
+      "Probably",
+      "Maybe",
+      "Probably not",
+      "Definitely not"
+    ],
+    true
+  );
+
+  addParagraph(
+    form,
+    "What would LOFT's messaging need for you to use it regularly?",
+    false
+  );
+
+  // =========================================================
+  // SECTION 9 — FILES AND DOCUMENTS
+  // =========================================================
+
+  addSection(
+    form,
+    "9. Files and Documents",
+    "Complete the file management and collaborative document activities " +
+    "before answering."
+  );
+
+  addScale(
+    form,
+    "How easy was it to upload, find, and manage files?",
+    "Very difficult",
+    "Very easy",
+    true
+  );
+
+  addMultipleChoice(
+    form,
+    "Would keeping your team's files inside LOFT be useful to you?",
+    [
+      "Definitely",
+      "Probably",
+      "Maybe",
+      "Probably not",
+      "Definitely not"
+    ],
+    true
+  );
+
+  addMultipleChoice(
+    form,
+    "Was the file version feature understandable?",
+    [
+      "Yes, immediately",
+      "Yes, after exploring it",
+      "I needed some help understanding it",
+      "No, I did not understand it",
+      "I did not test this feature"
+    ],
+    true
+  );
+
+  addMultipleChoice(
+    form,
+    "Would you use LOFT's collaborative documents to work with your team?",
+    [
+      "Definitely",
+      "Probably",
+      "Maybe",
+      "Probably not",
+      "Definitely not"
+    ],
+    true
+  );
+
+  addParagraph(
+    form,
+    "What features would you want LOFT's files or document editor to have?",
+    false
+  );
+
+  // =========================================================
+  // SECTION 10 — VIDEO CALLS
+  // =========================================================
+
+  addSection(
+    form,
+    "10. Video Calls",
+    "Complete the video call activity before answering."
+  );
+
+  addScale(
+    form,
+    "How easy was it to find and use the video call feature?",
+    "Very difficult",
+    "Very easy",
+    true
+  );
+
+  addMultipleChoice(
+    form,
+    "Would having video calls directly inside LOFT be useful to you?",
+    [
+      "Definitely",
+      "Probably",
+      "Maybe",
+      "Probably not",
+      "Definitely not"
+    ],
+    true
+  );
+
+  addParagraph(
+    form,
+    "What would you want LOFT's video calls to have in the future?",
+    false
+  );
+
+  // =========================================================
+  // SECTION 11 — FEATURES THEY WOULD ACTUALLY USE
+  // =========================================================
+
+  addSection(
+    form,
+    "11. Which Features Would You Actually Use?",
+    "Think about everything you tried today. We want to know which features " +
+    "you would actually use rather than simply which features worked."
+  );
+
+  addCheckboxes(
+    form,
+    "Which LOFT features would you actually use?",
+    [
+      "Workspaces",
+      "Tasks",
+      "Calendar and events",
+      "Dashboard",
+      "My Plan",
+      "Meeting conflict warnings",
+      "Task/workload warnings",
+      "Notifications",
+      "Team messaging",
+      "Private messaging",
+      "File sharing",
+      "File versioning",
+      "Collaborative documents",
+      "Video calls",
+      "None"
+    ],
+    true,
+    true
+  );
+
+  // Q40 - checkbox with maximum 3 responses
+  const topFeatures = form.addCheckboxItem();
+
+  topFeatures
+    .setTitle("Which THREE features are the most important to you?")
+    .setHelpText("Select up to 3.")
+    .setChoiceValues([
+      "Workspaces",
+      "Tasks",
+      "Calendar and events",
+      "Dashboard / My Plan",
+      "Conflict and workload warnings",
+      "Notifications",
+      "Messaging",
+      "Files",
+      "Collaborative documents",
+      "Video calls",
+      "Other"
+    ])
     .setRequired(true);
-  let firstPage;
 
-  LOFT_QUESTIONNAIRE.sections.forEach(function (section) {
-    const page = form.addPageBreakItem().setTitle(section.title).setHelpText(section.description);
-    if (!firstPage) firstPage = page;
-    (section.tasks || []).forEach(function (task) {
-      form.addMultipleChoiceItem()
-        .setTitle(task.id + ': ' + task.name + ' — how did it go?')
-        .setHelpText('Try this:\n' + task.action + '\n\nCheck: ' + task.expected)
-        .setChoiceValues(LOFT_OUTCOMES)
-        .setRequired(true);
-    });
-    (section.questions || []).forEach(function (question) {
-      addLoftQuestion_(form, question);
-    });
-  });
+  const maxThreeValidation =
+    FormApp.createCheckboxValidation()
+      .requireSelectAtMost(3)
+      .setHelpText("Please select no more than 3 features.")
+      .build();
 
-  consentItem.setChoices([
-    consentItem.createChoice(LOFT_QUESTIONNAIRE.consent.yes, firstPage),
-    consentItem.createChoice(LOFT_QUESTIONNAIRE.consent.no, FormApp.PageNavigationType.SUBMIT)
-  ]);
+  topFeatures.setValidation(maxThreeValidation);
 
-  if (LOFT_FORM_CONFIG.createResponseSheet) {
-    const sheet = SpreadsheetApp.create('LOFT Tester Responses — ' + LOFT_FORM_CONFIG.buildLabel);
-    form.setDestination(FormApp.DestinationType.SPREADSHEET, sheet.getId());
-    Logger.log('Response spreadsheet: ' + sheet.getUrl());
-  }
-  Logger.log('Draft complete. Review settings and preview, then publish in Google Forms.');
-  return form.getEditUrl();
+  addMultipleChoice(
+    form,
+    "Out of everything you tried, which ONE feature would you probably use the most?",
+    [
+      "Workspaces",
+      "Tasks",
+      "Calendar and events",
+      "Dashboard / My Plan",
+      "Conflict and workload warnings",
+      "Notifications",
+      "Messaging",
+      "Files",
+      "Collaborative documents",
+      "Video calls",
+      "Other"
+    ],
+    true
+  );
+
+  addParagraph(
+    form,
+    "Why would you use that feature the most?",
+    true
+  );
+
+  // =========================================================
+  // SECTION 12 — WHAT'S MISSING?
+  // =========================================================
+
+  addSection(
+    form,
+    "12. What Do You Want LOFT to Have?",
+    "Now forget about what LOFT currently has for a moment.\n\n" +
+    "Think about what would genuinely make LOFT more useful for your " +
+    "schoolwork, organizations, projects, or teams.\n\n" +
+    "There are no wrong or unrealistic answers. We want to know what you " +
+    "would want LOFT to become."
+  );
+
+  addParagraph(
+    form,
+    "While using LOFT, was there anything you expected to be able to do but could not?",
+    true,
+    'Write "None" if nothing comes to mind.'
+  );
+
+  addParagraph(
+    form,
+    "What feature do you wish LOFT had?",
+    true,
+    "Do not worry about whether it would be difficult for us to build. " +
+    "Tell us what would genuinely make LOFT more useful to you."
+  );
+
+  addParagraph(
+    form,
+    "Is there something you currently use another app or website for that you wish you could do directly inside LOFT?",
+    true,
+    "If yes, tell us what you currently use and what you would want LOFT " +
+    'to do. Write "None" if nothing comes to mind.'
+  );
+
+  addParagraph(
+    form,
+    "What would make you choose LOFT instead of switching between several different apps?",
+    true
+  );
+
+  addParagraph(
+    form,
+    "Is there anything currently in LOFT that you think you would rarely or never use?",
+    false
+  );
+
+  addParagraph(
+    form,
+    "Is there anything you think LOFT should do automatically for you?",
+    false,
+    "Think about repetitive work, scheduling, reminders, organizing tasks, " +
+    "prioritizing work, summaries, or anything else you normally have to do yourself."
+  );
+
+  // =========================================================
+  // SECTION 13 — FINAL THOUGHTS
+  // =========================================================
+
+  addSection(
+    form,
+    "13. Final Thoughts",
+    "Think about your overall experience using LOFT today."
+  );
+
+  addMultipleChoice(
+    form,
+    "Based on what you tried today, would you use LOFT for a real team, school project, organization, or group?",
+    [
+      "Definitely",
+      "Probably",
+      "Maybe",
+      "Probably not",
+      "Definitely not"
+    ],
+    true
+  );
+
+  addParagraph(
+    form,
+    "What is the main reason for your answer?",
+    true
+  );
+
+  addParagraph(
+    form,
+    "What is the best thing about LOFT right now?",
+    true
+  );
+
+  addParagraph(
+    form,
+    "What is the FIRST thing we should improve?",
+    true
+  );
+
+  addParagraph(
+    form,
+    "What is the FIRST feature you think we should add?",
+    true
+  );
+
+  addParagraph(
+    form,
+    "If LOFT added the features you need, what would make you keep using it?",
+    false
+  );
+
+  addParagraph(
+    form,
+    "Is there anything else you wish LOFT could do for you?",
+    false
+  );
+
+  addParagraph(
+    form,
+    "Is there anything else you would like to tell us about your experience using LOFT?",
+    false
+  );
+
+  // =========================================================
+  // CREATE RESPONSE SPREADSHEET
+  // =========================================================
+
+  const spreadsheet = SpreadsheetApp.create(
+    "LOFT Website Usability Test - Responses"
+  );
+
+  form.setDestination(
+    FormApp.DestinationType.SPREADSHEET,
+    spreadsheet.getId()
+  );
+
+  // =========================================================
+  // OUTPUT LINKS
+  // =========================================================
+
+  Logger.log("==============================================");
+  Logger.log("LOFT USABILITY TEST CREATED");
+  Logger.log("==============================================");
+  Logger.log("EDIT FORM:");
+  Logger.log(form.getEditUrl());
+  Logger.log("");
+  Logger.log("PARTICIPANT FORM:");
+  Logger.log(form.getPublishedUrl());
+  Logger.log("");
+  Logger.log("RESPONSE SPREADSHEET:");
+  Logger.log(spreadsheet.getUrl());
+  Logger.log("==============================================");
 }
 
-function addLoftQuestion_(form, question) {
-  let item;
-  switch (question.type) {
-    case 'text': item = form.addTextItem(); break;
-    case 'paragraph': item = form.addParagraphTextItem(); break;
-    case 'choice':
-      item = form.addMultipleChoiceItem().setChoiceValues(question.choices);
-      if (question.other) item.showOtherOption(true);
-      break;
-    case 'scale':
-      item = form.addScaleItem().setBounds(question.low, question.high).setLabels(question.left, question.right);
-      break;
-    default: throw new Error('Unsupported question type: ' + question.type);
+
+/**
+ * Adds a new Google Forms section.
+ */
+function addSection(form, title, description) {
+  const section = form.addPageBreakItem();
+  section.setTitle(title);
+
+  if (description) {
+    section.setHelpText(description);
   }
-  item.setTitle(question.title).setRequired(Boolean(question.required));
-  if (question.help) item.setHelpText(question.help);
+
+  return section;
+}
+
+
+/**
+ * Adds a 1–5 linear scale.
+ */
+function addScale(form, title, lowLabel, highLabel, required) {
+  const item = form.addScaleItem();
+
+  item
+    .setTitle(title)
+    .setBounds(1, 5)
+    .setLabels(lowLabel, highLabel)
+    .setRequired(required);
+
+  return item;
+}
+
+
+/**
+ * Adds a multiple-choice question.
+ */
+function addMultipleChoice(form, title, choices, required) {
+  const item = form.addMultipleChoiceItem();
+
+  item
+    .setTitle(title)
+    .setChoiceValues(choices)
+    .setRequired(required);
+
+  return item;
+}
+
+
+/**
+ * Adds a paragraph/long-answer question.
+ */
+function addParagraph(form, title, required, helpText) {
+  const item = form.addParagraphTextItem();
+
+  item
+    .setTitle(title)
+    .setRequired(required);
+
+  if (helpText) {
+    item.setHelpText(helpText);
+  }
+
+  return item;
+}
+
+
+/**
+ * Adds a checkbox question.
+ */
+function addCheckboxes(
+  form,
+  title,
+  choices,
+  required,
+  showOther
+) {
+  const item = form.addCheckboxItem();
+
+  item
+    .setTitle(title)
+    .setChoiceValues(choices)
+    .setRequired(required);
+
+  if (showOther) {
+    item.showOtherOption(true);
+  }
+
+  return item;
 }
