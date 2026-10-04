@@ -13,27 +13,34 @@ export async function getDashboard(req, res) {
 
   const workspaces = await prisma.workspace.findMany({
     where: { members: { some: { userId } } },
-    include: { _count: { select: { members: true } } },
+    include: { _count: { select: { members: true } }, members: { where: { userId } } },
     orderBy: { createdAt: "asc" },
   });
   const workspaceIds = workspaces.map((w) => w.id);
+  const membershipByWorkspaceId = new Map(workspaces.map((w) => [w.id, w.members[0]]));
+  // Clashes are scoped by role: in a workspace the caller admins they see
+  // every clash its tasks and meetings are part of; anywhere they're only a
+  // member, just the ones involving their own tasks and the meetings they attend.
+  const adminWorkspaceIds = workspaces.filter((w) => w.members[0].role === "ADMIN").map((w) => w.id);
   const doneStatuses = await prisma.taskStatus.findMany({ where: { isDone: true }, select: { id: true } });
   const doneStatusIds = doneStatuses.map((s) => s.id);
 
   const [
     upcomingEvents,
     pendingTasks,
-    allOpenTasksWithDates,
+    clashableTasks,
     recentMessages,
     notifications,
     unreadCount,
     recentAssets,
     visibleFolders,
-    memberships,
   ] = await Promise.all([
       prisma.event.findMany({
         where: { workspaceId: { in: workspaceIds }, startTime: { gte: now, lte: horizon } },
-        include: { workspace: { select: { name: true, color: true } } },
+        include: {
+          workspace: { select: { name: true, color: true } },
+          attendees: { where: { userId }, select: { id: true } },
+        },
         orderBy: { startTime: "asc" },
         take: 20,
       }),
@@ -44,7 +51,12 @@ export async function getDashboard(req, res) {
         take: 50,
       }),
       prisma.task.findMany({
-        where: { workspaceId: { in: workspaceIds }, status: { notIn: doneStatusIds }, dueDate: { not: null } },
+        where: {
+          workspaceId: { in: workspaceIds },
+          status: { notIn: doneStatusIds },
+          dueDate: { not: null },
+          OR: [{ workspaceId: { in: adminWorkspaceIds } }, { assigneeId: userId }],
+        },
         include: { workspace: { select: { name: true, color: true } } },
       }),
       prisma.message.findMany({
@@ -71,10 +83,8 @@ export async function getDashboard(req, res) {
         },
       }),
       prisma.folder.findMany({ where: { workspaceId: { in: workspaceIds } }, include: { members: true } }),
-      prisma.workspaceMember.findMany({ where: { userId, workspaceId: { in: workspaceIds } } }),
     ]);
 
-  const membershipByWorkspaceId = new Map(memberships.map((m) => [m.workspaceId, m]));
   const folderById = new Map(visibleFolders.map((f) => [f.id, f]));
   const recentFiles = recentAssets
     .filter(
@@ -93,15 +103,18 @@ export async function getDashboard(req, res) {
       latestVersion: a.versions[0] || null,
     }));
 
-  const eventsForConflicts = upcomingEvents.map((e) => ({
+  const toEventSummary = (e) => ({
     id: e.id,
     title: e.title,
     workspaceId: e.workspaceId,
     workspaceName: e.workspace.name,
     startTime: e.startTime,
     endTime: e.endTime,
-  }));
-  const tasksForConflicts = allOpenTasksWithDates.map((t) => ({
+  });
+  const eventsForConflicts = upcomingEvents
+    .filter((e) => adminWorkspaceIds.includes(e.workspaceId) || e.attendees.length > 0)
+    .map(toEventSummary);
+  const tasksForConflicts = clashableTasks.map((t) => ({
     id: t.id,
     title: t.title,
     workspaceId: t.workspaceId,
@@ -120,7 +133,7 @@ export async function getDashboard(req, res) {
       color: w.color,
       memberCount: w._count.members,
     })),
-    upcomingEvents: eventsForConflicts,
+    upcomingEvents: upcomingEvents.map(toEventSummary),
     pendingTasks: pendingTasks.map((t) => ({
       id: t.id,
       title: t.title,
