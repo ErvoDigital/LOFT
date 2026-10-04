@@ -6,6 +6,7 @@ build/
 server/prisma/dev.db
 server/prisma/dev.db-journal
 server/uploads/
+server/.seed-accounts/
 *.log
 
 .vercel

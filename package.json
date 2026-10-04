@@ -26,6 +26,7 @@
     "prisma:generate": "npm run prisma:generate -w server",
     "prisma:migrate": "npm run prisma:migrate -w server",
     "prisma:seed": "npm run prisma:seed -w server",
+    "prisma:seed:demo": "node server/prisma/seed-demo-accounts.js",
     "test": "npm run test -w server"
   },
   "devDependencies": {
