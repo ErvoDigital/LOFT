@@ -4,6 +4,7 @@ import Sidebar from "./Sidebar.jsx";
 import MobileNav from "./MobileNav.jsx";
 import Topbar from "./Topbar.jsx";
 import MiniCallPlayer from "../meeting/MiniCallPlayer.jsx";
+import AssistantWidget from "../assistant/AssistantWidget.jsx";
 import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
 
 // The page name, plus the workspace it belongs to when there is one. The
@@ -72,6 +73,7 @@ export default function AppShell() {
           <Outlet />
         </main>
         <MiniCallPlayer />
+        <AssistantWidget />
       </div>
     </div>
   );

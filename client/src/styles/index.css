@@ -178,6 +178,14 @@
   .dark .danger-wash {
     background-image: radial-gradient(26rem 10rem at 50% 0%, rgb(239 68 68 / 0.14), transparent 70%);
   }
+  /* The assistant panel: a brand glow from the top edge, so it reads as the
+     assistant's own surface rather than another menu. */
+  .assistant-wash {
+    background-image: radial-gradient(28rem 12rem at 50% 0%, rgb(var(--brand-500) / 0.1), transparent 70%);
+  }
+  .dark .assistant-wash {
+    background-image: radial-gradient(28rem 12rem at 50% 0%, rgb(var(--brand-500) / 0.16), transparent 70%);
+  }
   /* Light mode gives fields a solid white fill, a real border and a faint
      inset shadow. On the near-white glass cards, a translucent white field
      with a white border disappeared entirely. */
