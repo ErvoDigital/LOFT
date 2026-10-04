@@ -27,8 +27,8 @@ export function AuthProvider({ children }) {
     return user;
   }, []);
 
-  const register = useCallback(async (firstName, lastName, email, phone, password) => {
-    const { token, user } = await authApi.register(firstName, lastName, email, phone, password);
+  const register = useCallback(async (name, email, phone, password) => {
+    const { token, user } = await authApi.register(name, email, phone, password);
     localStorage.setItem("loft_token", token);
     setUser(user);
     return user;

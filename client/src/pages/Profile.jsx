@@ -16,12 +16,7 @@ const COLORS = ["#134A3C", "#1F9B7D", "#E76F51", "#E9A23B", "#5EEAD4", "#C44569"
 
 export default function Profile() {
   const { user, setUser } = useAuth();
-  const [firstName, setFirstName] = useState(user?.firstName || "");
-  const [lastName, setLastName] = useState(user?.lastName || "");
-  const [nickname, setNickname] = useState(user?.nickname || "");
-  const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-  // Mirrors the server's displayName(): what teammates will see once saved.
-  const name = nickname.trim() || fullName;
+  const [name, setName] = useState(user?.name || "");
   const [color, setColor] = useState(user?.avatarColor ? displayColor(user.avatarColor) : COLORS[0]);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState("");
@@ -43,7 +38,7 @@ export default function Profile() {
     setProfileError("");
     setSavingProfile(true);
     try {
-      const updated = await usersApi.updateProfile({ firstName, lastName, nickname, avatarColor: color });
+      const updated = await usersApi.updateProfile({ name, avatarColor: color });
       setUser(updated);
       setProfileMsg("Profile updated.");
     } catch (err) {
@@ -133,26 +128,9 @@ export default function Profile() {
         <form onSubmit={saveProfile} className="space-y-3">
           {profileMsg && <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">{profileMsg}</p>}
           {profileError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{profileError}</p>}
-          <div className="grid max-w-md gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">First name</label>
-              <input className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} maxLength={40} required />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Last name</label>
-              <input className="input" value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={40} />
-            </div>
-          </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Nickname</label>
-            <p className="mb-2 text-xs text-ink-400">Shown to your teammates instead of your full name. Leave blank to use your full name.</p>
-            <input
-              className="input max-w-md"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-              placeholder={fullName}
-              maxLength={40}
-            />
+            <input className="input max-w-sm" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Avatar color</label>
