@@ -1,5 +1,7 @@
 # LOFT Assistant with OpenClaw and OpenRouter
 
+This guide documents the currently implemented integration. For the combined V1 vision, architecture decisions, remaining work, and demo acceptance tests, see the [consolidated AI integration plan](AI-Workspace-Assistant-Integration-OpenClaw.md). The [V1 update](LOFT_V1_AI_Integration_Update.md) is now a decision summary pointing to that plan.
+
 The assistant uses this path:
 
 `LOFT browser → authenticated LOFT API → private OpenClaw gateway → OpenRouter`
@@ -33,7 +35,7 @@ Task editing, deletion, message access, transcripts/summaries, free/busy schedul
 
 ## Model and gateway configuration
 
-The gateway config is `infra/openclaw/openclaw.json`. It defaults to the officially documented `openrouter/auto`; you can replace `agents.defaults.model.primary` with an OpenRouter model reference that supports tool calling, then restart the gateway. Automatic routing can vary price and model choice. Host filesystem, shell, messaging, memory and other built-in agent tools are disabled; only LOFT's supplied client tools are available. No Docker socket or LOFT source/database is mounted in the container.
+The gateway config is `infra/openclaw/openclaw.json`. It defaults to the officially documented `openrouter/auto`; you can replace `agents.defaults.model.primary` with an OpenRouter model reference that supports tool calling, then restart the gateway. Automatic routing can vary price and model choice. The consolidated V1 plan calls for a single verified GPT-5.6 model target instead of automatic routing; that selection and live verification remain pending, and this documentation update does not change the runtime config. Host filesystem, shell, messaging, memory and other built-in agent tools are disabled; only LOFT's supplied client tools are available. No Docker socket or LOFT source/database is mounted in the container.
 
 The official image is pinned by digest in `infra/openclaw/compose.yml` for reproducibility. Upgrade deliberately and repeat gateway contract tests. Startup copies the read-only config template into the private writable state volume, then invokes the official image activation (including Doctor) before running the gateway. Edit the repository template for persistent config changes; startup replaces the runtime copy.
 
