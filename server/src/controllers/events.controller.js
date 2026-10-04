@@ -79,6 +79,7 @@ export async function createEvent(req, res) {
 
   const event = await prisma.event.create({
     data: {
+      ...(req.assistantActionId ? { id: req.assistantActionId } : {}),
       workspaceId,
       title: data.title,
       description: data.description,

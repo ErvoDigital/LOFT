@@ -93,7 +93,7 @@ export async function createTask(req, res) {
   }
 
   const task = await prisma.task.create({
-    data: { ...data, workspaceId, createdById: req.userId },
+    data: { ...data, ...(req.assistantActionId ? { id: req.assistantActionId } : {}), workspaceId, createdById: req.userId },
     include: {
       workspace: { select: { name: true, color: true } },
       assignee: { select: { id: true, name: true, avatarColor: true } },

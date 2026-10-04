@@ -8,7 +8,7 @@ Status snapshot and a detailed plan for what's left. See the [README](../README.
 
 **Phase 2 — nearly done.** File storage with Frame.io-style version merging is built, now with folders and folder-level view/download restriction. WebRTC video meetings are built, including screen sharing, a live annotation tool, and a persistent mini-player that keeps a call running (as a small floating widget) while browsing other pages. Shared documents (real-time collaborative rich text, Yjs + Tiptap) are built. Global search, billing, and a platform-wide admin panel are not.
 
-**Phase 3 (AI) — not started.** Blocked on an LLM provider decision (see [Open decisions](#open-decisions) below).
+**Phase 3 (AI) — first integration implemented; live verification pending.** The assistant now connects through a private OpenClaw gateway using OpenRouter, with scoped task/event reads and confirmed task/meeting creation. See [AI setup](ai/README.md). Other AI features remain planned.
 
 ---
 
@@ -67,7 +67,7 @@ As part of the same pass, the call itself was also made to survive navigation: t
 
 ## Phase 3 — AI layer
 
-Every item here needs an LLM provider + API key before any code is written (see [Open decisions](#open-decisions)). Assuming that's resolved, suggested build order and approach:
+The first assistant integration uses OpenClaw with OpenRouter. Add the OpenRouter key and start the gateway using [AI setup](ai/README.md). The following describes the broader AI plan; meeting summarization, action-item extraction, reprioritization and free/busy scheduling are not implemented yet.
 
 ### 7. AI Assistant (build this first — the other four build on it)
 **Goal:** natural-language assistant in the dashboard that can answer questions and take action across the user's workspaces.
@@ -129,7 +129,7 @@ Every item here needs an LLM provider + API key before any code is written (see 
 
 Things I can't move forward on without a call from you:
 
-- **LLM provider + API key** for all of Phase 3 (item 7 onward). Recommend Claude given the existing ecosystem here, but needs your account/key.
+- **OpenRouter API key and gateway hosting** for Phase 3. The first integration is implemented using OpenClaw; live inference needs your key, model access/credits and a running persistent gateway. See [AI setup](ai/README.md).
 - **Payment provider** for billing (item 5) — Stripe vs. PayMongo/Xendit for PHP settlement, plus what actually gets gated behind the paid tier.
 - **Production database** — currently SQLite for zero-setup local dev; the schema was deliberately kept portable (see `server/prisma/schema.prisma` header comment), so moving to PostgreSQL is a provider/URL change plus `prisma migrate dev`, not a rewrite. Worth doing before any real deployment — SQLite is fine for one process on one machine but won't hold up multi-instance.
 - **Hosting/deployment target** — not yet chosen. Affects the meeting feature specifically (TURN server needed for reliable WebRTC across restrictive networks — currently STUN-only) and the file storage feature (local disk today; a real deployment should move `server/src/utils/uploads.js` to object storage such as S3-compatible storage rather than the server's local filesystem).

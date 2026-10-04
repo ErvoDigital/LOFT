@@ -14,3 +14,6 @@ server/uploads/
 
 # macOS metadata
 .DS_Store
+
+# Commit the gateway template, never the filled-in Lightsail secrets file.
+!infra/openclaw/.env.lightsail.example

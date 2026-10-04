@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { Layers, Sparkles, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
 import WorkspaceMark from "../common/WorkspaceMark.jsx";
+import { assistantStatus, sendAssistantMessage, confirmAssistantAction } from "../../api/assistant.js";
+import { apiErrorMessage } from "../../api/client.js";
 
-// Prompts from the V1 demo flow (docs/ai/openclaw-blueprint.md, section 12).
+// Supported by the LOFT tools exposed to the OpenClaw gateway.
 const SUGGESTIONS = [
   "What do I need to do today?",
   "What should I work on first?",
@@ -13,11 +15,7 @@ const SUGGESTIONS = [
   "Schedule a meeting with my team Friday at 10",
 ];
 
-// Until OpenClaw is wired up (docs/ai/README.md), every message gets this
-// reply, so the panel never claims to have done something it didn't.
-const PLACEHOLDER_REPLY =
-  "I'm not connected yet, so I can't act on that. Once LOFT's OpenClaw integration is live, I'll answer from your tasks, calendar and messages.";
-const REPLY_DELAY_MS = 700;
+const PRIORITY_NAMES = { TIER_1: "Critical", TIER_2: "Time-sensitive", TIER_3: "Flexible", TIER_4: "Backlog" };
 
 // Chat composers and the meeting controls run along the bottom edge and put
 // a button in the right corner, so on those pages the launcher sits higher.
@@ -25,9 +23,7 @@ const hasBottomControls = (pathname) => /\/(chat|meeting)$/.test(pathname);
 
 let nextId = 0;
 
-// The LOFT assistant: a launcher in the bottom-right corner of the content
-// column and the panel it opens. A front-end preview for now: messages stay
-// in this component's state and nothing reaches the server.
+// Conversation history stays in memory; tools and confirmations run on the server.
 export default function AssistantWidget() {
   const { user } = useAuth();
   const { workspaces } = useWorkspaces();
@@ -40,13 +36,33 @@ export default function AssistantWidget() {
   const launcherRef = useRef(null);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
-  const replyTimer = useRef(null);
+  const requestRef = useRef(null);
+  const contextVersion = useRef(0);
+  const [configured, setConfigured] = useState(null);
+  const [error, setError] = useState("");
+  const [confirming, setConfirming] = useState(null);
 
   const workspace = workspaces.find((w) => w.id === workspaceId);
   const firstName = user?.name?.trim().split(/\s+/)[0];
   const raised = hasBottomControls(pathname);
 
-  useEffect(() => () => clearTimeout(replyTimer.current), []);
+  useEffect(() => {
+    contextVersion.current++;
+    requestRef.current?.abort();
+    setMessages([]);
+    setDraft("");
+    setThinking(false);
+    setError("");
+    setConfirming(null);
+    return () => { contextVersion.current++; requestRef.current?.abort(); };
+  }, [workspaceId, user?.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    let current = true;
+    assistantStatus().then((status) => { if (current) setConfigured(status.configured); }).catch(() => { if (current) { setConfigured(null); setError("Could not check assistant setup. Close and reopen to retry."); } });
+    return () => { current = false; };
+  }, [open]);
 
   // Focus goes to the composer on open and back to the launcher on close.
   useEffect(() => {
@@ -65,16 +81,44 @@ export default function AssistantWidget() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, thinking, open]);
 
-  function send(text) {
+  async function send(text) {
     const content = text.trim();
-    if (!content || thinking) return;
-    setMessages((m) => [...m, { id: ++nextId, role: "user", content }]);
+    if (!content || thinking || confirming || !configured) return;
+    const version = contextVersion.current;
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setError("");
+    const history = messages.filter((m) => !m.failed).slice(-12).map(({ role, content }) => ({ role, content: content.slice(0, 6000) }));
+    const messageId = ++nextId;
+    setMessages((m) => [...m, { id: messageId, role: "user", content }]);
     setDraft("");
     setThinking(true);
-    replyTimer.current = setTimeout(() => {
-      setMessages((m) => [...m, { id: ++nextId, role: "assistant", content: PLACEHOLDER_REPLY }]);
-      setThinking(false);
-    }, REPLY_DELAY_MS);
+    try {
+      const result = await sendAssistantMessage({ message: content, history, ...(workspaceId ? { workspaceId } : {}), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Manila" }, controller.signal);
+      if (version === contextVersion.current) setMessages((m) => [...m, { id: ++nextId, role: "assistant", content: result.reply, actions: result.actions }]);
+    } catch (err) {
+      if (!controller.signal.aborted && version === contextVersion.current) {
+        setError(apiErrorMessage(err));
+        setMessages((m) => m.map((item) => item.id === messageId ? { ...item, failed: true } : item));
+        setDraft(content);
+      }
+    } finally { if (version === contextVersion.current) setThinking(false); }
+  }
+
+  async function confirm(action) {
+    if (confirming || thinking) return;
+    const version = contextVersion.current;
+    setConfirming(action.id);
+    setError("");
+    try {
+      const result = await confirmAssistantAction(action.token);
+      if (version === contextVersion.current) setMessages((m) => m.map((item) => ({ ...item, actions: item.actions?.map((a) => a.id === action.id ? { ...a, result } : a) })));
+    } catch (err) { if (version === contextVersion.current) setError(apiErrorMessage(err)); }
+    finally { if (version === contextVersion.current) setConfirming(null); }
+  }
+
+  function dismiss(actionId) {
+    setMessages((m) => m.map((item) => ({ ...item, actions: item.actions?.map((a) => a.id === actionId ? { ...a, dismissed: true } : a) })));
   }
 
   return (
@@ -117,7 +161,7 @@ export default function AssistantWidget() {
                 <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-50">LOFT Assistant</h2>
                 <p className="flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
                   <span className="h-1.5 w-1.5 rounded-full bg-accent-500" aria-hidden="true" />
-                  Preview · not connected yet
+                  {configured === null ? "Checking setup" : configured ? "Ready to ask" : "Setup needed"}
                 </p>
               </div>
               <button
@@ -155,7 +199,7 @@ export default function AssistantWidget() {
                   Hi{firstName ? ` ${firstName}` : ""}, I'm your LOFT assistant.
                 </p>
                 <p className="text-sm leading-relaxed text-ink-600 dark:text-ink-300">
-                  Soon I'll plan your day, create tasks and schedule meetings across your workspaces.
+                  I can help you plan from your tasks and events, and prepare tasks and meetings for you to confirm.
                   {messages.length === 0 && " Try one of these:"}
                 </p>
               </div>
@@ -167,6 +211,7 @@ export default function AssistantWidget() {
                       key={s}
                       type="button"
                       onClick={() => send(s)}
+                      disabled={!configured || thinking || Boolean(confirming)}
                       className="flex w-full items-center gap-2.5 rounded-xl border border-ink-200 bg-white/70 px-3 py-2.5 text-left text-sm text-ink-700 transition-colors hover:border-brand-400/60 hover:bg-brand-500/[0.06] hover:text-ink-900 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-ink-200 dark:hover:border-brand-400/30 dark:hover:bg-brand-500/10 dark:hover:text-ink-50"
                     >
                       <Sparkles className="h-3.5 w-3.5 shrink-0 text-brand-600 dark:text-brand-400" />
@@ -177,7 +222,8 @@ export default function AssistantWidget() {
               )}
 
               {messages.map((m) => (
-                <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : ""}`}>
+                <div key={m.id} className="space-y-2">
+                <div className={`flex ${m.role === "user" ? "justify-end" : ""}`}>
                   <p
                     className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-soft ${
                       m.role === "user"
@@ -188,7 +234,27 @@ export default function AssistantWidget() {
                     {m.content}
                   </p>
                 </div>
+                {m.actions?.map((action) => (
+                  <div key={action.id} className="rounded-xl border border-ink-200 bg-white p-3 text-sm dark:border-ink-700 dark:bg-ink-800">
+                    <p className="font-semibold">{action.kind === "task" ? "Create task" : "Create meeting"}: {action.data.title}</p>
+                    <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">Workspace: {action.preview?.workspaceName || workspaces.find((w) => w.id === action.data.workspaceId)?.name || action.data.workspaceId}</p>
+                    {action.data.description && <p className="mt-1 whitespace-pre-wrap">{action.data.description}</p>}
+                    {action.kind === "task" ? <>
+                      <p className="mt-1 text-xs">Priority: {PRIORITY_NAMES[action.data.tier]} · Assigned to {action.data.assigneeId === user?.id ? "you" : action.preview?.people?.[0]?.name || action.data.assigneeId}</p>
+                      {action.data.dueDate && <p className="mt-1 text-xs">Due: {new Date(action.data.dueDate).toLocaleString()}</p>}
+                    </> : <>
+                      <p className="mt-1 text-xs">{new Date(action.data.startTime).toLocaleString()} – {new Date(action.data.endTime).toLocaleString()}</p>
+                      <p className="mt-1 text-xs">Attendees: {action.preview?.people?.map((p) => p.name).join(", ") || action.data.attendeeIds.join(", ")}</p>
+                    </>}
+                    {action.result ? <Link className="mt-2 inline-block text-brand-600 underline dark:text-brand-400" to={`/workspaces/${action.result.workspaceId}/${action.kind === "task" ? "tasks" : "calendar"}`}>Saved — open {action.kind === "task" ? "task board" : "calendar"}</Link>
+                      : action.dismissed ? <p className="mt-2 text-xs">Dismissed</p>
+                      : <div className="mt-3 flex gap-2"><button type="button" className="btn-primary" onClick={() => confirm(action)} disabled={Boolean(confirming) || thinking}>{confirming === action.id ? "Saving…" : "Confirm"}</button><button type="button" className="btn-secondary" onClick={() => dismiss(action.id)} disabled={Boolean(confirming)}>Dismiss</button></div>}
+                  </div>
+                ))}
+                </div>
               ))}
+
+              {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</p>}
 
               {thinking && (
                 <div
@@ -222,13 +288,14 @@ export default function AssistantWidget() {
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   aria-label="Message the assistant"
+                  maxLength={4000}
                 />
-                <button type="submit" className="btn-primary shrink-0" disabled={!draft.trim() || thinking}>
+                <button type="submit" className="btn-primary shrink-0" disabled={!draft.trim() || thinking || Boolean(confirming) || !configured}>
                   Send
                 </button>
               </div>
               <p className="mt-2 text-center text-[11px] text-ink-400 dark:text-ink-500">
-                Preview: replies aren't connected to your workspace yet.
+                {configured ? "Check suggestions before confirming. Chat clears when you change workspace or reload." : "Your team needs to finish assistant setup before you can send messages."}
               </p>
             </form>
           </section>
