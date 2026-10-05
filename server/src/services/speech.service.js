@@ -33,7 +33,7 @@ export async function transcribeAssistantAudio({ audioBuffer, mimeType, fileName
   const blob = new Blob([audioBuffer], { type: mimeType || "audio/webm" });
   form.set("file", blob, fileName || "assistant-voice.webm");
   form.set("model", config.sttModel);
-  form.set("response_format", "verbose_json");
+  form.set("response_format", "json");
   let response;
   try {
     response = await fetchImpl(`${config.baseUrl}/audio/transcriptions`, {
@@ -71,7 +71,7 @@ export async function synthesizeAssistantSpeech({ text, voice }, { fetchImpl = f
         "Content-Type": "application/json",
         ...authHeaders(config),
       },
-      body: JSON.stringify({ model: config.ttsModel, input, voice: voice || config.ttsVoice, format: "mp3" }),
+      body: JSON.stringify({ model: config.ttsModel, input, voice: voice || config.ttsVoice, response_format: "mp3" }),
       redirect: "error",
       signal: AbortSignal.timeout(60000),
     });

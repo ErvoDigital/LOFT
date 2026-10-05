@@ -41,6 +41,7 @@ export default function AssistantWidget() {
   const transcribeRef = useRef(null);
   const ttsRef = useRef(null);
   const playbackRef = useRef(null);
+  const playbackUrlRef = useRef(null);
   const recorderRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const recorderChunksRef = useRef([]);
@@ -51,7 +52,8 @@ export default function AssistantWidget() {
   const [confirming, setConfirming] = useState(null);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
-  const [speakReplies, setSpeakReplies] = useState(() => localStorage.getItem("loft_assistant_speak_replies") === "1");
+  const [speakReplies, setSpeakReplies] = useState(false);
+  const voiceEnabledRef = useRef(false);
 
   const workspace = workspaces.find((w) => w.id === workspaceId);
   const firstName = user?.name?.trim().split(/\s+/)[0];
@@ -64,8 +66,12 @@ export default function AssistantWidget() {
     ttsRef.current?.abort();
     playbackRef.current?.pause();
     playbackRef.current = null;
+    if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current);
+    playbackUrlRef.current = null;
+    voiceEnabledRef.current = false;
+    setSpeakReplies(false);
     clearTimeout(recordingTimeoutRef.current);
-    if (recorderRef.current?.state !== "inactive") recorderRef.current.stop();
+    if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
     recorderRef.current = null;
     mediaStreamRef.current = null;
@@ -84,8 +90,10 @@ export default function AssistantWidget() {
       ttsRef.current?.abort();
       playbackRef.current?.pause();
       playbackRef.current = null;
+      if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current);
+      playbackUrlRef.current = null;
       clearTimeout(recordingTimeoutRef.current);
-      if (recorderRef.current?.state !== "inactive") recorderRef.current.stop();
+      if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
       recorderRef.current = null;
       mediaStreamRef.current = null;
@@ -94,11 +102,14 @@ export default function AssistantWidget() {
   }, [workspaceId, user?.id]);
 
   useEffect(() => {
-    localStorage.setItem("loft_assistant_speak_replies", speakReplies ? "1" : "0");
-  }, [speakReplies]);
-
-  useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      voiceEnabledRef.current = false;
+      setSpeakReplies(false);
+      stopPlayback();
+      transcribeRef.current?.abort();
+      stopRecording();
+      return;
+    }
     let current = true;
     assistantStatus().then((status) => { if (current) setConfigured(status.configured); }).catch(() => { if (current) { setConfigured(null); setError("Could not check assistant setup. Close and reopen to retry."); } });
     return () => { current = false; };
@@ -126,29 +137,50 @@ export default function AssistantWidget() {
     ttsRef.current = null;
     playbackRef.current?.pause();
     playbackRef.current = null;
+    if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current);
+    playbackUrlRef.current = null;
+  }
+
+  function toggleVoiceMode() {
+    const enabled = !voiceEnabledRef.current;
+    voiceEnabledRef.current = enabled;
+    setSpeakReplies(enabled);
+    if (!enabled) {
+      stopPlayback();
+      transcribeRef.current?.abort();
+      stopRecording();
+    }
   }
 
   async function playReply(text, version) {
-    if (!speakReplies || !text?.trim()) return;
+    if (!voiceEnabledRef.current || !text?.trim()) return;
     stopPlayback();
     const controller = new AbortController();
     ttsRef.current = controller;
     try {
       const audioBlob = await speakAssistantReply(text, { ...(workspaceId ? { workspaceId } : {}) }, controller.signal);
-      if (controller.signal.aborted || version !== contextVersion.current) return;
+      if (controller.signal.aborted || !voiceEnabledRef.current || version !== contextVersion.current) return;
       const url = URL.createObjectURL(audioBlob);
+      playbackUrlRef.current = url;
       const audio = new Audio(url);
       playbackRef.current = audio;
-      audio.onended = () => { URL.revokeObjectURL(url); if (playbackRef.current === audio) playbackRef.current = null; };
-      audio.onerror = () => { URL.revokeObjectURL(url); if (playbackRef.current === audio) playbackRef.current = null; };
+      const release = () => {
+        URL.revokeObjectURL(url);
+        if (playbackUrlRef.current === url) playbackUrlRef.current = null;
+        if (playbackRef.current === audio) playbackRef.current = null;
+      };
+      audio.onended = release;
+      audio.onerror = release;
       await audio.play();
     } catch (err) {
-      if (!controller.signal.aborted && version === contextVersion.current) setError(apiErrorMessage(err));
+      const reportError = !controller.signal.aborted && version === contextVersion.current;
+      if (ttsRef.current === controller) stopPlayback();
+      if (reportError) setError(apiErrorMessage(err));
     }
   }
 
   async function beginRecording() {
-    if (thinking || confirming || transcribing || !configured || recording) return;
+    if (!voiceEnabledRef.current || thinking || confirming || transcribing || !configured || recording) return;
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setError("Voice input is not supported in this browser.");
       return;
@@ -157,7 +189,7 @@ export default function AssistantWidget() {
     const version = contextVersion.current;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (version !== contextVersion.current) {
+      if (!voiceEnabledRef.current || version !== contextVersion.current) {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
@@ -174,7 +206,7 @@ export default function AssistantWidget() {
         const chunks = recorderChunksRef.current;
         recorderChunksRef.current = [];
         setRecording(false);
-        if (!chunks.length || contextVersion.current !== version) return;
+        if (!voiceEnabledRef.current || !chunks.length || contextVersion.current !== version) return;
         const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
         if (!blob.size) {
           setError("No voice audio was captured. Please try again.");
@@ -203,7 +235,7 @@ export default function AssistantWidget() {
 
   function stopRecording() {
     clearTimeout(recordingTimeoutRef.current);
-    if (recorderRef.current?.state !== "inactive") recorderRef.current.stop();
+    if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
     else setRecording(false);
   }
 
@@ -411,15 +443,16 @@ export default function AssistantWidget() {
               className="shrink-0 border-t border-ink-900/[0.06] px-3 pb-3 pt-3 dark:border-white/[0.06]"
             >
               <div className="flex items-center gap-2">
-                <button
+                {speakReplies && <button
                   type="button"
                   onClick={recording ? stopRecording : beginRecording}
                   disabled={thinking || Boolean(confirming) || transcribing || !configured}
                   className={`btn-secondary shrink-0 ${recording ? "border-red-300 text-red-700 dark:border-red-700 dark:text-red-300" : ""}`}
                   title={recording ? "Stop recording" : "Record voice"}
+                  aria-label={recording ? "Stop recording" : "Record voice"}
                 >
                   {recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                </button>
+                </button>}
                 <input
                   ref={inputRef}
                   className="input min-w-0"
@@ -435,17 +468,17 @@ export default function AssistantWidget() {
               </div>
               <div className="mt-2 flex items-center justify-between gap-3">
                 <p className="text-[11px] text-ink-400 dark:text-ink-500">
-                  {recording ? "Recording… tap stop to transcribe (max 30s)." : transcribing ? "Transcribing voice…" : "Edit transcript before sending to avoid unnecessary actions."}
+                  {recording ? "Recording… tap stop to transcribe (max 30s)." : transcribing ? "Transcribing voice…" : speakReplies ? "Record a short question, review it, then Send." : "Type a message or enable Voice mode to test speech."}
                 </p>
                 <button
                   type="button"
-                  onClick={() => setSpeakReplies((value) => !value)}
+                  onClick={toggleVoiceMode}
                   className="flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-ink-500 transition-colors hover:text-ink-800 dark:text-ink-400 dark:hover:text-ink-200"
                   aria-pressed={speakReplies}
-                  title={speakReplies ? "Disable spoken replies" : "Enable spoken replies"}
+                  title={speakReplies ? "Exit voice mode" : "Test voice mode"}
                 >
                   {speakReplies ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
-                  {speakReplies ? "Voice reply on" : "Voice reply off"}
+                  {speakReplies ? "Voice mode on" : "Voice mode off"}
                 </button>
               </div>
               <p className="mt-2 text-center text-[11px] text-ink-400 dark:text-ink-500">

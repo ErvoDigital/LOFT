@@ -26,7 +26,7 @@ Docker Desktop with its Linux engine running and the existing LOFT database/serv
 - Read up to 100 unfinished tasks assigned to the signed-in user and up to 100 events over the next 14 days.
 - Explain conflicts computed by LOFT's existing conflict detector, within those returned records. Deadline comparisons currently use the API host's time zone, as the existing detector does.
 - Prepare task and meeting proposals. A user must click **Confirm** to save. **Dismiss** makes no changes.
-- Optional voice mode: short microphone clips are transcribed server-side, and assistant text replies can be played back as audio when the user enables spoken replies.
+- Existing voice plumbing: short microphone clips are transcribed server-side, and assistant text replies can be played back as audio. The intended product is a separate premium voice mode; a session-scoped Voice mode toggle is available for testing, while backend subscription checks and voice allowances are not implemented yet. See the consolidated plan before enabling premium access.
 
 The assistant must follow the user's explicit request, clarify missing or ambiguous details before proposing, and avoid unsolicited actions or inferred follow-ups. Task proposals require a resolved assignee and priority; the backend supplies neither default. Advice and summaries do not authorize changes. Every save still requires confirmation of the exact preview; conversational approval cannot save records.
 
@@ -44,7 +44,7 @@ Task editing, deletion, message access, transcripts/summaries, free/busy schedul
 
 The gateway config is `infra/openclaw/openclaw.json`. It now uses `OPENCLAW_PRIMARY_MODEL` instead of automatic routing so tool behavior and token usage are predictable across runs. `npm run ai:setup` writes a pinned default (`openrouter/openai/gpt-4o-mini`), and you can replace that environment value with another tool-capable OpenRouter model reference before restarting the gateway.
 
-Voice features are separate from tool-calling inference and use direct OpenRouter speech APIs from the LOFT backend (not OpenClaw tools). Configure:
+The intended architecture mixes explicit models by role through one OpenRouter key: reasoning, speech recognition, and speech synthesis. The gateway currently selects one reasoning model; additional reasoning routing remains work. Voice uses direct OpenRouter speech APIs from the LOFT backend (not OpenClaw tools), and is planned as a separate premium feature. Current speech routes enforce authentication and supplied workspace membership, but do not enforce premium entitlement or the message route's rate limits. Configure:
 
 - `OPENROUTER_API_KEY` (required for both assistant inference and voice)
 - `OPENROUTER_STT_MODEL` (default `openai/gpt-4o-mini-transcribe`)
@@ -54,6 +54,17 @@ Voice features are separate from tool-calling inference and use direct OpenRoute
 If speech is unavailable (unsupported browser capture, missing keys, or provider error), LOFT falls back to text-only assistant chat without bypassing confirmation controls. Host filesystem, shell, messaging, memory and other built-in agent tools are disabled; only LOFT's supplied client tools are available. No Docker socket or LOFT source/database is mounted in the container.
 
 The official image is pinned by digest in `infra/openclaw/compose.yml` for reproducibility. Upgrade deliberately and repeat gateway contract tests. Startup copies the read-only config template into the private writable state volume, then invokes the official image activation (including Doctor) before running the gateway. Edit the repository template for persistent config changes; startup replaces the runtime copy.
+
+## Brief local voice test
+
+Testing is available before the premium paywall is implemented. Use localhost or HTTPS in a browser that supports microphone recording. Voice mode starts off and resets when the assistant closes or the account/workspace changes.
+
+1. Run `npm run ai:setup`, then fill in `OPENROUTER_API_KEY` in `server/.env` without sharing it in chat.
+2. For Gemini speech, set `OPENROUTER_TTS_MODEL="google/gemini-3.1-flash-tts-preview"` and `OPENROUTER_TTS_VOICE="Kore"`. These appear in OpenRouter's speech model catalog; account access and live synthesis still require verification. Keep the existing STT model for a mixed-model test.
+3. With Docker running, run `npm run ai:start`, then `npm run ai:check`. Start/restart LOFT with `npm run dev`.
+4. Sign in, open the assistant, enable **Voice mode**, click the microphone, and allow microphone access. Say a short read-only question such as "What should I work on first?", then click Stop. Clips stop automatically after 30 seconds.
+5. Review/edit the transcript and click **Send**. The assistant displays its answer and requests spoken playback. Browser autoplay restrictions may block playback; check any displayed error. Confirm controls are still required for persisted changes.
+6. Switch Voice mode off or close the assistant to stop capture/playback. Default text mode makes no speech calls. The test uses paid STT, reasoning, and TTS requests; no live provider calls are made by the automated tests.
 
 ## Deployment
 

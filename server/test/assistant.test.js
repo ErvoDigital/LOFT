@@ -308,6 +308,9 @@ test("Assistant voice routes require auth, enforce membership and return normali
     if (req.url === "/audio/transcriptions") {
       assert.equal(req.method, "POST");
       assert.ok(String(req.headers.authorization || "").startsWith("Bearer "));
+      const upload = await new Response(req, { headers: { "Content-Type": req.headers["content-type"] } }).formData();
+      assert.equal(upload.get("response_format"), "json");
+      assert.equal(upload.get("file").name, "voice.webm");
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ text: "  review   all   deadline   conflicts   today  ", confidence: 0.89 }));
       return;
@@ -319,6 +322,7 @@ test("Assistant voice routes require auth, enforce membership and return normali
       for await (const chunk of req) source += chunk;
       const payload = JSON.parse(source);
       assert.equal(payload.input, "Here is your summary.");
+      assert.equal(payload.response_format, "mp3");
       res.setHeader("Content-Type", "audio/mpeg");
       res.end(Buffer.from("ID3"));
       return;

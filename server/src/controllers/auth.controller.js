@@ -7,6 +7,8 @@ import { ApiError } from "../utils/ApiError.js";
 import { verifyGoogleCredential } from "../utils/googleAuth.js";
 import { publicUser } from "../utils/publicUser.js";
 import { fullName, splitName } from "../utils/userName.js";
+import { clientUrl, isMailConfigured, sendMail } from "../services/mail.service.js";
+import { buildPasswordResetEmail, buildWelcomeEmail } from "../utils/emailTemplates.js";
 
 const registerSchema = z
   .object({
@@ -53,6 +55,14 @@ export async function register(req, res) {
       avatarColor: colors[Math.floor(Math.random() * colors.length)],
     },
   });
+
+  if (isMailConfigured()) {
+    try {
+      await sendMail({ to: user.email, ...buildWelcomeEmail({ name: user.name, email: user.email }) });
+    } catch (err) {
+      console.error(`welcome email to ${user.email} failed`, err);
+    }
+  }
 
   const token = signToken({ sub: user.id });
   res.status(201).json({ token, user: publicUser(user) });
@@ -119,9 +129,8 @@ export async function me(req, res) {
   res.json({ user: publicUser(user) });
 }
 
-// Password recovery: issues a reset token. In production this would be
-// emailed; here it's returned directly in dev so the flow is testable
-// without an email provider configured.
+// Password recovery: issues a reset token and emails it when SMTP is configured.
+// Without email in development, return the token so the local flow remains testable.
 export async function forgotPassword(req, res) {
   const { email } = forgotSchema.parse(req.body);
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
@@ -137,7 +146,23 @@ export async function forgotPassword(req, res) {
     data: { resetToken, resetTokenExpiry },
   });
 
-  const devOnly = process.env.NODE_ENV !== "production" ? { resetToken } : {};
+  const emailEnabled = isMailConfigured();
+  if (emailEnabled) {
+    try {
+      await sendMail({
+        to: user.email,
+        ...buildPasswordResetEmail({
+          name: user.name,
+          email: user.email,
+          link: clientUrl(`/reset-password?token=${encodeURIComponent(resetToken)}`),
+        }),
+      });
+    } catch (err) {
+      console.error(`password reset email to ${user.email} failed`, err);
+    }
+  }
+
+  const devOnly = !emailEnabled && process.env.NODE_ENV !== "production" ? { resetToken } : {};
   res.json({ message: "If that email exists, a reset link has been generated.", ...devOnly });
 }
 
