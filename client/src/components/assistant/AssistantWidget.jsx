@@ -289,10 +289,10 @@ export default function AssistantWidget() {
         ref={launcherRef}
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Open LOFT Assistant"
+        aria-label="Open Lofty"
         aria-expanded={open}
         aria-controls="loft-assistant"
-        title="LOFT Assistant"
+        title="Lofty"
         className={`brand-mark absolute right-3 z-30 flex h-12 w-12 items-center justify-center rounded-full text-white shadow-glow ring-1 ring-white/20 transition-[transform,opacity,filter] duration-200 hover:-translate-y-0.5 hover:brightness-110 active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 sm:right-5 sm:h-14 sm:w-14 ${
           raised ? "bottom-[4.75rem] sm:bottom-24" : "bottom-3 sm:bottom-5"
         } ${open ? "invisible scale-75 opacity-0" : ""}`}
@@ -312,7 +312,7 @@ export default function AssistantWidget() {
           <section
             id="loft-assistant"
             role="dialog"
-            aria-label="LOFT Assistant"
+            aria-label="Lofty"
             className="dropdown-panel assistant-wash absolute inset-x-0 bottom-0 z-40 flex h-[88%] animate-sheet-up flex-col overflow-hidden rounded-b-none sm:inset-x-auto sm:bottom-5 sm:right-5 sm:h-[min(38rem,calc(100%-2.5rem))] sm:w-[24rem] sm:animate-slide-fade-in sm:rounded-b-2xl"
           >
             <header className="flex shrink-0 items-center gap-3 px-4 pb-3 pt-4">
@@ -320,7 +320,7 @@ export default function AssistantWidget() {
                 <Sparkles className="h-[18px] w-[18px]" />
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-50">LOFT Assistant</h2>
+                <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-50">Lofty</h2>
                 <p className="flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
                   <span className="h-1.5 w-1.5 rounded-full bg-accent-500" aria-hidden="true" />
                   {configured === null ? "Checking setup" : configured ? "Ready to ask" : "Setup needed"}
@@ -329,7 +329,7 @@ export default function AssistantWidget() {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="Close assistant"
+                aria-label="Close Lofty"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ink-500 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-900 dark:text-ink-400 dark:hover:bg-white/[0.08] dark:hover:text-ink-50"
               >
                 <X className="h-[18px] w-[18px]" />
@@ -358,7 +358,7 @@ export default function AssistantWidget() {
             <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4" aria-live="polite">
               <div className="space-y-1.5">
                 <p className="text-sm font-semibold text-ink-900 dark:text-ink-50">
-                  Hi{firstName ? ` ${firstName}` : ""}, I'm your LOFT assistant.
+                  Hi{firstName ? ` ${firstName}` : ""}, I'm Lofty, your LOFT workspace assistant.
                 </p>
                 <p className="text-sm leading-relaxed text-ink-600 dark:text-ink-300">
                   I can help you plan from your tasks and events, and prepare tasks and meetings for you to confirm.
@@ -423,7 +423,7 @@ export default function AssistantWidget() {
                   role="status"
                   className="flex w-fit items-center gap-1 rounded-2xl rounded-bl-sm border border-ink-200 bg-white px-3.5 py-3 dark:border-ink-700 dark:bg-ink-800"
                 >
-                  <span className="sr-only">Assistant is thinking</span>
+                  <span className="sr-only">Lofty is thinking</span>
                   {[0, 150, 300].map((delay) => (
                     <span
                       key={delay}
@@ -456,10 +456,10 @@ export default function AssistantWidget() {
                 <input
                   ref={inputRef}
                   className="input min-w-0"
-                  placeholder="Ask LOFT anything…"
+                  placeholder="Ask Lofty anything…"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  aria-label="Message the assistant"
+                  aria-label="Message Lofty"
                   maxLength={4000}
                 />
                 <button type="submit" className="btn-primary shrink-0" disabled={!draft.trim() || thinking || Boolean(confirming) || transcribing || recording || !configured}>

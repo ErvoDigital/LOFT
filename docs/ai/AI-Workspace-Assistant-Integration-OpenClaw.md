@@ -4,6 +4,8 @@ Updated: October 5, 2026. This canonical plan combines the engineering blueprint
 
 ## 1. Product intent
 
+The assistant's name is **Lofty**. Use this name in the interface and when the assistant introduces or identifies itself, in both text and voice modes.
+
 > LOFT AI is a workspace agent that lets users naturally ask, plan, create, communicate, summarize, and reprioritize across their permitted teams, while LOFT remains responsible for the actual data, permissions, workflow logic, and final actions.
 
 The assistant belongs in the normal LOFT experience. Users should be able to say “What's on my schedule today?”, “Add a task to finish the presentation tomorrow”, “Move the development meeting to 3 PM”, or “What should I work on first?” without learning command syntax or constructing detailed prompts.

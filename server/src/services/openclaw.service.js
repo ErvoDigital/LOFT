@@ -8,7 +8,7 @@ export function gatewayConfig(env = process.env) {
 // Each turn gets an isolated session. Only continuations within that turn share it.
 // Never accept a gateway session ID or previous_response_id from the browser.
 export async function runOpenClaw({ message, history, instructions, tools, executeTool, fetchImpl = fetch, config = gatewayConfig() }) {
-  if (!config.token) throw new ApiError(503, "LOFT Assistant needs setup. Run npm run ai:setup and start the OpenClaw gateway.");
+  if (!config.token) throw new ApiError(503, "Lofty needs setup. Run npm run ai:setup and start the OpenClaw gateway.");
   const session = `loft:${randomUUID()}`;
   let input = [...history.map(({ role, content }) => `${role}: ${content}`), `user: ${message}`].join("\n");
   let previousResponseId;

@@ -1,4 +1,4 @@
-# LOFT Assistant with OpenClaw and OpenRouter
+# Lofty — LOFT Assistant with OpenClaw and OpenRouter
 
 This guide documents the currently implemented integration. For the combined V1 vision, architecture decisions, remaining work, and demo acceptance tests, see the [consolidated AI integration plan](AI-Workspace-Assistant-Integration-OpenClaw.md). The [V1 update](LOFT_V1_AI_Integration_Update.md) is now a decision summary pointing to that plan.
 
