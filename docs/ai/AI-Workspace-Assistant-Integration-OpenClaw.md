@@ -1,6 +1,6 @@
 # LOFT V1 AI Workspace Assistant — Consolidated Integration Plan
 
-Updated: October 4, 2026. This canonical plan combines the engineering blueprint and `LOFT_V1_AI_Integration_Update.md` against the current repository. See [AI setup](README.md) for operational commands, [Lightsail deployment](LIGHTSAIL.md) for gateway hosting, and the [roadmap](../ROADMAP.md) for project sequencing.
+Updated: October 5, 2026. This canonical plan combines the engineering blueprint and `LOFT_V1_AI_Integration_Update.md` against the current repository. See [AI setup](README.md) for operational commands, [Lightsail deployment](LIGHTSAIL.md) for gateway hosting, and the [roadmap](../ROADMAP.md) for project sequencing.
 
 ## 1. Product intent
 
@@ -10,22 +10,22 @@ The assistant belongs in the normal LOFT experience. Users should be able to say
 
 Preserve the original differentiator: independent teams share a user's limited time, so My Plan helps that user understand conflicts and the effects of changing priorities across permitted workspaces. The assistant explains and operates that workflow; LOFT computes the plan and enforces its rules.
 
-V1 aims for a reliable, repeatable end-to-end demonstration. Natural conversation, task/meeting creation and supported updates, message drafts, summaries, cross-team agenda queries, deterministic Auto-Reprioritization, and accurate priority explanations are core. Voice is a stretch feature.
+V1 aims for a reliable, repeatable end-to-end demonstration. Natural conversation, task/meeting creation and supported updates, message drafts, summaries, cross-team agenda queries, deterministic Auto-Reprioritization, and accurate priority explanations are core. Voice interaction is a separate premium feature with its own release criteria; it does not block core text acceptance.
 
 ## 2. Comparison and resolved decisions
 
-Both source documents agree on OpenClaw orchestration, one reasoning model, narrow backend tools, efficient context, deterministic priorities, and approval of meeting action items. The update adds workstreams, stress testing, and a presentation exit test. This plan retains those requirements and resolves differences with the implementation:
+Both source documents agree on OpenClaw orchestration, narrow backend tools, efficient context, deterministic priorities, and approval of meeting action items. The current product decision supersedes the original single-model restriction: use a mixed-model setup through OpenRouter and offer voice interaction separately to premium users. The update adds workstreams, stress testing, and a presentation exit test. This plan retains those requirements and resolves differences with the implementation:
 
 | Topic | Source proposal | Consolidated decision |
 | --- | --- | --- |
-| Model | GPT-5.6 as the sole V1 reasoning model | Retain as the requested target. Current config is `openrouter/auto`; selecting and verifying an exact tool-capable model ID is remaining work. Do not claim the target is connected yet. |
-| Provider | No multiple providers; update mentions OpenRouter usage | Keep the existing OpenRouter connection as the single provider route to the target model. Replace automatic routing after verifying the selected model. |
+| Model | GPT-5.6 as the sole V1 reasoning model | Superseded by a mixed-model setup with explicit, verified model IDs per role: tool-capable reasoning, speech recognition, and speech synthesis. The gateway uses `OPENCLAW_PRIMARY_MODEL`; additional reasoning routes require a tested backend policy. |
+| Provider | No multiple providers; update mentions OpenRouter usage | Use the existing OpenRouter API key and credit balance for the selected models, including supported speech models. Model vendors may differ behind OpenRouter; no direct Gemini credential is required for this path. |
 | Database | Supabase Postgres + RLS | Current schema uses Prisma + PostgreSQL (Neon). Keep this data path and backend authorization. Supabase migration/RLS are neither V1 prerequisites nor existing guarantees. |
 | Priority | Implement Smart Priority; suggested new factors | Extend the existing engine and My Plan. Explain implemented factors first; dependency scoring requires a represented relationship before it can be promised. |
 | Tools | `create_task`, `create_meeting`, other target names | Preserve current proposal/confirmation tools. Target names describe capabilities backed by existing controllers, not immediate-write permission. |
 | Confirmation | Selected writes require confirmation; task demo implies immediate creation | Keep V1 confirmation for every persisted assistant mutation, including task creation and updates. Reads, drafts, and derived ranking calculations need no approval. |
 | Context | Server envelope containing `client_current_timestamp` | Use server UTC time plus a validated user time zone. Browser preferences never establish identity or permission. |
-| Retrieval/voice | Optional `pgvector` and speech | Defer advanced semantic retrieval and voice from the core demonstration. Scoped queries and supplied meeting notes are sufficient. |
+| Retrieval/voice | Optional `pgvector` and speech | Defer advanced semantic retrieval. Voice is a separate premium mode with backend entitlement enforcement and usage limits; core text remains independently usable. |
 | Phase numbering | Update calls this Phase 5 | Keep repository Phase 3 (AI), using workstreams A–E below. The referenced separate development-plan file is superseded by this plan and the roadmap. |
 
 ## 3. Current implementation baseline
@@ -35,7 +35,7 @@ Both source documents agree on OpenClaw orchestration, one reasoning model, narr
 | Capability | Repository evidence | Remaining work |
 | --- | --- | --- |
 | Authenticated assistant API | `server/src/routes/assistant.routes.js` | Verify live gateway/model and deployment timeouts. |
-| Private OpenClaw + OpenRouter | `server/src/services/openclaw.service.js`, `infra/openclaw/openclaw.json` | Select the single target model. Responses are currently buffered JSON, not streamed. |
+| Private OpenClaw + OpenRouter | `server/src/services/openclaw.service.js`, `infra/openclaw/openclaw.json` | Verify explicit reasoning model IDs and routing policy. Responses are currently buffered JSON, not streamed. |
 | Scoped reads and conflicts | `server/src/services/assistant.service.js` | Date-range agenda, workload/priority retrieval, and explicit completeness. Reads currently cap tasks/events at 100; events cover 14 days. |
 | Confirmed task/meeting creation | Same service and existing task/event controllers | Add supported updates; verify persistence, notifications, realtime refresh, and retries end to end. |
 | Embedded assistant UI | `client/src/components/assistant/AssistantWidget.jsx` | Streaming, tool progress, preview editing/retry states, and refresh after confirmed changes. |
@@ -52,7 +52,7 @@ User -> LOFT Assistant UI -> authenticated LOFT API
                                 |
                          private OpenClaw gateway
                                 |
-                    OpenRouter -> single target model
+                    OpenRouter -> selected reasoning model
                                 |
                       structured tool requests
                                 |
@@ -72,6 +72,29 @@ User -> LOFT Assistant UI -> authenticated LOFT API
 - **LOFT backend:** authenticate, authorize, validate inputs/results, retrieve data, compute priorities/conflicts, prepare confirmations, and execute final changes through existing workflows.
 - **LOFT UI:** show context and progress, clarify ambiguity, preview actions, collect approval, and refresh affected views after backend success.
 
+### Separate premium voice interaction
+
+Default text chat and premium voice are distinct user modes. Entering voice mode is explicit; it enables microphone input and spoken assistant replies for that session. Text chat must not invoke transcription or speech synthesis. Users can stop voice mode and continue typing, and voice displays the transcript, answer text, and normal confirmation previews.
+
+```text
+Premium voice UI -> authenticated LOFT API -> entitlement + usage check
+    -> OpenRouter speech recognition -> transcript
+    -> shared assistant / OpenClaw reasoning and LOFT tools
+    -> final user-facing response -> OpenRouter TTS -> audio playback
+```
+
+Speech recognition and synthesis remain outside OpenClaw's tool loop. A premium subscription grants access to voice, not extra workspace permissions. Spoken approval cannot bypass the exact preview and Confirm control. Every model uses the same backend authorization, deterministic planning, validation, and persistence rules.
+
+Current repository speech routes (`/api/assistant/transcribe`, `/api/assistant/speak`) and a session-scoped Voice mode toggle exist for pre-paywall testing, but premium entitlement enforcement and voice allowances are remaining work. Before premium release, check trusted server-side subscription state before accepting audio uploads or making any paid speech request, and enforce it on every speech endpoint and cached-audio retrieval. A browser toggle or hidden button is not enforcement. Define the entitlement source and subscription expiry behavior before implementation.
+
+Use explicit OpenRouter STT/TTS model IDs. Gemini TTS is a candidate through OpenRouter's [speech API](https://openrouter.ai/docs/guides/overview/multimodal/tts); verify its exact supported slug, voice, format, price, and account access with live requests. Direct Google API prices do not establish OpenRouter charges. Keep `OPENROUTER_API_KEY` private and use the existing OpenRouter balance.
+
+Control cost with push-to-talk or bounded utterances, an idle timeout, per-user voice allowances, shared rate/concurrency limits, and a global spend ceiling. Account for STT, reasoning, and TTS separately within the total budget; the current message limiter does not cover speech routes. Reserve usage atomically before provider calls so concurrent requests cannot exceed the allowance. Deduplicate retries, limit fallback attempts, and reuse generated audio for replay with user-scoped cache keys that include exact text, model, voice, and language. Clear browser audio on account/context changes and apply a short retention policy.
+
+Speak concise, complete answers while preserving names, dates, deadlines, and proposal state; keep the full written answer available. Do not silently truncate important content to save tokens. Generate audio only during an explicitly active voice session or a premium playback request. Cancellation stops capture and playback; already generated provider output can still be billed. Measure turn latency and actual OpenRouter usage before enabling streaming or selecting a premium allowance.
+
+Premium release checks: non-premium callers cannot reach paid speech APIs, expired subscriptions and exhausted allowances are denied server-side, default text makes no speech calls, replay causes no new synthesis charge, account changes cannot expose cached audio, and voice proposals preserve the normal confirmation roundtrip. Existing voice plumbing is not proof that these checks pass.
+
 ### Explicit intent and caller authority
 
 The assistant is request-driven. Act only on what the interacting user explicitly asks, and ask a focused clarification before preparing an action when intent or material details are missing or ambiguous. Advice, a conflict report, a summary, an inferred next step, or a prior assistant suggestion does not authorize a new action. No autonomous follow-ups, background actions, or unsolicited task/meeting proposals are allowed. Relevant authorized reads may support the requested answer.
@@ -84,7 +107,7 @@ The runtime supplies a server-generated context envelope with active workspace r
 
 Intent interpretation and clarification are model instructions, not a deterministic proof that every proposed field was requested. Required task assignee/priority, strict schemas, scoped queries, backend authorization and explicit confirmation enforce the runtime boundary. Verify clarification and resistance to unsolicited proposals with live adversarial tests before release.
 
-The browser talks only to LOFT. Provider credentials stay on the gateway; the gateway token stays server-side. Neither the model nor gateway receives database credentials or LOFT login tokens. Keep existing local Docker and separate Lightsail deployment options described in the operational guides.
+The browser talks only to LOFT. The OpenRouter key stays server-side: on the gateway for reasoning and on the LOFT backend for speech. The gateway token stays server-side. Neither the model nor gateway receives database credentials or LOFT login tokens. Keep existing local Docker and separate Lightsail deployment options described in the operational guides.
 
 ## 5. V1 tool contract
 
@@ -98,7 +121,7 @@ These are target capabilities, not claims that all tools already exist. Preserve
 | `create_meeting` | Reuse `propose_event` plus confirmation: `workspaceId`, title, offset-aware `startTime`/`endTime`, explicit `attendeeIds`. Resolve duration and “the team” into validated times/member IDs. |
 | `update_meeting` | Prepare supported title/time/duration/attendee changes against a specific calendar event. Recheck permissions and the current record before applying. |
 | `search_workspace_content` | Retrieve bounded permitted messages, documents, tasks, or supplied notes. Apply resource restrictions as well as workspace membership. Start with scoped database queries. |
-| `summarize_content` | Summarize authorized retrieved sources, with source references and structured meeting output where relevant. Reuse the same model; no specialist agent. |
+| `summarize_content` | Summarize authorized retrieved sources, with source references and structured meeting output where relevant. Use a verified model from the configured OpenRouter allowlist with the same source and access contract; no specialist agent. |
 | `draft_message` | Produce an editable draft for a permitted workspace/channel. No delivery side effect. |
 | `send_message` (optional) | Separate explicit confirmation, channel/recipient authorization, and idempotent delivery. Drafting remains complete without sending. |
 
@@ -188,10 +211,10 @@ Checked items indicate repository implementation only. Live verification is sepa
 - [ ] Refresh/recompute after meaningful changes; show before/after reasons.
 - [ ] Test score factors, overrides, time boundaries, allocation, completed statuses, and multi-workspace isolation.
 
-### B — Complete OpenClaw and the single-model foundation
+### B — Complete OpenClaw and the mixed-model foundation
 
 - [x] Authenticated API, gateway adapter, allowlisted tools, server-only credentials, bounded tool loop, and Docker/Lightsail helpers exist.
-- [ ] Verify the requested GPT-5.6 target's exact provider ID, availability, tool calling, and cost; replace `openrouter/auto` with the verified single-model setting. If unavailable, record an explicit model decision instead of silently routing.
+- [ ] Verify explicit OpenRouter model IDs, availability, capabilities, and cost for each role. Benchmark all reasoning routes against the same tool schemas and confirmation tests; use an allowlist with bounded fallbacks, not unconstrained automatic routing. The current gateway selects one reasoning model through `OPENCLAW_PRIMARY_MODEL`; additional reasoning routing remains work.
 - [ ] Formalize server context and filtered agenda queries.
 - [ ] Add streaming, cancellation, connection/retry handling, and safe tool progress events.
 - [ ] Verify real inference, confirmed persistence, notifications, and deployment timeouts.
@@ -220,7 +243,7 @@ Checked items indicate repository implementation only. Live verification is sepa
 - [ ] Add review/edit/reject/approve and conversion of approved items only.
 - [ ] Run correctness, isolation, failure/retry, efficiency, and presentation rehearsals.
 
-Build order: verify the existing gateway/model first; finish Smart Priority explanations and agenda access; complete UI progress/confirmation and update tools; add scoped retrieval, summaries, and drafts; then action-item review and final rehearsals. Workstreams share one model and backend contract. Platform-wide search and advanced availability scheduling do not block V1.
+Build order: verify the existing gateway/model first; finish Smart Priority explanations and agenda access; complete UI progress/confirmation and update tools; add scoped retrieval, summaries, and drafts; then action-item review and final rehearsals. Workstreams share the backend contract across configured models. Platform-wide search and advanced availability scheduling do not block V1.
 
 ## 11. V1 acceptance and presentation exit tests
 
@@ -246,8 +269,8 @@ During several days of stress testing, measure OpenRouter spend, input/output to
 
 ## 12. Deferred scope and readiness decisions
 
-Defer multi-provider/model routing, specialist agents, DeepSeek/other provider evaluation, self-learning, autonomous background actions, custom training, advanced semantic retrieval/`pgvector`, enterprise automation, persistent conversation history, deletion/bulk edits, and automatic free/busy scheduling. Voice, live transcription, and controlled message sending are optional after core acceptance passes.
+Defer direct provider integrations outside OpenRouter, specialist agents, self-learning, autonomous background actions, custom training, advanced semantic retrieval/`pgvector`, enterprise automation, persistent conversation history, deletion/bulk edits, and automatic free/busy scheduling. Mixed-model selection through OpenRouter is the intended architecture. Premium assistant voice ships separately after its entitlement, usage, and speech quality checks pass. Live meeting transcription and controlled message sending remain optional after core acceptance passes.
 
-Remaining readiness decisions are the verified single-model identifier/access, actual gateway hosting/credentials, measured budget, exact update allowlists, and any meeting-note storage model. These do not require redesigning the assistant or migrating databases.
+Remaining readiness decisions are verified per-role model identifiers/access and routing policy, actual gateway hosting/credentials, measured budget, premium entitlement source and voice allowance, exact update allowlists, and any meeting-note storage model. These do not require redesigning the assistant or migrating databases.
 
 V1 is complete when the core behaviors work through the normal LOFT UI, preserve permissions, and can be demonstrated repeatedly. Preserve simple natural requests, cross-team awareness, backend-owned actions/priorities, and visible human control.

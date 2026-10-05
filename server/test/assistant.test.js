@@ -296,3 +296,84 @@ test("HTTP assistant routes require auth and reject client authority/history inj
     clearPrismaClient(fake.db);
   }
 });
+
+test("Assistant voice routes require auth, enforce membership and return normalized transcript/audio", async () => {
+  const fake = fakeDatabase();
+  setPrismaClient(fake.db);
+  const appServer = http.createServer(createApp());
+  await new Promise((resolve) => appServer.listen(0, "127.0.0.1", resolve));
+  const appUrl = `http://127.0.0.1:${appServer.address().port}/api/assistant`;
+  const headers = { Authorization: "Bearer " + signToken({ sub: userId }) };
+  const speech = http.createServer(async (req, res) => {
+    if (req.url === "/audio/transcriptions") {
+      assert.equal(req.method, "POST");
+      assert.ok(String(req.headers.authorization || "").startsWith("Bearer "));
+      const upload = await new Response(req, { headers: { "Content-Type": req.headers["content-type"] } }).formData();
+      assert.equal(upload.get("response_format"), "json");
+      assert.equal(upload.get("file").name, "voice.webm");
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ text: "  review   all   deadline   conflicts   today  ", confidence: 0.89 }));
+      return;
+    }
+    if (req.url === "/audio/speech") {
+      assert.equal(req.method, "POST");
+      assert.ok(String(req.headers.authorization || "").startsWith("Bearer "));
+      let source = "";
+      for await (const chunk of req) source += chunk;
+      const payload = JSON.parse(source);
+      assert.equal(payload.input, "Here is your summary.");
+      assert.equal(payload.response_format, "mp3");
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.end(Buffer.from("ID3"));
+      return;
+    }
+    res.statusCode = 404;
+    res.end();
+  });
+  await new Promise((resolve) => speech.listen(0, "127.0.0.1", resolve));
+  const originalKey = process.env.OPENROUTER_API_KEY;
+  const originalBase = process.env.OPENROUTER_BASE_URL;
+  process.env.OPENROUTER_API_KEY = "speech-test-key";
+  process.env.OPENROUTER_BASE_URL = `http://127.0.0.1:${speech.address().port}`;
+  try {
+    const form = new FormData();
+    form.set("audio", new Blob([Buffer.from("voice")], { type: "audio/webm" }), "voice.webm");
+    assert.equal((await fetch(`${appUrl}/transcribe`, { method: "POST", body: form })).status, 401);
+    const blocked = new FormData();
+    blocked.set("audio", new Blob([Buffer.from("voice")], { type: "audio/webm" }), "voice.webm");
+    blocked.set("workspaceId", inaccessible);
+    assert.equal((await fetch(`${appUrl}/transcribe`, { method: "POST", headers, body: blocked })).status, 403);
+    const allowed = new FormData();
+    allowed.set("audio", new Blob([Buffer.from("voice")], { type: "audio/webm" }), "voice.webm");
+    allowed.set("workspaceId", workspaceId);
+    const transcribed = await fetch(`${appUrl}/transcribe`, { method: "POST", headers, body: allowed });
+    assert.equal(transcribed.status, 200);
+    assert.deepEqual(await transcribed.json(), {
+      transcript: "review all deadline conflicts today",
+      confidence: 0.89,
+      provider: "openrouter",
+      model: process.env.OPENROUTER_STT_MODEL || "openai/gpt-4o-mini-transcribe",
+    });
+    const spoken = await fetch(`${appUrl}/speak`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "Here is your summary.", workspaceId }),
+    });
+    assert.equal(spoken.status, 200);
+    assert.match(spoken.headers.get("content-type"), /audio\/mpeg/i);
+    assert.equal(Buffer.from(await spoken.arrayBuffer()).toString("utf8"), "ID3");
+    assert.equal((await fetch(`${appUrl}/speak`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "Nope", workspaceId: inaccessible }),
+    })).status, 403);
+  } finally {
+    await new Promise((resolve) => appServer.close(resolve));
+    await new Promise((resolve) => speech.close(resolve));
+    if (originalKey === undefined) delete process.env.OPENROUTER_API_KEY;
+    else process.env.OPENROUTER_API_KEY = originalKey;
+    if (originalBase === undefined) delete process.env.OPENROUTER_BASE_URL;
+    else process.env.OPENROUTER_BASE_URL = originalBase;
+    clearPrismaClient(fake.db);
+  }
+});

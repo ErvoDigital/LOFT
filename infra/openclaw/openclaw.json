@@ -17,7 +17,7 @@
   },
   "agents": {
     "defaults": {
-      "model": { "primary": "openrouter/auto" },
+      "model": { "primary": "${OPENCLAW_PRIMARY_MODEL}" },
       "workspace": "/home/node/.openclaw/workspace",
       "skipBootstrap": true,
       "contextInjection": "never",
