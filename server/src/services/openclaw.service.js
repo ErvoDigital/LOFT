@@ -10,7 +10,7 @@ export function gatewayConfig(env = process.env) {
 export async function runOpenClaw({ message, history, instructions, tools, executeTool, fetchImpl = fetch, config = gatewayConfig() }) {
   if (!config.token) throw new ApiError(503, "LOFT Assistant needs setup. Run npm run ai:setup and start the OpenClaw gateway.");
   const session = `loft:${randomUUID()}`;
-  let input = [...history.map(({ role, content }) => ({ role, content })), { role: "user", content: message }];
+  let input = [...history.map(({ role, content }) => `${role}: ${content}`), `user: ${message}`].join("\n");
   let previousResponseId;
   const signal = AbortSignal.timeout(90000);
   for (let round = 0; round < 6; round++) {
@@ -36,12 +36,12 @@ export async function runOpenClaw({ message, history, instructions, tools, execu
     }
     if (calls.length > 8 || !data.id) throw new ApiError(502, "OpenClaw returned too many actions or an invalid continuation.");
     previousResponseId = data.id;
-    input = [];
+    input = "";
     for (const call of calls) {
       let output;
       try { output = await executeTool(call.name, JSON.parse(call.arguments)); }
       catch (err) { output = { error: err instanceof ApiError ? err.message : "Invalid tool arguments or tool unavailable." }; }
-      input.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify(output) });
+      input += `\nTool ${call.name} result: ${JSON.stringify(output)}`;
     }
   }
   throw new ApiError(502, "The assistant needed too many steps. Try a more specific request.");

@@ -71,7 +71,7 @@ test("OpenClaw continuation uses server-only auth and an isolated session", asyn
   assert.equal(requests[0].body.previous_response_id, undefined);
   assert.equal(requests[1].body.previous_response_id, "response-one");
   assert.equal(requests[0].init.headers["x-openclaw-session-key"], requests[1].init.headers["x-openclaw-session-key"]);
-  assert.deepEqual(requests[1].body.input, [{ type: "function_call_output", call_id: "call-one", output: '{"tasks":[]}' }]);
+  assert.equal(requests[1].body.input, '\nTool list_my_tasks result: {"tasks":[]}');
   assert.equal(requests[0].body.user, undefined);
 });
 
@@ -108,7 +108,7 @@ test("Invalid tool arguments are returned to the model rather than executed", as
   let count = 0;
   await runOpenClaw({ message: "Hi", history: [], instructions: "", tools: [], executeTool: async () => assert.fail("Malformed arguments executed"), fetchImpl: async (_url, init) => {
     if (count++ === 0) return { ok: true, json: async () => ({ id: "first", output: [{ type: "function_call", call_id: "bad", name: "x", arguments: "{" }] }) };
-    assert.match(JSON.parse(init.body).input[0].output, /Invalid tool arguments/);
+    assert.match(JSON.parse(init.body).input, /Invalid tool arguments/);
     return { ok: true, json: async () => messageOutput("Please clarify.") };
   } });
 });
@@ -256,12 +256,12 @@ test("HTTP assistant routes require auth and reject client authority/history inj
     const body = JSON.parse(source);
     let output;
     if (!body.previous_response_id) {
-      assert.equal(body.input.at(-1).content, "Prepare a presentation task");
+      assert.equal(body.input, "user: Prepare a presentation task");
       assert.ok(body.tools.some((t) => t.name === "propose_task"));
       output = { id: "mock-first", output: [{ type: "function_call", call_id: "proposal", name: "propose_task", arguments: JSON.stringify(taskData) }] };
     } else {
       assert.equal(body.previous_response_id, "mock-first");
-      assert.equal(JSON.parse(body.input[0].output).status, "awaiting_user_confirmation");
+      assert.match(body.input, /"status":"awaiting_user_confirmation"/);
       output = messageOutput("Confirm below to save the task.");
     }
     res.setHeader("Content-Type", "application/json");
