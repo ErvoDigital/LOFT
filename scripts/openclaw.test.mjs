@@ -17,7 +17,7 @@ async function fixture(t) {
   const dir = await mkdtemp(join(tmpdir(), "loft-gateway-test-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const env = { ...process.env };
-  for (const key of Object.keys(env)) if (key.startsWith("OPENCLAW_") || key === "OPENROUTER_API_KEY") delete env[key];
+  for (const key of Object.keys(env)) if (key.startsWith("OPENCLAW_") || key.startsWith("OPENROUTER_")) delete env[key];
   const path = join(dir, "gateway.env");
   return { path, run: (args, overrides = {}) => exec(process.execPath, [cli, ...args, "--settings-file", path], { cwd: root, env: { ...env, ...overrides } }) };
 }

@@ -33,7 +33,15 @@ async function setup() {
     await writeFile(envPath, source, { mode: 0o600, flag: "wx" });
   }
   const env = dotenv.parse(source);
-  const defaults = { ...(!lightsail && { OPENCLAW_GATEWAY_URL: "http://127.0.0.1:18789" }), OPENCLAW_GATEWAY_TOKEN: randomBytes(32).toString("hex"), OPENROUTER_API_KEY: "" };
+  const defaults = {
+    ...(!lightsail && { OPENCLAW_GATEWAY_URL: "http://127.0.0.1:18789" }),
+    OPENCLAW_GATEWAY_TOKEN: randomBytes(32).toString("hex"),
+    OPENCLAW_PRIMARY_MODEL: "openrouter/openai/gpt-4o-mini",
+    OPENROUTER_API_KEY: "",
+    OPENROUTER_STT_MODEL: "openai/gpt-4o-mini-transcribe",
+    OPENROUTER_TTS_MODEL: "openai/gpt-4o-mini-tts",
+    OPENROUTER_TTS_VOICE: "alloy",
+  };
   for (const [name, value] of Object.entries(defaults)) {
     if (env[name]) continue;
     // Replace an existing blank entry instead of creating duplicate env keys.

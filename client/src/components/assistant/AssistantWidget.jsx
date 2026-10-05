@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { Layers, Sparkles, X } from "lucide-react";
+import { Layers, Mic, Sparkles, Square, Volume2, VolumeX, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
 import WorkspaceMark from "../common/WorkspaceMark.jsx";
-import { assistantStatus, sendAssistantMessage, confirmAssistantAction } from "../../api/assistant.js";
+import { assistantStatus, sendAssistantMessage, confirmAssistantAction, speakAssistantReply, transcribeAssistantAudio } from "../../api/assistant.js";
 import { apiErrorMessage } from "../../api/client.js";
 
 // Supported by the LOFT tools exposed to the OpenClaw gateway.
@@ -22,6 +22,7 @@ const PRIORITY_NAMES = { TIER_1: "Critical", TIER_2: "Time-sensitive", TIER_3: "
 const hasBottomControls = (pathname) => /\/(chat|meeting)$/.test(pathname);
 
 let nextId = 0;
+const MAX_RECORDING_MS = 30000;
 
 // Conversation history stays in memory; tools and confirmations run on the server.
 export default function AssistantWidget() {
@@ -37,10 +38,20 @@ export default function AssistantWidget() {
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const requestRef = useRef(null);
+  const transcribeRef = useRef(null);
+  const ttsRef = useRef(null);
+  const playbackRef = useRef(null);
+  const recorderRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+  const recorderChunksRef = useRef([]);
+  const recordingTimeoutRef = useRef(null);
   const contextVersion = useRef(0);
   const [configured, setConfigured] = useState(null);
   const [error, setError] = useState("");
   const [confirming, setConfirming] = useState(null);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [speakReplies, setSpeakReplies] = useState(() => localStorage.getItem("loft_assistant_speak_replies") === "1");
 
   const workspace = workspaces.find((w) => w.id === workspaceId);
   const firstName = user?.name?.trim().split(/\s+/)[0];
@@ -49,13 +60,42 @@ export default function AssistantWidget() {
   useEffect(() => {
     contextVersion.current++;
     requestRef.current?.abort();
+    transcribeRef.current?.abort();
+    ttsRef.current?.abort();
+    playbackRef.current?.pause();
+    playbackRef.current = null;
+    clearTimeout(recordingTimeoutRef.current);
+    if (recorderRef.current?.state !== "inactive") recorderRef.current.stop();
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recorderRef.current = null;
+    mediaStreamRef.current = null;
+    recorderChunksRef.current = [];
     setMessages([]);
     setDraft("");
     setThinking(false);
+    setRecording(false);
+    setTranscribing(false);
     setError("");
     setConfirming(null);
-    return () => { contextVersion.current++; requestRef.current?.abort(); };
+    return () => {
+      contextVersion.current++;
+      requestRef.current?.abort();
+      transcribeRef.current?.abort();
+      ttsRef.current?.abort();
+      playbackRef.current?.pause();
+      playbackRef.current = null;
+      clearTimeout(recordingTimeoutRef.current);
+      if (recorderRef.current?.state !== "inactive") recorderRef.current.stop();
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recorderRef.current = null;
+      mediaStreamRef.current = null;
+      recorderChunksRef.current = [];
+    };
   }, [workspaceId, user?.id]);
+
+  useEffect(() => {
+    localStorage.setItem("loft_assistant_speak_replies", speakReplies ? "1" : "0");
+  }, [speakReplies]);
 
   useEffect(() => {
     if (!open) return;
@@ -81,13 +121,100 @@ export default function AssistantWidget() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, thinking, open]);
 
+  function stopPlayback() {
+    ttsRef.current?.abort();
+    ttsRef.current = null;
+    playbackRef.current?.pause();
+    playbackRef.current = null;
+  }
+
+  async function playReply(text, version) {
+    if (!speakReplies || !text?.trim()) return;
+    stopPlayback();
+    const controller = new AbortController();
+    ttsRef.current = controller;
+    try {
+      const audioBlob = await speakAssistantReply(text, { ...(workspaceId ? { workspaceId } : {}) }, controller.signal);
+      if (controller.signal.aborted || version !== contextVersion.current) return;
+      const url = URL.createObjectURL(audioBlob);
+      const audio = new Audio(url);
+      playbackRef.current = audio;
+      audio.onended = () => { URL.revokeObjectURL(url); if (playbackRef.current === audio) playbackRef.current = null; };
+      audio.onerror = () => { URL.revokeObjectURL(url); if (playbackRef.current === audio) playbackRef.current = null; };
+      await audio.play();
+    } catch (err) {
+      if (!controller.signal.aborted && version === contextVersion.current) setError(apiErrorMessage(err));
+    }
+  }
+
+  async function beginRecording() {
+    if (thinking || confirming || transcribing || !configured || recording) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setError("Voice input is not supported in this browser.");
+      return;
+    }
+    setError("");
+    const version = contextVersion.current;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (version !== contextVersion.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      mediaStreamRef.current = stream;
+      recorderChunksRef.current = [];
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/mpeg"].find((type) => MediaRecorder.isTypeSupported?.(type));
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      recorderRef.current = recorder;
+      recorder.ondataavailable = (event) => { if (event.data?.size) recorderChunksRef.current.push(event.data); };
+      recorder.onstop = async () => {
+        clearTimeout(recordingTimeoutRef.current);
+        mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+        const chunks = recorderChunksRef.current;
+        recorderChunksRef.current = [];
+        setRecording(false);
+        if (!chunks.length || contextVersion.current !== version) return;
+        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+        if (!blob.size) {
+          setError("No voice audio was captured. Please try again.");
+          return;
+        }
+        setTranscribing(true);
+        const controller = new AbortController();
+        transcribeRef.current = controller;
+        try {
+          const result = await transcribeAssistantAudio(blob, { ...(workspaceId ? { workspaceId } : {}) }, controller.signal);
+          if (!controller.signal.aborted && contextVersion.current === version) setDraft(result.transcript);
+        } catch (err) {
+          if (!controller.signal.aborted && contextVersion.current === version) setError(apiErrorMessage(err));
+        } finally {
+          if (contextVersion.current === version) setTranscribing(false);
+        }
+      };
+      recorder.start();
+      setRecording(true);
+      recordingTimeoutRef.current = setTimeout(() => { if (recorder.state !== "inactive") recorder.stop(); }, MAX_RECORDING_MS);
+    } catch {
+      setRecording(false);
+      setError("Couldn't access your microphone. Check your browser permissions and try again.");
+    }
+  }
+
+  function stopRecording() {
+    clearTimeout(recordingTimeoutRef.current);
+    if (recorderRef.current?.state !== "inactive") recorderRef.current.stop();
+    else setRecording(false);
+  }
+
   async function send(text) {
     const content = text.trim();
-    if (!content || thinking || confirming || !configured) return;
+    if (!content || thinking || confirming || transcribing || recording || !configured) return;
     const version = contextVersion.current;
     const controller = new AbortController();
     requestRef.current = controller;
     setError("");
+    stopPlayback();
     const history = messages.filter((m) => !m.failed).slice(-12).map(({ role, content }) => ({ role, content: content.slice(0, 6000) }));
     const messageId = ++nextId;
     setMessages((m) => [...m, { id: messageId, role: "user", content }]);
@@ -95,7 +222,10 @@ export default function AssistantWidget() {
     setThinking(true);
     try {
       const result = await sendAssistantMessage({ message: content, history, ...(workspaceId ? { workspaceId } : {}), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Manila" }, controller.signal);
-      if (version === contextVersion.current) setMessages((m) => [...m, { id: ++nextId, role: "assistant", content: result.reply, actions: result.actions }]);
+      if (version === contextVersion.current) {
+        setMessages((m) => [...m, { id: ++nextId, role: "assistant", content: result.reply, actions: result.actions }]);
+        void playReply(result.reply, version);
+      }
     } catch (err) {
       if (!controller.signal.aborted && version === contextVersion.current) {
         setError(apiErrorMessage(err));
@@ -281,6 +411,15 @@ export default function AssistantWidget() {
               className="shrink-0 border-t border-ink-900/[0.06] px-3 pb-3 pt-3 dark:border-white/[0.06]"
             >
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={recording ? stopRecording : beginRecording}
+                  disabled={thinking || Boolean(confirming) || transcribing || !configured}
+                  className={`btn-secondary shrink-0 ${recording ? "border-red-300 text-red-700 dark:border-red-700 dark:text-red-300" : ""}`}
+                  title={recording ? "Stop recording" : "Record voice"}
+                >
+                  {recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </button>
                 <input
                   ref={inputRef}
                   className="input min-w-0"
@@ -290,8 +429,23 @@ export default function AssistantWidget() {
                   aria-label="Message the assistant"
                   maxLength={4000}
                 />
-                <button type="submit" className="btn-primary shrink-0" disabled={!draft.trim() || thinking || Boolean(confirming) || !configured}>
+                <button type="submit" className="btn-primary shrink-0" disabled={!draft.trim() || thinking || Boolean(confirming) || transcribing || recording || !configured}>
                   Send
+                </button>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <p className="text-[11px] text-ink-400 dark:text-ink-500">
+                  {recording ? "Recording… tap stop to transcribe (max 30s)." : transcribing ? "Transcribing voice…" : "Edit transcript before sending to avoid unnecessary actions."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSpeakReplies((value) => !value)}
+                  className="flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-ink-500 transition-colors hover:text-ink-800 dark:text-ink-400 dark:hover:text-ink-200"
+                  aria-pressed={speakReplies}
+                  title={speakReplies ? "Disable spoken replies" : "Enable spoken replies"}
+                >
+                  {speakReplies ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+                  {speakReplies ? "Voice reply on" : "Voice reply off"}
                 </button>
               </div>
               <p className="mt-2 text-center text-[11px] text-ink-400 dark:text-ink-500">

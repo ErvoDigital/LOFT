@@ -26,6 +26,7 @@ Docker Desktop with its Linux engine running and the existing LOFT database/serv
 - Read up to 100 unfinished tasks assigned to the signed-in user and up to 100 events over the next 14 days.
 - Explain conflicts computed by LOFT's existing conflict detector, within those returned records. Deadline comparisons currently use the API host's time zone, as the existing detector does.
 - Prepare task and meeting proposals. A user must click **Confirm** to save. **Dismiss** makes no changes.
+- Optional voice mode: short microphone clips are transcribed server-side, and assistant text replies can be played back as audio when the user enables spoken replies.
 
 The assistant must follow the user's explicit request, clarify missing or ambiguous details before proposing, and avoid unsolicited actions or inferred follow-ups. Task proposals require a resolved assignee and priority; the backend supplies neither default. Advice and summaries do not authorize changes. Every save still requires confirmation of the exact preview; conversational approval cannot save records.
 
@@ -41,7 +42,16 @@ Task editing, deletion, message access, transcripts/summaries, free/busy schedul
 
 ## Model and gateway configuration
 
-The gateway config is `infra/openclaw/openclaw.json`. It defaults to the officially documented `openrouter/auto`; you can replace `agents.defaults.model.primary` with an OpenRouter model reference that supports tool calling, then restart the gateway. Automatic routing can vary price and model choice. The consolidated V1 plan calls for a single verified GPT-5.6 model target instead of automatic routing; that selection and live verification remain pending, and this documentation update does not change the runtime config. Host filesystem, shell, messaging, memory and other built-in agent tools are disabled; only LOFT's supplied client tools are available. No Docker socket or LOFT source/database is mounted in the container.
+The gateway config is `infra/openclaw/openclaw.json`. It now uses `OPENCLAW_PRIMARY_MODEL` instead of automatic routing so tool behavior and token usage are predictable across runs. `npm run ai:setup` writes a pinned default (`openrouter/openai/gpt-4o-mini`), and you can replace that environment value with another tool-capable OpenRouter model reference before restarting the gateway.
+
+Voice features are separate from tool-calling inference and use direct OpenRouter speech APIs from the LOFT backend (not OpenClaw tools). Configure:
+
+- `OPENROUTER_API_KEY` (required for both assistant inference and voice)
+- `OPENROUTER_STT_MODEL` (default `openai/gpt-4o-mini-transcribe`)
+- `OPENROUTER_TTS_MODEL` (default `openai/gpt-4o-mini-tts`)
+- `OPENROUTER_TTS_VOICE` (default `alloy`)
+
+If speech is unavailable (unsupported browser capture, missing keys, or provider error), LOFT falls back to text-only assistant chat without bypassing confirmation controls. Host filesystem, shell, messaging, memory and other built-in agent tools are disabled; only LOFT's supplied client tools are available. No Docker socket or LOFT source/database is mounted in the container.
 
 The official image is pinned by digest in `infra/openclaw/compose.yml` for reproducibility. Upgrade deliberately and repeat gateway contract tests. Startup copies the read-only config template into the private writable state volume, then invokes the official image activation (including Doctor) before running the gateway. Edit the repository template for persistent config changes; startup replaces the runtime copy.
 
