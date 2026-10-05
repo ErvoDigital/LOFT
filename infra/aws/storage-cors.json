@@ -1,0 +1,12 @@
+[
+  {
+    "AllowedOrigins": [
+      "https://www.loft-client.site",
+      "https://loft-client.site",
+      "https://loft-client.vercel.app",
+      "http://localhost:5173"
+    ],
+    "AllowedMethods": ["GET", "HEAD"],
+    "MaxAgeSeconds": 300
+  }
+]
