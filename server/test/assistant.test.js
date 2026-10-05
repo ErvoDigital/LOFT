@@ -303,18 +303,18 @@ test("Assistant voice routes require auth, enforce membership and return normali
   const appServer = http.createServer(createApp());
   await new Promise((resolve) => appServer.listen(0, "127.0.0.1", resolve));
   const appUrl = `http://127.0.0.1:${appServer.address().port}/api/assistant`;
-  const headers = { Authorization: `****** sub: userId })}` };
+  const headers = { Authorization: "Bearer " + signToken({ sub: userId }) };
   const speech = http.createServer(async (req, res) => {
     if (req.url === "/audio/transcriptions") {
       assert.equal(req.method, "POST");
-      assert.equal(req.headers.authorization, "******");
+      assert.ok(String(req.headers.authorization || "").startsWith("Bearer "));
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ text: "  review   all   deadline   conflicts   today  ", confidence: 0.89 }));
       return;
     }
     if (req.url === "/audio/speech") {
       assert.equal(req.method, "POST");
-      assert.equal(req.headers.authorization, "******");
+      assert.ok(String(req.headers.authorization || "").startsWith("Bearer "));
       let source = "";
       for await (const chunk of req) source += chunk;
       const payload = JSON.parse(source);

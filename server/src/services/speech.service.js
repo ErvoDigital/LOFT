@@ -23,6 +23,10 @@ function normalizeSpeechInput(raw) {
   return String(raw).replace(/\s+/g, " ").trim().slice(0, SPEECH_LIMIT);
 }
 
+function authHeaders(config) {
+  return { Authorization: "Bearer " + config.apiKey };
+}
+
 export async function transcribeAssistantAudio({ audioBuffer, mimeType, fileName }, { fetchImpl = fetch, config = speechConfig() } = {}) {
   if (!config.apiKey) throw new ApiError(503, "Voice transcription is not configured.");
   const form = new FormData();
@@ -34,7 +38,7 @@ export async function transcribeAssistantAudio({ audioBuffer, mimeType, fileName
   try {
     response = await fetchImpl(`${config.baseUrl}/audio/transcriptions`, {
       method: "POST",
-      headers: { Authorization: `****** },
+      headers: authHeaders(config),
       body: form,
       redirect: "error",
       signal: AbortSignal.timeout(60000),
@@ -65,7 +69,7 @@ export async function synthesizeAssistantSpeech({ text, voice }, { fetchImpl = f
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `******`,
+        ...authHeaders(config),
       },
       body: JSON.stringify({ model: config.ttsModel, input, voice: voice || config.ttsVoice, format: "mp3" }),
       redirect: "error",
