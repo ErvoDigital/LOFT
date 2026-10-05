@@ -4,6 +4,7 @@ import { Layers, Mic, Sparkles, Square, Volume2, VolumeX, X } from "lucide-react
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
 import WorkspaceMark from "../common/WorkspaceMark.jsx";
+import VoiceRecordingIndicator from "./VoiceRecordingIndicator.jsx";
 import { assistantStatus, sendAssistantMessage, confirmAssistantAction, speakAssistantReply, transcribeAssistantAudio } from "../../api/assistant.js";
 import { apiErrorMessage } from "../../api/client.js";
 
@@ -228,6 +229,8 @@ export default function AssistantWidget() {
       setRecording(true);
       recordingTimeoutRef.current = setTimeout(() => { if (recorder.state !== "inactive") recorder.stop(); }, MAX_RECORDING_MS);
     } catch {
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
       setRecording(false);
       setError("Couldn't access your microphone. Check your browser permissions and try again.");
     }
@@ -442,16 +445,18 @@ export default function AssistantWidget() {
               }}
               className="shrink-0 border-t border-ink-900/[0.06] px-3 pb-3 pt-3 dark:border-white/[0.06]"
             >
+              {recording && <VoiceRecordingIndicator stream={mediaStreamRef.current} maxDurationMs={MAX_RECORDING_MS} />}
               <div className="flex items-center gap-2">
                 {speakReplies && <button
                   type="button"
                   onClick={recording ? stopRecording : beginRecording}
                   disabled={thinking || Boolean(confirming) || transcribing || !configured}
-                  className={`btn-secondary shrink-0 ${recording ? "border-red-300 text-red-700 dark:border-red-700 dark:text-red-300" : ""}`}
+                  className={`btn-secondary shrink-0 ${recording ? "border-red-300 bg-red-50 text-red-700 ring-2 ring-red-500/20 dark:border-red-700 dark:bg-red-950/40 dark:text-red-300" : ""}`}
                   title={recording ? "Stop recording" : "Record voice"}
                   aria-label={recording ? "Stop recording" : "Record voice"}
+                  aria-pressed={recording}
                 >
-                  {recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  {recording ? <><Square className="h-3.5 w-3.5 fill-current" /><span className="ml-1.5 text-xs">Stop</span></> : <Mic className="h-4 w-4" />}
                 </button>}
                 <input
                   ref={inputRef}
