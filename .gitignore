@@ -8,6 +8,7 @@ server/prisma/dev.db-journal
 server/uploads/
 server/.seed-accounts/
 *.log
+/*.pem
 
 .vercel
 .env*

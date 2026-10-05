@@ -57,9 +57,10 @@ The check does not require a database. An authenticated model list verifies conn
 
 ## Upgrade an existing gateway for audio
 
-Update the VPS checkout with the new `plugins/loft-speech` directory, `openclaw.json`, Compose files and `Caddyfile`. Keep the existing gateway token and OpenRouter key. Run these commands from the checkout root on the VPS:
+Update the VPS checkout with the new `plugins/loft-speech` directory, `openclaw.json`, `start.mjs`, Compose files and `Caddyfile`. Keep the existing gateway token and OpenRouter key. Run these commands from the checkout root on the VPS:
 
 ```bash
+chmod -R go-w infra/openclaw/plugins/loft-speech
 npm run ai:lightsail:setup   # Adds missing speech defaults; preserves existing credentials.
 npm run ai:lightsail:config
 npm run ai:lightsail:start
@@ -68,7 +69,9 @@ docker compose --env-file infra/openclaw/.env.lightsail -f infra/openclaw/compos
 npm run ai:lightsail:check
 ```
 
-Restarting OpenClaw loads the updated plugin code even when the existing container did not need recreation. Reloading Caddy activates the new speech routes on existing proxy containers. If a custom `--settings-file` is used, substitute that file for `.env.lightsail` in all commands. Deploy/restart the LOFT backend with the speech service change, then test a short microphone clip and assistant playback. Text and both speech operations now use the VPS's `OPENROUTER_API_KEY`. Provider credits are still required.
+OpenClaw rejects world-writable plugin directories or entry files; the permission command also handles files transferred from Windows. Restarting OpenClaw loads the updated plugin code even when the existing container did not need recreation. Reloading Caddy activates the new speech routes on existing proxy containers. If a custom `--settings-file` is used, substitute that file for `.env.lightsail` in all commands. Deploy/restart the LOFT backend with the speech service change, then test a short microphone clip and assistant playback. Text and both speech operations now use the VPS's `OPENROUTER_API_KEY`. Provider credits are still required.
+
+The plugin manifest declares `activation.onStartup: true` so the running gateway registers its HTTP routes. The startup script applies the template's plugin settings through OpenClaw's configuration CLI because existing installations read active authored configuration from SQLite. Runtime inspection alone does not prove live activation. Compose gives OpenClaw six minutes to stop gracefully; killing an older container before cleanup can leave its gateway owner lease active for up to five minutes on the pinned image. Allow that lease to expire and check startup logs instead of deleting gateway state.
 
 ## Connect the LOFT backend
 

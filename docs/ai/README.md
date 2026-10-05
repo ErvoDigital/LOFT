@@ -57,7 +57,7 @@ If speech is unavailable (unsupported browser capture, missing keys, or provider
 
 If voice reports insufficient OpenRouter credits (HTTP 402), top up the OpenRouter account used by the **gateway's** `OPENROUTER_API_KEY` at [OpenRouter credits](https://openrouter.ai/settings/credits). Audio requests can require a minimum available balance even for a short clip; a diagnostic request on October 5, 2026 required at least $0.50. Retry recording after adding credits. The assistant setup status only checks gateway configuration, so it can appear configured while speech is blocked by billing.
 
-The official image is pinned by digest in `infra/openclaw/compose.yml` for reproducibility. Upgrade deliberately and repeat gateway contract tests. Startup copies the read-only config template into the private writable state volume, then invokes the official image activation (including Doctor) before running the gateway. Edit the repository template for persistent config changes; startup replaces the runtime copy.
+The official image is pinned by digest in `infra/openclaw/compose.yml` for reproducibility. Upgrade deliberately and repeat gateway contract tests. Startup copies the read-only config template into the private writable state volume and applies its plugin settings through `openclaw config set`, then invokes the official image activation (including Doctor) before running the gateway. Existing installations keep authored settings in SQLite, so copying a JSON seed alone does not update their active configuration. Startup applies the template's plugin settings to that store; use the OpenClaw configuration CLI for other changes to an existing gateway.
 
 ## Brief local voice test
 
