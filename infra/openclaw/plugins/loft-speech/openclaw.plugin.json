@@ -1,0 +1,6 @@
+{
+  "id": "loft-speech",
+  "name": "LOFT speech",
+  "description": "Authenticated transcription and playback using the OpenClaw host's OpenRouter credentials.",
+  "configSchema": { "type": "object", "additionalProperties": false }
+}

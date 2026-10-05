@@ -44,14 +44,18 @@ Task editing, deletion, message access, transcripts/summaries, free/busy schedul
 
 The gateway config is `infra/openclaw/openclaw.json`. It now uses `OPENCLAW_PRIMARY_MODEL` instead of automatic routing so tool behavior and token usage are predictable across runs. `npm run ai:setup` writes a pinned default (`openrouter/openai/gpt-4o-mini`), and you can replace that environment value with another tool-capable OpenRouter model reference before restarting the gateway.
 
-The intended architecture mixes explicit models by role through one OpenRouter key: reasoning, speech recognition, and speech synthesis. The gateway currently selects one reasoning model; additional reasoning routing remains work. Voice uses direct OpenRouter speech APIs from the LOFT backend (not OpenClaw tools), and is planned as a separate premium feature. Current speech routes enforce authentication and supplied workspace membership, but do not enforce premium entitlement or the message route's rate limits. Configure:
+The architecture mixes explicit models by role through one OpenRouter key on the OpenClaw host: reasoning, speech recognition, and speech synthesis. The gateway currently selects one reasoning model; additional reasoning routing remains work. LOFT sends voice to the gateway's `loft-speech` plugin using the same URL and token as text. The plugin registers authenticated `POST /v1/audio/transcriptions` and `POST /v1/audio/speech` routes and calls OpenRouter with the gateway's key; speech stays outside the agent's tool loop. Voice is planned as a separate premium feature. Current LOFT speech routes enforce authentication and supplied workspace membership, but do not enforce premium entitlement or the message route's rate limits. Configure these values on the **OpenClaw host** (`server/.env` for local Docker, or the VPS's `infra/openclaw/.env.lightsail`):
 
 - `OPENROUTER_API_KEY` (required for both assistant inference and voice)
 - `OPENROUTER_STT_MODEL` (default `openai/gpt-4o-mini-transcribe`)
-- `OPENROUTER_TTS_MODEL` (default `openai/gpt-4o-mini-tts`)
-- `OPENROUTER_TTS_VOICE` (default `alloy`)
+- `OPENROUTER_TTS_MODEL` (default `google/gemini-3.1-flash-tts-preview`)
+- `OPENROUTER_TTS_VOICE` (default `Kore`)
+
+A remote LOFT backend needs only `OPENCLAW_GATEWAY_URL` and `OPENCLAW_GATEWAY_TOKEN` for text and audio. Its `OPENROUTER_*` settings are not used for speech. Local Docker shares `server/.env` with the gateway, so keep the provider key there for that deployment. The checked-in Compose configuration mounts and enables the speech plugin automatically. Existing remote gateways need the updated plugin, OpenClaw config, Compose file and Caddy routes deployed; see [Lightsail deployment](LIGHTSAIL.md#upgrade-an-existing-gateway-for-audio). A missing speech route produces an installation error, with no direct-provider fallback.
 
 If speech is unavailable (unsupported browser capture, missing keys, or provider error), LOFT falls back to text-only assistant chat without bypassing confirmation controls. Host filesystem, shell, messaging, memory and other built-in agent tools are disabled; only LOFT's supplied client tools are available. No Docker socket or LOFT source/database is mounted in the container.
+
+If voice reports insufficient OpenRouter credits (HTTP 402), top up the OpenRouter account used by the **gateway's** `OPENROUTER_API_KEY` at [OpenRouter credits](https://openrouter.ai/settings/credits). Audio requests can require a minimum available balance even for a short clip; a diagnostic request on October 5, 2026 required at least $0.50. Retry recording after adding credits. The assistant setup status only checks gateway configuration, so it can appear configured while speech is blocked by billing.
 
 The official image is pinned by digest in `infra/openclaw/compose.yml` for reproducibility. Upgrade deliberately and repeat gateway contract tests. Startup copies the read-only config template into the private writable state volume, then invokes the official image activation (including Doctor) before running the gateway. Edit the repository template for persistent config changes; startup replaces the runtime copy.
 
@@ -60,7 +64,7 @@ The official image is pinned by digest in `infra/openclaw/compose.yml` for repro
 Testing is available before the premium paywall is implemented. Use localhost or HTTPS in a browser that supports microphone recording. Voice mode starts off and resets when the assistant closes or the account/workspace changes.
 
 1. Run `npm run ai:setup`, then fill in `OPENROUTER_API_KEY` in `server/.env` without sharing it in chat.
-2. For Gemini speech, set `OPENROUTER_TTS_MODEL="google/gemini-3.1-flash-tts-preview"` and `OPENROUTER_TTS_VOICE="Kore"`. These appear in OpenRouter's speech model catalog; account access and live synthesis still require verification. Keep the existing STT model for a mixed-model test.
+2. The speech defaults are `OPENROUTER_TTS_MODEL="google/gemini-3.1-flash-tts-preview"` and `OPENROUTER_TTS_VOICE="Kore"`. These appear in OpenRouter's speech model catalog; account access and live synthesis still require verification. Keep the existing STT model for a mixed-model test. Restart the gateway after changing speech models or credentials.
 3. With Docker running, run `npm run ai:start`, then `npm run ai:check`. Start/restart LOFT with `npm run dev`.
 4. Sign in, open the assistant, enable **Voice mode**, click the microphone, and allow microphone access. Say a short read-only question such as "What should I work on first?", then click Stop. Clips stop automatically after 30 seconds.
 5. Review/edit the transcript and click **Send**. The assistant displays its answer and requests spoken playback. Browser autoplay restrictions may block playback; check any displayed error. Confirm controls are still required for persisted changes.

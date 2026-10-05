@@ -39,8 +39,8 @@ async function setup() {
     OPENCLAW_PRIMARY_MODEL: "openrouter/openai/gpt-4o-mini",
     OPENROUTER_API_KEY: "",
     OPENROUTER_STT_MODEL: "openai/gpt-4o-mini-transcribe",
-    OPENROUTER_TTS_MODEL: "openai/gpt-4o-mini-tts",
-    OPENROUTER_TTS_VOICE: "alloy",
+    OPENROUTER_TTS_MODEL: "google/gemini-3.1-flash-tts-preview",
+    OPENROUTER_TTS_VOICE: "Kore",
   };
   for (const [name, value] of Object.entries(defaults)) {
     if (env[name]) continue;

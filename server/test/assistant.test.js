@@ -12,6 +12,7 @@ const { answerAssistant, signAction, verifyAction, confirmAction, eventAction, t
 const { setPrismaClient, clearPrismaClient } = await import("../src/db/prisma.js");
 const { createApp } = await import("../src/app.js");
 const { signToken, verifyToken } = await import("../src/utils/jwt.js");
+const { createSpeechHandler } = await import("../../infra/openclaw/plugins/loft-speech/index.js");
 
 const userId = "11111111-1111-4111-8111-111111111111";
 const partnerId = "22222222-2222-4222-8222-222222222222";
@@ -304,37 +305,46 @@ test("Assistant voice routes require auth, enforce membership and return normali
   await new Promise((resolve) => appServer.listen(0, "127.0.0.1", resolve));
   const appUrl = `http://127.0.0.1:${appServer.address().port}/api/assistant`;
   const headers = { Authorization: "Bearer " + signToken({ sub: userId }) };
-  const speech = http.createServer(async (req, res) => {
-    if (req.url === "/audio/transcriptions") {
-      assert.equal(req.method, "POST");
-      assert.ok(String(req.headers.authorization || "").startsWith("Bearer "));
-      const upload = await new Response(req, { headers: { "Content-Type": req.headers["content-type"] } }).formData();
-      assert.equal(upload.get("response_format"), "json");
-      assert.equal(upload.get("file").name, "voice.webm");
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ text: "  review   all   deadline   conflicts   today  ", confidence: 0.89 }));
-      return;
-    }
-    if (req.url === "/audio/speech") {
-      assert.equal(req.method, "POST");
-      assert.ok(String(req.headers.authorization || "").startsWith("Bearer "));
-      let source = "";
-      for await (const chunk of req) source += chunk;
-      const payload = JSON.parse(source);
+  let speechCreditsExhausted = false;
+  let providerCalls = 0;
+  const speechOptions = {
+    config: { apiKey: "gateway-provider-secret", baseUrl: "https://provider.example/v1", sttModel: "gateway-stt-model", ttsModel: "gateway-tts-model", ttsVoice: "Kore" },
+    fetchImpl: async (url, init) => {
+      providerCalls++;
+      assert.equal(init.headers.Authorization, "Bearer gateway-provider-secret");
+      assert.equal(init.redirect, "error");
+      const payload = JSON.parse(init.body);
+      assert.ok(!init.body.includes("private-test-gateway-token"));
+      if (speechCreditsExhausted) return Response.json({ error: { message: "Private provider details" } }, { status: 402 });
+      if (url.endsWith("/audio/transcriptions")) {
+        assert.equal(payload.model, "gateway-stt-model");
+        assert.equal(payload.input_audio.format, "webm");
+        assert.equal(Buffer.from(payload.input_audio.data, "base64").toString(), "voice");
+        return Response.json({ text: "  review   all   deadline   conflicts   today  ", confidence: 0.89 });
+      }
+      assert.equal(url, "https://provider.example/v1/audio/speech");
+      assert.equal(payload.model, "gateway-tts-model");
       assert.equal(payload.input, "Here is your summary.");
+      assert.equal(payload.voice, "Kore");
       assert.equal(payload.response_format, "mp3");
-      res.setHeader("Content-Type", "audio/mpeg");
-      res.end(Buffer.from("ID3"));
-      return;
-    }
+      return new Response(Buffer.from("ID3"), { headers: { "Content-Type": "audio/mpeg" } });
+    },
+  };
+  const transcribe = createSpeechHandler("transcribe", speechOptions);
+  const speak = createSpeechHandler("speak", speechOptions);
+  // Emulate the gateway's token guard before invoking its registered plugin routes.
+  const speech = http.createServer((req, res) => {
+    assert.equal(req.headers.authorization, "Bearer private-test-gateway-token");
+    if (req.url === "/v1/audio/transcriptions") return transcribe(req, res);
+    if (req.url === "/v1/audio/speech") return speak(req, res);
     res.statusCode = 404;
     res.end();
   });
   await new Promise((resolve) => speech.listen(0, "127.0.0.1", resolve));
   const originalKey = process.env.OPENROUTER_API_KEY;
-  const originalBase = process.env.OPENROUTER_BASE_URL;
-  process.env.OPENROUTER_API_KEY = "speech-test-key";
-  process.env.OPENROUTER_BASE_URL = `http://127.0.0.1:${speech.address().port}`;
+  const originalGatewayUrl = process.env.OPENCLAW_GATEWAY_URL;
+  delete process.env.OPENROUTER_API_KEY;
+  process.env.OPENCLAW_GATEWAY_URL = `http://127.0.0.1:${speech.address().port}`;
   try {
     const form = new FormData();
     form.set("audio", new Blob([Buffer.from("voice")], { type: "audio/webm" }), "voice.webm");
@@ -343,6 +353,7 @@ test("Assistant voice routes require auth, enforce membership and return normali
     blocked.set("audio", new Blob([Buffer.from("voice")], { type: "audio/webm" }), "voice.webm");
     blocked.set("workspaceId", inaccessible);
     assert.equal((await fetch(`${appUrl}/transcribe`, { method: "POST", headers, body: blocked })).status, 403);
+    assert.equal(providerCalls, 0);
     const allowed = new FormData();
     allowed.set("audio", new Blob([Buffer.from("voice")], { type: "audio/webm" }), "voice.webm");
     allowed.set("workspaceId", workspaceId);
@@ -351,8 +362,8 @@ test("Assistant voice routes require auth, enforce membership and return normali
     assert.deepEqual(await transcribed.json(), {
       transcript: "review all deadline conflicts today",
       confidence: 0.89,
-      provider: "openrouter",
-      model: process.env.OPENROUTER_STT_MODEL || "openai/gpt-4o-mini-transcribe",
+      provider: "openclaw",
+      model: "gateway-stt-model",
     });
     const spoken = await fetch(`${appUrl}/speak`, {
       method: "POST",
@@ -367,13 +378,27 @@ test("Assistant voice routes require auth, enforce membership and return normali
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({ text: "Nope", workspaceId: inaccessible }),
     })).status, 403);
+    speechCreditsExhausted = true;
+    const creditBlocked = await fetch(`${appUrl}/transcribe`, { method: "POST", headers, body: allowed });
+    assert.equal(creditBlocked.status, 402);
+    const transcriptionError = await creditBlocked.json();
+    assert.match(transcriptionError.error, /insufficient OpenRouter credits/);
+    assert.match(transcriptionError.error, /Add credits/);
+    assert.ok(!transcriptionError.error.includes("Private provider details"));
+    const playbackBlocked = await fetch(`${appUrl}/speak`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "Here is your summary.", workspaceId }),
+    });
+    assert.equal(playbackBlocked.status, 402);
+    assert.match((await playbackBlocked.json()).error, /Voice playback is blocked by insufficient OpenRouter credits/);
   } finally {
     await new Promise((resolve) => appServer.close(resolve));
     await new Promise((resolve) => speech.close(resolve));
     if (originalKey === undefined) delete process.env.OPENROUTER_API_KEY;
     else process.env.OPENROUTER_API_KEY = originalKey;
-    if (originalBase === undefined) delete process.env.OPENROUTER_BASE_URL;
-    else process.env.OPENROUTER_BASE_URL = originalBase;
+    if (originalGatewayUrl === undefined) delete process.env.OPENCLAW_GATEWAY_URL;
+    else process.env.OPENCLAW_GATEWAY_URL = originalGatewayUrl;
     clearPrismaClient(fake.db);
   }
 });

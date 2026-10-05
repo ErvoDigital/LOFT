@@ -1,8 +1,8 @@
 {$OPENCLAW_DOMAIN} {
-	# Only LOFT's inference and authenticated connectivity-check endpoints.
+	# Only LOFT's inference, speech and authenticated connectivity-check endpoints.
 	@loftApi {
 		method POST
-		path /v1/responses
+		path /v1/responses /v1/audio/transcriptions /v1/audio/speech
 	}
 	@loftModels {
 		method GET

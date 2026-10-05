@@ -80,12 +80,12 @@ Default text chat and premium voice are distinct user modes. Entering voice mode
 
 ```text
 Premium voice UI -> authenticated LOFT API -> entitlement + usage check
-    -> OpenRouter speech recognition -> transcript
+    -> OpenClaw speech plugin -> OpenRouter speech recognition -> transcript
     -> shared assistant / OpenClaw reasoning and LOFT tools
-    -> final user-facing response -> OpenRouter TTS -> audio playback
+    -> final user-facing response -> OpenClaw speech plugin -> OpenRouter TTS -> audio playback
 ```
 
-Speech recognition and synthesis remain outside OpenClaw's tool loop. A premium subscription grants access to voice, not extra workspace permissions. Spoken approval cannot bypass the exact preview and Confirm control. Every model uses the same backend authorization, deterministic planning, validation, and persistence rules.
+Speech recognition and synthesis run through authenticated routes in the OpenClaw `loft-speech` plugin, outside the agent's tool loop. The plugin uses the same gateway-side OpenRouter key as text reasoning. A premium subscription grants access to voice, not extra workspace permissions. Spoken approval cannot bypass the exact preview and Confirm control. Every model uses the same backend authorization, deterministic planning, validation, and persistence rules.
 
 Current repository speech routes (`/api/assistant/transcribe`, `/api/assistant/speak`) and a session-scoped Voice mode toggle exist for pre-paywall testing, but premium entitlement enforcement and voice allowances are remaining work. Before premium release, check trusted server-side subscription state before accepting audio uploads or making any paid speech request, and enforce it on every speech endpoint and cached-audio retrieval. A browser toggle or hidden button is not enforcement. Define the entitlement source and subscription expiry behavior before implementation.
 
@@ -109,7 +109,7 @@ The runtime supplies a server-generated context envelope with active workspace r
 
 Intent interpretation and clarification are model instructions, not a deterministic proof that every proposed field was requested. Required task assignee/priority, strict schemas, scoped queries, backend authorization and explicit confirmation enforce the runtime boundary. Verify clarification and resistance to unsolicited proposals with live adversarial tests before release.
 
-The browser talks only to LOFT. The OpenRouter key stays server-side: on the gateway for reasoning and on the LOFT backend for speech. The gateway token stays server-side. Neither the model nor gateway receives database credentials or LOFT login tokens. Keep existing local Docker and separate Lightsail deployment options described in the operational guides.
+The browser talks only to LOFT. The OpenRouter key stays on the OpenClaw host for reasoning, transcription and speech synthesis. The LOFT backend uses the gateway URL and token for all three operations. The gateway token stays server-side. Neither the model nor gateway receives database credentials or LOFT login tokens. Keep existing local Docker and separate Lightsail deployment options described in the operational guides.
 
 ## 5. V1 tool contract
 

@@ -25,6 +25,10 @@
       "heartbeat": { "every": "0m" }
     }
   },
+  "plugins": {
+    "load": { "paths": ["/etc/loft/plugins/loft-speech"] },
+    "entries": { "loft-speech": { "enabled": true } }
+  },
   "tools": {
     "profile": "minimal",
     "deny": ["*"],
