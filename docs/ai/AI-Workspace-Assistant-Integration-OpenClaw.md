@@ -76,7 +76,7 @@ User -> LOFT Assistant UI -> authenticated LOFT API
 
 ### Separate premium voice interaction
 
-Default text chat and premium voice are distinct user modes. Entering voice mode is explicit; it enables microphone input and spoken assistant replies for that session. Text chat must not invoke transcription or speech synthesis. A typed submission switches back to text replies. Voice displays the recorded user's transcript, generated audio controls, and normal confirmation previews; the assistant's answer text is kept in conversation context and is not displayed as a reply bubble. Speech failures offer a retry while preserving the voice response.
+Text chat and premium voice are separate features with shared conversation history. Holding **M** outside a text field starts the voice bubble; releasing it submits the recording. The bubble owns microphone input, audio generation, automatic playback after generation completes, and Play/Skip/Retry controls in both the full and minimized views. Text chat must not invoke transcription or speech synthesis, and a typed submission receives a text reply without canceling bubble audio. Voice questions and answers synchronize into the text chat as transcripts, with normal confirmation previews. Closing the text chat does not end voice interaction; closing the bubble stops its capture and pending playback. Speech failures offer a retry directly in the bubble while preserving the shared response.
 
 ```text
 Premium voice UI -> authenticated LOFT API -> entitlement + usage check
