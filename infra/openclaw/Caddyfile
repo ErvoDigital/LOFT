@@ -1,0 +1,36 @@
+{$OPENCLAW_DOMAIN} {
+	# Only LOFT's inference, speech and authenticated connectivity-check endpoints.
+	@loftApi {
+		method POST
+		path /v1/responses /v1/audio/transcriptions /v1/audio/speech
+	}
+	@loftModels {
+		method GET
+		path /v1/models
+	}
+	handle @loftApi {
+		reverse_proxy openclaw:18789 {
+			# Gateway token auth is authoritative; don't trust caller proxy headers.
+			header_up -X-Forwarded-For
+			header_up -X-Forwarded-Host
+			header_up -X-Forwarded-Proto
+			header_up -X-Real-IP
+			header_up -Forwarded
+			transport http {
+				response_header_timeout 95s
+			}
+		}
+	}
+	handle @loftModels {
+		reverse_proxy openclaw:18789 {
+			header_up -X-Forwarded-For
+			header_up -X-Forwarded-Host
+			header_up -X-Forwarded-Proto
+			header_up -X-Real-IP
+			header_up -Forwarded
+		}
+	}
+	handle {
+		respond "Not found" 404
+	}
+}

@@ -1,0 +1,21 @@
+# Overlay on compose.yml: same pinned gateway and persistent state as local dev.
+# The raw gateway remains bound to host loopback; only Caddy is public.
+services:
+  caddy:
+    image: caddy:2.11.2-alpine
+    restart: unless-stopped
+    depends_on:
+      - openclaw
+    environment:
+      OPENCLAW_DOMAIN: ${OPENCLAW_DOMAIN:?Set OPENCLAW_DOMAIN in the Lightsail env file}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - loft-openclaw-caddy-data:/data
+      - loft-openclaw-caddy-config:/config
+    security_opt: ["no-new-privileges:true"]
+volumes:
+  loft-openclaw-caddy-data:
+  loft-openclaw-caddy-config:

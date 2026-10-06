@@ -158,7 +158,7 @@ function MicRequestModal({ open, onCancel, onConfirm }) {
 
 export default function WorkspaceMeeting() {
   const { workspaceId } = useParams();
-  const { socket } = useSocket();
+  const { socket, connected } = useSocket();
   const { user } = useAuth();
   const { workspaces } = useWorkspaces();
   const {
@@ -274,14 +274,14 @@ export default function WorkspaceMeeting() {
   // whichever workspace is currently being viewed, independent of whatever
   // call (if any) is actually active elsewhere.
   useEffect(() => {
-    if (!socket || inThisWorkspacesCall) return;
-    socket.emit("meeting:status", workspaceId, (res) => res && setPreJoinCount(res.count));
+    if (!socket || !connected || inThisWorkspacesCall) return;
+    socket.emit("meeting:status", workspaceId, (res) => Number.isFinite(res?.count) && setPreJoinCount(res.count));
     const onActivity = (payload) => {
       if (payload.workspaceId === workspaceId) setPreJoinCount(payload.count);
     };
     socket.on("meeting:activity", onActivity);
     return () => socket.off("meeting:activity", onActivity);
-  }, [socket, workspaceId, inThisWorkspacesCall]);
+  }, [socket, connected, workspaceId, inThisWorkspacesCall]);
 
   const cameraCount = 1 + Object.keys(participants).length;
   const [gridRef, gridSize] = useElementSize();
@@ -334,11 +334,12 @@ export default function WorkspaceMeeting() {
 
           {error && <p className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
 
+          {!connected && <p role="status" className="mt-3 text-sm text-amber-300">Live connection unavailable. Reconnecting…</p>}
           <div className="mt-5 flex items-center gap-2">
-            <button onClick={cancelPrepare} className="btn-secondary flex-1">
+            <button onClick={cancelPrepare} disabled={joining} className="btn-secondary flex-1">
               Cancel
             </button>
-            <button onClick={confirmJoin} disabled={joining} className="btn-primary flex-1">
+            <button onClick={confirmJoin} disabled={joining || !connected} className="btn-primary flex-1">
               {joining ? "Joining…" : "Join now"}
             </button>
           </div>
@@ -365,7 +366,8 @@ export default function WorkspaceMeeting() {
               : "Nobody's here yet — start one and workspace members will be notified."}
           </p>
           {error && <p className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
-          <button onClick={() => promptJoin(workspaceId)} disabled={joining} className="btn-primary mt-5 w-full">
+          {!connected && <p role="status" className="mt-3 text-sm text-amber-300">Live connection unavailable. Reconnecting…</p>}
+          <button onClick={() => promptJoin(workspaceId)} disabled={joining || !connected} className="btn-primary mt-5 w-full">
             {joining ? "Requesting access…" : preJoinCount > 0 ? "Join meeting" : "Start meeting"}
           </button>
           <div className="mt-2 flex items-center gap-2">

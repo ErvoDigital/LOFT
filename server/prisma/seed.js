@@ -110,6 +110,8 @@ export async function seed(injectedClient = null) {
     {
       id: SEED_IDS.users.alice,
       name: "Alice Walker",
+      firstName: "Alice",
+      lastName: "Walker",
       email: "alice@loft.test",
       passwordHash: devPasswordHash,
       avatarColor: "#5B5BD6",
@@ -117,6 +119,8 @@ export async function seed(injectedClient = null) {
     {
       id: SEED_IDS.users.bob,
       name: "Bob Smith",
+      firstName: "Bob",
+      lastName: "Smith",
       email: "bob@loft.test",
       passwordHash: devPasswordHash,
       avatarColor: "#2A9D8F",
@@ -124,6 +128,8 @@ export async function seed(injectedClient = null) {
     {
       id: SEED_IDS.users.charlie,
       name: "Charlie Davis",
+      firstName: "Charlie",
+      lastName: "Davis",
       email: "charlie@loft.test",
       passwordHash: devPasswordHash,
       avatarColor: "#E76F51",
@@ -131,6 +137,8 @@ export async function seed(injectedClient = null) {
     {
       id: SEED_IDS.users.diana,
       name: "Diana Prince",
+      firstName: "Diana",
+      lastName: "Prince",
       email: "diana@loft.test",
       passwordHash: devPasswordHash,
       avatarColor: "#3D8BFD",
@@ -140,7 +148,7 @@ export async function seed(injectedClient = null) {
   for (const u of users) {
     await prisma.user.upsert({
       where: { email: u.email },
-      update: { name: u.name, avatarColor: u.avatarColor },
+      update: { name: u.name, firstName: u.firstName, lastName: u.lastName, avatarColor: u.avatarColor },
       create: u,
     });
   }

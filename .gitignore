@@ -6,7 +6,9 @@ build/
 server/prisma/dev.db
 server/prisma/dev.db-journal
 server/uploads/
+server/.seed-accounts/
 *.log
+/*.pem
 
 .vercel
 .env*
@@ -14,3 +16,6 @@ server/uploads/
 
 # macOS metadata
 .DS_Store
+
+# Commit the gateway template, never the filled-in Lightsail secrets file.
+!infra/openclaw/.env.lightsail.example

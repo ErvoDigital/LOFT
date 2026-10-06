@@ -7,6 +7,18 @@
     "client"
   ],
   "scripts": {
+    "ai:setup": "node scripts/openclaw.mjs setup",
+    "ai:start": "node scripts/openclaw.mjs start",
+    "ai:stop": "node scripts/openclaw.mjs stop",
+    "ai:logs": "node scripts/openclaw.mjs logs",
+    "ai:check": "node scripts/openclaw.mjs check",
+    "ai:lightsail:setup": "node scripts/openclaw.mjs setup --lightsail",
+    "ai:lightsail:config": "node scripts/openclaw.mjs config --lightsail",
+    "ai:lightsail:start": "node scripts/openclaw.mjs start --lightsail",
+    "ai:lightsail:stop": "node scripts/openclaw.mjs stop --lightsail",
+    "ai:lightsail:logs": "node scripts/openclaw.mjs logs --lightsail",
+    "ai:lightsail:check": "node scripts/openclaw.mjs check --lightsail",
+    "ai:test": "node --test scripts/openclaw.test.mjs scripts/openclaw-speech.test.mjs server/test/assistant.test.js server/test/event-drafts.test.js client/test/assistant-*.test.js",
     "dev": "concurrently -n SERVER,CLIENT -c blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
     "dev:server": "npm run dev -w server",
     "dev:client": "npm run dev -w client",
@@ -14,6 +26,7 @@
     "prisma:generate": "npm run prisma:generate -w server",
     "prisma:migrate": "npm run prisma:migrate -w server",
     "prisma:seed": "npm run prisma:seed -w server",
+    "prisma:seed:demo": "node server/prisma/seed-demo-accounts.js",
     "test": "npm run test -w server"
   },
   "devDependencies": {

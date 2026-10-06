@@ -1,0 +1,38 @@
+{
+  "gateway": {
+    "mode": "local",
+    "bind": "lan",
+    "port": 18789,
+    "auth": { "mode": "token", "token": "${OPENCLAW_GATEWAY_TOKEN}" },
+    "controlUi": { "enabled": false },
+    "http": {
+      "endpoints": {
+        "responses": {
+          "enabled": true,
+          "files": { "allowUrl": false },
+          "images": { "allowUrl": false }
+        }
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": { "primary": "${OPENCLAW_PRIMARY_MODEL}" },
+      "workspace": "/home/node/.openclaw/workspace",
+      "skipBootstrap": true,
+      "contextInjection": "never",
+      "skills": [],
+      "heartbeat": { "every": "0m" }
+    }
+  },
+  "plugins": {
+    "load": { "paths": ["/etc/loft/plugins/loft-speech"] },
+    "entries": { "loft-speech": { "enabled": true } }
+  },
+  "tools": {
+    "profile": "minimal",
+    "deny": ["*"],
+    "codeMode": { "enabled": false },
+    "toolSearch": { "enabled": false }
+  }
+}

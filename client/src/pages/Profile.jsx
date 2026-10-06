@@ -14,9 +14,21 @@ import { displayColor } from "../lib/colors.js";
 
 const COLORS = ["#134A3C", "#1F9B7D", "#E76F51", "#E9A23B", "#5EEAD4", "#C44569", "#3F6B52", "#C17538"];
 
+// Accounts the server hasn't split into first/last name yet only carry the
+// combined name.
+function initialNameParts(user) {
+  if (user?.firstName != null) return { firstName: user.firstName, lastName: user.lastName || "" };
+  const [firstName = "", ...rest] = (user?.name || "").trim().split(/\s+/);
+  return { firstName, lastName: rest.join(" ") };
+}
+
 export default function Profile() {
   const { user, setUser } = useAuth();
-  const [name, setName] = useState(user?.name || "");
+  const [firstName, setFirstName] = useState(() => initialNameParts(user).firstName);
+  const [lastName, setLastName] = useState(() => initialNameParts(user).lastName);
+  const [nickname, setNickname] = useState(user?.nickname || "");
+  // Mirrors the server's fullName(): what teammates will see once saved.
+  const name = `${firstName.trim()} ${lastName.trim()}`.trim();
   const [color, setColor] = useState(user?.avatarColor ? displayColor(user.avatarColor) : COLORS[0]);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState("");
@@ -38,7 +50,9 @@ export default function Profile() {
     setProfileError("");
     setSavingProfile(true);
     try {
-      const updated = await usersApi.updateProfile({ name, avatarColor: color });
+      // `name` is only read by a server from before first/last name existed;
+      // current servers derive it themselves.
+      const updated = await usersApi.updateProfile({ name, firstName, lastName, nickname, avatarColor: color });
       setUser(updated);
       setProfileMsg("Profile updated.");
     } catch (err) {
@@ -128,9 +142,19 @@ export default function Profile() {
         <form onSubmit={saveProfile} className="space-y-3">
           {profileMsg && <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">{profileMsg}</p>}
           {profileError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{profileError}</p>}
+          <div className="grid max-w-md gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">First name</label>
+              <input className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} maxLength={40} required />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Last name</label>
+              <input className="input" value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={40} />
+            </div>
+          </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Nickname</label>
-            <input className="input max-w-sm" value={name} onChange={(e) => setName(e.target.value)} required />
+            <input className="input max-w-md" value={nickname} onChange={(e) => setNickname(e.target.value)} maxLength={40} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-200">Avatar color</label>

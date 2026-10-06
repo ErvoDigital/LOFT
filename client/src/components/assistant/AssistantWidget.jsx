@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
-import { Layers, Sparkles, X } from "lucide-react";
+import { Link, useLocation, useParams } from "react-router-dom";
+import { Layers, Mic, Sparkles, Square, Volume2, VolumeX, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
 import WorkspaceMark from "../common/WorkspaceMark.jsx";
+import VoiceRecordingIndicator from "./VoiceRecordingIndicator.jsx";
+import { assistantStatus, sendAssistantMessage, confirmAssistantAction, speakAssistantReply, transcribeAssistantAudio } from "../../api/assistant.js";
+import { apiErrorMessage } from "../../api/client.js";
 
-// Prompts from the V1 demo flow (docs/ai/openclaw-blueprint.md, section 12).
+// Supported by the LOFT tools exposed to the OpenClaw gateway.
 const SUGGESTIONS = [
   "What do I need to do today?",
   "What should I work on first?",
@@ -13,21 +16,16 @@ const SUGGESTIONS = [
   "Schedule a meeting with my team Friday at 10",
 ];
 
-// Until OpenClaw is wired up (docs/ai/README.md), every message gets this
-// reply, so the panel never claims to have done something it didn't.
-const PLACEHOLDER_REPLY =
-  "I'm not connected yet, so I can't act on that. Once LOFT's OpenClaw integration is live, I'll answer from your tasks, calendar and messages.";
-const REPLY_DELAY_MS = 700;
+const PRIORITY_NAMES = { TIER_1: "Critical", TIER_2: "Time-sensitive", TIER_3: "Flexible", TIER_4: "Backlog" };
 
 // Chat composers and the meeting controls run along the bottom edge and put
 // a button in the right corner, so on those pages the launcher sits higher.
 const hasBottomControls = (pathname) => /\/(chat|meeting)$/.test(pathname);
 
 let nextId = 0;
+const MAX_RECORDING_MS = 30000;
 
-// The LOFT assistant: a launcher in the bottom-right corner of the content
-// column and the panel it opens. A front-end preview for now: messages stay
-// in this component's state and nothing reaches the server.
+// Conversation history stays in memory; tools and confirmations run on the server.
 export default function AssistantWidget() {
   const { user } = useAuth();
   const { workspaces } = useWorkspaces();
@@ -40,13 +38,79 @@ export default function AssistantWidget() {
   const launcherRef = useRef(null);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
-  const replyTimer = useRef(null);
+  const requestRef = useRef(null);
+  const transcribeRef = useRef(null);
+  const ttsRef = useRef(null);
+  const playbackRef = useRef(null);
+  const voiceAudioRef = useRef(new Map());
+  const [playingReplyId, setPlayingReplyId] = useState(null);
+  const recorderRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+  const recordingTimeoutRef = useRef(null);
+  const contextVersion = useRef(0);
+  const [configured, setConfigured] = useState(null);
+  const [error, setError] = useState("");
+  const [confirming, setConfirming] = useState(null);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const voiceEnabledRef = useRef(false);
+  const voiceSessionRef = useRef(0);
 
   const workspace = workspaces.find((w) => w.id === workspaceId);
   const firstName = user?.name?.trim().split(/\s+/)[0];
   const raised = hasBottomControls(pathname);
 
-  useEffect(() => () => clearTimeout(replyTimer.current), []);
+  useEffect(() => {
+    contextVersion.current++;
+    requestRef.current?.abort();
+    transcribeRef.current?.abort();
+    ttsRef.current?.controller.abort();
+    playbackRef.current?.pause();
+    playbackRef.current = null;
+    for (const { url } of voiceAudioRef.current.values()) URL.revokeObjectURL(url);
+    voiceAudioRef.current.clear();
+    setPlayingReplyId(null);
+    voiceEnabledRef.current = false;
+    setVoiceMode(false);
+    clearTimeout(recordingTimeoutRef.current);
+    if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recorderRef.current = null;
+    mediaStreamRef.current = null;
+    setMessages([]);
+    setDraft("");
+    setThinking(false);
+    setRecording(false);
+    setTranscribing(false);
+    setError("");
+    setConfirming(null);
+    return () => {
+      contextVersion.current++;
+      requestRef.current?.abort();
+      transcribeRef.current?.abort();
+      ttsRef.current?.controller.abort();
+      playbackRef.current?.pause();
+      playbackRef.current = null;
+      for (const { url } of voiceAudioRef.current.values()) URL.revokeObjectURL(url);
+      voiceAudioRef.current.clear();
+      clearTimeout(recordingTimeoutRef.current);
+      if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recorderRef.current = null;
+      mediaStreamRef.current = null;
+    };
+  }, [workspaceId, user?.id]);
+
+  useEffect(() => {
+    if (!open) {
+      changeVoiceMode(false);
+      return;
+    }
+    let current = true;
+    assistantStatus().then((status) => { if (current) setConfigured(status.configured); }).catch(() => { if (current) { setConfigured(null); setError("Could not check assistant setup. Close and reopen to retry."); } });
+    return () => { current = false; };
+  }, [open]);
 
   // Focus goes to the composer on open and back to the launcher on close.
   useEffect(() => {
@@ -65,16 +129,212 @@ export default function AssistantWidget() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, thinking, open]);
 
-  function send(text) {
+  function stopPlayback() {
+    if (ttsRef.current) {
+      const { controller, messageId } = ttsRef.current;
+      controller.abort();
+      updateVoiceReply(messageId, { audioStatus: "canceled" });
+    }
+    ttsRef.current = null;
+    playbackRef.current?.pause();
+    playbackRef.current = null;
+    setPlayingReplyId(null);
+  }
+
+  function updateVoiceReply(messageId, patch) {
+    setMessages((items) => items.map((item) => item.id === messageId ? { ...item, ...patch } : item));
+  }
+
+  function changeVoiceMode(enabled) {
+    voiceSessionRef.current++;
+    voiceEnabledRef.current = enabled;
+    setVoiceMode(enabled);
+    if (!enabled) {
+      stopPlayback();
+      transcribeRef.current?.abort();
+      stopRecording();
+      setTranscribing(false);
+    }
+  }
+
+  async function playGeneratedReply(messageId) {
+    const entry = voiceAudioRef.current.get(messageId);
+    if (!entry) return;
+    stopPlayback();
+    if (!voiceEnabledRef.current) changeVoiceMode(true);
+    const version = contextVersion.current;
+    playbackRef.current = entry.audio;
+    setPlayingReplyId(messageId);
+    updateVoiceReply(messageId, { audioError: "" });
+    try {
+      await entry.audio.play();
+    } catch (err) {
+      if (version !== contextVersion.current || playbackRef.current !== entry.audio) return;
+      playbackRef.current = null;
+      setPlayingReplyId(null);
+      // Keep generated audio available when the browser requires a user click.
+      updateVoiceReply(messageId, { audioError: err.name === "NotAllowedError" ? "Audio is ready. Tap Play to listen." : "Could not play the voice reply. Tap Play to try again." });
+    }
+  }
+
+  async function playReply(text, version, voiceSession, messageId) {
+    if (!voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || !text?.trim()) return;
+    stopPlayback();
+    const controller = new AbortController();
+    ttsRef.current = { controller, messageId };
+    updateVoiceReply(messageId, { audioStatus: "generating", audioError: "" });
+    try {
+      const audioBlob = await speakAssistantReply(text, { ...(workspaceId ? { workspaceId } : {}) }, controller.signal);
+      if (controller.signal.aborted || !voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || version !== contextVersion.current) return;
+      ttsRef.current = null;
+      const previous = voiceAudioRef.current.get(messageId);
+      if (previous) URL.revokeObjectURL(previous.url);
+      const url = URL.createObjectURL(audioBlob);
+      const audio = new Audio(url);
+      voiceAudioRef.current.set(messageId, { url, audio });
+      audio.onended = () => {
+        if (playbackRef.current === audio) {
+          playbackRef.current = null;
+          setPlayingReplyId(null);
+        }
+      };
+      audio.onerror = () => {
+        if (version !== contextVersion.current) return;
+        if (playbackRef.current === audio) stopPlayback();
+        voiceAudioRef.current.delete(messageId);
+        URL.revokeObjectURL(url);
+        updateVoiceReply(messageId, { audioStatus: "failed", audioError: "The generated audio could not be played. Try again." });
+      };
+      updateVoiceReply(messageId, { audioStatus: "ready" });
+      await playGeneratedReply(messageId);
+    } catch (err) {
+      const reportError = !controller.signal.aborted && version === contextVersion.current;
+      if (ttsRef.current?.controller === controller) ttsRef.current = null;
+      if (reportError) updateVoiceReply(messageId, { audioStatus: "failed", audioError: apiErrorMessage(err) });
+    }
+  }
+
+  function retryVoiceReply(message) {
+    if (!voiceEnabledRef.current) changeVoiceMode(true);
+    void playReply(message.content, contextVersion.current, voiceSessionRef.current, message.id);
+  }
+
+  async function beginRecording() {
+    if (!voiceEnabledRef.current || thinking || confirming || transcribing || !configured || recording) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setError("Voice input is not supported in this browser.");
+      return;
+    }
+    setError("");
+    stopPlayback();
+    const version = contextVersion.current;
+    const voiceSession = voiceSessionRef.current;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || version !== contextVersion.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      mediaStreamRef.current = stream;
+      const chunks = [];
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/mpeg"].find((type) => MediaRecorder.isTypeSupported?.(type));
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      recorderRef.current = recorder;
+      recorder.ondataavailable = (event) => { if (event.data?.size) chunks.push(event.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        if (recorderRef.current !== recorder) return;
+        recorderRef.current = null;
+        clearTimeout(recordingTimeoutRef.current);
+        mediaStreamRef.current = null;
+        setRecording(false);
+        if (!voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || !chunks.length || contextVersion.current !== version) return;
+        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+        if (!blob.size) {
+          setError("No voice audio was captured. Please try again.");
+          return;
+        }
+        setTranscribing(true);
+        const controller = new AbortController();
+        transcribeRef.current = controller;
+        try {
+          const result = await transcribeAssistantAudio(blob, { ...(workspaceId ? { workspaceId } : {}) }, controller.signal);
+          if (!controller.signal.aborted && voiceEnabledRef.current && voiceSession === voiceSessionRef.current && contextVersion.current === version) {
+            setTranscribing(false);
+            await send(result.transcript, { voice: true });
+          }
+        } catch (err) {
+          if (!controller.signal.aborted && contextVersion.current === version) setError(apiErrorMessage(err));
+        } finally {
+          if (contextVersion.current === version && voiceSession === voiceSessionRef.current) setTranscribing(false);
+        }
+      };
+      recorder.start();
+      setRecording(true);
+      recordingTimeoutRef.current = setTimeout(() => { if (recorder.state !== "inactive") recorder.stop(); }, MAX_RECORDING_MS);
+    } catch {
+      if (!voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || version !== contextVersion.current) return;
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+      setRecording(false);
+      setError("Couldn't access your microphone. Check your browser permissions and try again.");
+    }
+  }
+
+  function stopRecording() {
+    clearTimeout(recordingTimeoutRef.current);
+    if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
+    else setRecording(false);
+  }
+
+  async function send(text, { voice = false } = {}) {
     const content = text.trim();
-    if (!content || thinking) return;
-    setMessages((m) => [...m, { id: ++nextId, role: "user", content }]);
-    setDraft("");
+    // The recorder callback retains the state from when recording started.
+    // Voice submissions already passed the transcription and context checks.
+    if (!content || thinking || confirming || (!voice && (transcribing || recording)) || !configured) return;
+    // Capture the input mode per request so later toggles cannot voice a text reply.
+    if (!voice) changeVoiceMode(false);
+    const version = contextVersion.current;
+    const voiceSession = voiceSessionRef.current;
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setError("");
+    stopPlayback();
+    const history = messages.filter((m) => !m.failed).slice(-12).map(({ role, content }) => ({ role, content: content.slice(0, 6000) }));
+    const messageId = ++nextId;
+    setMessages((m) => [...m, { id: messageId, role: "user", content }]);
+    if (!voice) setDraft("");
     setThinking(true);
-    replyTimer.current = setTimeout(() => {
-      setMessages((m) => [...m, { id: ++nextId, role: "assistant", content: PLACEHOLDER_REPLY }]);
-      setThinking(false);
-    }, REPLY_DELAY_MS);
+    try {
+      const result = await sendAssistantMessage({ message: content, interactionMode: voice ? "voice" : "text", history, ...(workspaceId ? { workspaceId } : {}), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Manila" }, controller.signal);
+      if (!controller.signal.aborted && version === contextVersion.current) {
+        const replyId = ++nextId;
+        setMessages((m) => [...m, { id: replyId, role: "assistant", content: result.reply, actions: result.actions, replyMode: voice ? "voice" : "text", ...(voice ? { audioStatus: "canceled" } : {}) }]);
+        if (voice) void playReply(result.reply, version, voiceSession, replyId);
+      }
+    } catch (err) {
+      if (!controller.signal.aborted && version === contextVersion.current) {
+        setError(apiErrorMessage(err));
+        setMessages((m) => m.map((item) => item.id === messageId ? { ...item, failed: true } : item));
+        if (!voice) setDraft(content);
+      }
+    } finally { if (version === contextVersion.current) setThinking(false); }
+  }
+
+  async function confirm(action) {
+    if (confirming || thinking) return;
+    const version = contextVersion.current;
+    setConfirming(action.id);
+    setError("");
+    try {
+      const result = await confirmAssistantAction(action.token);
+      if (version === contextVersion.current) setMessages((m) => m.map((item) => ({ ...item, actions: item.actions?.map((a) => a.id === action.id ? { ...a, result } : a) })));
+    } catch (err) { if (version === contextVersion.current) setError(apiErrorMessage(err)); }
+    finally { if (version === contextVersion.current) setConfirming(null); }
+  }
+
+  function dismiss(actionId) {
+    setMessages((m) => m.map((item) => ({ ...item, actions: item.actions?.map((a) => a.id === actionId ? { ...a, dismissed: true } : a) })));
   }
 
   return (
@@ -83,10 +343,10 @@ export default function AssistantWidget() {
         ref={launcherRef}
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Open LOFT Assistant"
+        aria-label="Open Lofty"
         aria-expanded={open}
         aria-controls="loft-assistant"
-        title="LOFT Assistant"
+        title="Lofty"
         className={`brand-mark absolute right-3 z-30 flex h-12 w-12 items-center justify-center rounded-full text-white shadow-glow ring-1 ring-white/20 transition-[transform,opacity,filter] duration-200 hover:-translate-y-0.5 hover:brightness-110 active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 sm:right-5 sm:h-14 sm:w-14 ${
           raised ? "bottom-[4.75rem] sm:bottom-24" : "bottom-3 sm:bottom-5"
         } ${open ? "invisible scale-75 opacity-0" : ""}`}
@@ -106,7 +366,7 @@ export default function AssistantWidget() {
           <section
             id="loft-assistant"
             role="dialog"
-            aria-label="LOFT Assistant"
+            aria-label="Lofty"
             className="dropdown-panel assistant-wash absolute inset-x-0 bottom-0 z-40 flex h-[88%] animate-sheet-up flex-col overflow-hidden rounded-b-none sm:inset-x-auto sm:bottom-5 sm:right-5 sm:h-[min(38rem,calc(100%-2.5rem))] sm:w-[24rem] sm:animate-slide-fade-in sm:rounded-b-2xl"
           >
             <header className="flex shrink-0 items-center gap-3 px-4 pb-3 pt-4">
@@ -114,16 +374,16 @@ export default function AssistantWidget() {
                 <Sparkles className="h-[18px] w-[18px]" />
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-50">LOFT Assistant</h2>
+                <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-50">Lofty</h2>
                 <p className="flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
                   <span className="h-1.5 w-1.5 rounded-full bg-accent-500" aria-hidden="true" />
-                  Preview · not connected yet
+                  {configured === null ? "Checking setup" : configured ? "Ready to ask" : "Setup needed"}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="Close assistant"
+                aria-label="Close Lofty"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ink-500 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-900 dark:text-ink-400 dark:hover:bg-white/[0.08] dark:hover:text-ink-50"
               >
                 <X className="h-[18px] w-[18px]" />
@@ -152,10 +412,10 @@ export default function AssistantWidget() {
             <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4" aria-live="polite">
               <div className="space-y-1.5">
                 <p className="text-sm font-semibold text-ink-900 dark:text-ink-50">
-                  Hi{firstName ? ` ${firstName}` : ""}, I'm your LOFT assistant.
+                  Hi{firstName ? ` ${firstName}` : ""}, I'm Lofty, your LOFT workspace assistant.
                 </p>
                 <p className="text-sm leading-relaxed text-ink-600 dark:text-ink-300">
-                  Soon I'll plan your day, create tasks and schedule meetings across your workspaces.
+                  I can help you plan from your tasks and events, and prepare tasks and meetings for you to confirm.
                   {messages.length === 0 && " Try one of these:"}
                 </p>
               </div>
@@ -167,6 +427,7 @@ export default function AssistantWidget() {
                       key={s}
                       type="button"
                       onClick={() => send(s)}
+                      disabled={!configured || thinking || Boolean(confirming)}
                       className="flex w-full items-center gap-2.5 rounded-xl border border-ink-200 bg-white/70 px-3 py-2.5 text-left text-sm text-ink-700 transition-colors hover:border-brand-400/60 hover:bg-brand-500/[0.06] hover:text-ink-900 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-ink-200 dark:hover:border-brand-400/30 dark:hover:bg-brand-500/10 dark:hover:text-ink-50"
                     >
                       <Sparkles className="h-3.5 w-3.5 shrink-0 text-brand-600 dark:text-brand-400" />
@@ -177,8 +438,29 @@ export default function AssistantWidget() {
               )}
 
               {messages.map((m) => (
-                <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : ""}`}>
-                  <p
+                <div key={m.id} className="space-y-2">
+                <div className={`flex ${m.role === "user" ? "justify-end" : ""}`}>
+                  {m.replyMode === "voice" ? (
+                    <div role="group" aria-label="Lofty voice reply" className="max-w-[85%] space-y-2 rounded-2xl rounded-bl-sm border border-ink-200 bg-white px-3.5 py-3 text-sm shadow-soft dark:border-ink-700 dark:bg-ink-800">
+                      <div className="flex items-center gap-2 text-ink-800 dark:text-ink-100">
+                        <Volume2 className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                        <span>Voice reply</span>
+                      </div>
+                      {m.audioStatus === "generating" ? <p role="status" className="text-xs text-ink-500 dark:text-ink-400">Generating audio…</p> : (
+                        <button
+                          type="button"
+                          className="btn-secondary flex items-center gap-1.5 text-xs"
+                          aria-label={m.audioStatus === "ready" ? playingReplyId === m.id ? "Stop voice reply" : "Play voice reply" : "Retry voice reply"}
+                          disabled={recording || transcribing || thinking || Boolean(confirming) || !configured}
+                          onClick={() => m.audioStatus === "ready" ? playingReplyId === m.id ? stopPlayback() : void playGeneratedReply(m.id) : retryVoiceReply(m)}
+                        >
+                          {playingReplyId === m.id ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                          {m.audioStatus === "ready" ? playingReplyId === m.id ? "Stop" : "Play" : m.audioStatus === "failed" ? "Retry audio" : "Generate audio"}
+                        </button>
+                      )}
+                      {m.audioError && <p role="alert" className="text-xs text-red-700 dark:text-red-300">{m.audioError}</p>}
+                    </div>
+                  ) : <p
                     className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-soft ${
                       m.role === "user"
                         ? "rounded-br-sm bg-gradient-to-br from-brand-600 to-brand-800 text-white"
@@ -186,16 +468,40 @@ export default function AssistantWidget() {
                     }`}
                   >
                     {m.content}
-                  </p>
+                  </p>}
+                </div>
+                {m.actions?.map((action) => (
+                  <div key={action.id} className="rounded-xl border border-ink-200 bg-white p-3 text-sm dark:border-ink-700 dark:bg-ink-800">
+                    <p className="font-semibold">{action.kind === "task" ? "Create task" : action.kind === "event_draft" ? "Save meeting draft" : "Create meeting"}: {action.data.title}</p>
+                    <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">Workspace: {action.preview?.workspaceName || workspaces.find((w) => w.id === action.data.workspaceId)?.name || action.data.workspaceId}</p>
+                    {action.data.description && <p className="mt-1 whitespace-pre-wrap">{action.data.description}</p>}
+                    {action.data.location && <p className="mt-1 text-xs">Location: {action.data.location}</p>}
+                    {action.kind === "task" ? <>
+                      <p className="mt-1 text-xs">Priority: {PRIORITY_NAMES[action.data.tier]}{action.data.deferredFields?.includes("tier") ? " (default until you edit it)" : ""} · {action.data.assigneeId ? `Assigned to ${action.data.assigneeId === user?.id ? "you" : action.preview?.people?.[0]?.name || action.data.assigneeId}` : "Unassigned"}</p>
+                      {action.data.dueDate && <p className="mt-1 text-xs">Due: {new Date(action.data.dueDate).toLocaleString()}</p>}
+                    </> : <>
+                      <p className="mt-1 text-xs">{action.kind === "event_draft" ? "Unscheduled draft — finish the details in your workspace calendar." : `${new Date(action.data.startTime).toLocaleString()} – ${new Date(action.data.endTime).toLocaleString()}`}</p>
+                      {action.kind === "event_draft" && action.data.startTime && <p className="mt-1 text-xs">Proposed start: {new Date(action.data.startTime).toLocaleString()}</p>}
+                      {action.kind === "event_draft" && action.data.endTime && <p className="mt-1 text-xs">Proposed end: {new Date(action.data.endTime).toLocaleString()}</p>}
+                      <p className="mt-1 text-xs">Attendees: {action.preview?.people?.map((p) => p.name).join(", ") || action.data.attendeeIds?.join(", ") || "To add later"}</p>
+                    </>}
+                    {action.data.deferredFields?.length > 0 && <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">You can add the remaining details later.</p>}
+                    {action.result ? <Link className="mt-2 inline-block text-brand-600 underline dark:text-brand-400" to={`/workspaces/${action.result.workspaceId}/${action.kind === "task" ? "tasks" : "calendar"}`}>Saved — open {action.kind === "task" ? "task board" : "calendar"}</Link>
+                      : action.dismissed ? <p className="mt-2 text-xs">Dismissed</p>
+                      : <div className="mt-3 flex gap-2"><button type="button" className="btn-primary" onClick={() => confirm(action)} disabled={Boolean(confirming) || thinking}>{confirming === action.id ? "Saving…" : "Confirm"}</button><button type="button" className="btn-secondary" onClick={() => dismiss(action.id)} disabled={Boolean(confirming)}>Dismiss</button></div>}
+                  </div>
+                ))}
                 </div>
               ))}
+
+              {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</p>}
 
               {thinking && (
                 <div
                   role="status"
                   className="flex w-fit items-center gap-1 rounded-2xl rounded-bl-sm border border-ink-200 bg-white px-3.5 py-3 dark:border-ink-700 dark:bg-ink-800"
                 >
-                  <span className="sr-only">Assistant is thinking</span>
+                  <span className="sr-only">Lofty is thinking</span>
                   {[0, 150, 300].map((delay) => (
                     <span
                       key={delay}
@@ -214,21 +520,49 @@ export default function AssistantWidget() {
               }}
               className="shrink-0 border-t border-ink-900/[0.06] px-3 pb-3 pt-3 dark:border-white/[0.06]"
             >
+              {recording && <VoiceRecordingIndicator stream={mediaStreamRef.current} maxDurationMs={MAX_RECORDING_MS} />}
               <div className="flex items-center gap-2">
+                {voiceMode && <button
+                  type="button"
+                  onClick={recording ? stopRecording : beginRecording}
+                  disabled={thinking || Boolean(confirming) || transcribing || !configured}
+                  className={`btn-secondary shrink-0 ${recording ? "border-red-300 bg-red-50 text-red-700 ring-2 ring-red-500/20 dark:border-red-700 dark:bg-red-950/40 dark:text-red-300" : ""}`}
+                  title={recording ? "Stop recording" : "Record voice"}
+                  aria-label={recording ? "Stop recording" : "Record voice"}
+                  aria-pressed={recording}
+                >
+                  {recording ? <><Square className="h-3.5 w-3.5 fill-current" /><span className="ml-1.5 text-xs">Stop</span></> : <Mic className="h-4 w-4" />}
+                </button>}
                 <input
                   ref={inputRef}
                   className="input min-w-0"
-                  placeholder="Ask LOFT anything…"
+                  placeholder="Ask Lofty anything…"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  aria-label="Message the assistant"
+                  aria-label="Message Lofty"
+                  maxLength={4000}
                 />
-                <button type="submit" className="btn-primary shrink-0" disabled={!draft.trim() || thinking}>
+                <button type="submit" className="btn-primary shrink-0" disabled={!draft.trim() || thinking || Boolean(confirming) || transcribing || recording || !configured}>
                   Send
                 </button>
               </div>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <p className="text-[11px] text-ink-400 dark:text-ink-500">
+                  {recording ? "Recording… tap stop to ask Lofty (max 30s)." : transcribing ? "Transcribing voice…" : voiceMode ? "Speak to get a voice reply. Send text to switch to text replies." : "Type for text replies, or enable voice to talk to Lofty."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => changeVoiceMode(!voiceEnabledRef.current)}
+                  className="flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-ink-500 transition-colors hover:text-ink-800 dark:text-ink-400 dark:hover:text-ink-200"
+                  aria-pressed={voiceMode}
+                  title={voiceMode ? "Exit voice mode" : "Enable voice mode"}
+                >
+                  {voiceMode ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+                  {voiceMode ? "Voice mode on" : "Voice mode off"}
+                </button>
+              </div>
               <p className="mt-2 text-center text-[11px] text-ink-400 dark:text-ink-500">
-                Preview: replies aren't connected to your workspace yet.
+                {configured ? "Check suggestions before confirming. Chat clears when you change workspace or reload." : "Your team needs to finish assistant setup before you can send messages."}
               </p>
             </form>
           </section>

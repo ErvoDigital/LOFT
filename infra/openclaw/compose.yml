@@ -1,0 +1,29 @@
+services:
+  openclaw:
+    # Official image pinned to the digest inspected on 2026-10-04.
+    image: ghcr.io/openclaw/openclaw@sha256:d0ded1dd76939b2bf4d67ef2d13247b8b160aa5666331d4a0b0e58811182cbb8
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 6m
+    command: ["node", "/etc/loft/start.mjs"]
+    environment:
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY in the gateway env file}
+      OPENROUTER_STT_MODEL: ${OPENROUTER_STT_MODEL:-openai/gpt-4o-mini-transcribe}
+      OPENROUTER_TTS_MODEL: ${OPENROUTER_TTS_MODEL:-google/gemini-3.1-flash-tts-preview}
+      OPENROUTER_TTS_VOICE: ${OPENROUTER_TTS_VOICE:-Kore}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:?Run npm run ai:setup first}
+      OPENCLAW_PRIMARY_MODEL: ${OPENCLAW_PRIMARY_MODEL:-openrouter/openai/gpt-4o-mini}
+      OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
+    ports:
+      - "127.0.0.1:18789:18789"
+    volumes:
+      - ./openclaw.json:/etc/loft/openclaw.json:ro
+      - ./start.mjs:/etc/loft/start.mjs:ro
+      - ./plugins/loft-speech:/etc/loft/plugins/loft-speech:ro
+      - loft-openclaw-state:/home/node/.openclaw
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+volumes:
+  loft-openclaw-state:

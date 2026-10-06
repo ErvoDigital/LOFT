@@ -8,18 +8,18 @@ import Avatar from "../common/Avatar.jsx";
 // Reads the same "how many are in the room right now" signal the meeting page
 // uses, so the overview can say whether a call is live without joining it.
 function usePresenceCount(workspaceId, skip) {
-  const { socket } = useSocket();
+  const { socket, connected } = useSocket();
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    if (!socket || skip) return;
-    socket.emit("meeting:status", workspaceId, (res) => res && setCount(res.count));
+    if (!socket || !connected || skip) return;
+    socket.emit("meeting:status", workspaceId, (res) => Number.isFinite(res?.count) && setCount(res.count));
     const onActivity = (payload) => {
       if (payload.workspaceId === workspaceId) setCount(payload.count);
     };
     socket.on("meeting:activity", onActivity);
     return () => socket.off("meeting:activity", onActivity);
-  }, [socket, workspaceId, skip]);
+  }, [socket, connected, workspaceId, skip]);
 
   return count;
 }

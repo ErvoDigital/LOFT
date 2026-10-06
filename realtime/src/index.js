@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { Pool } from "pg";
 import * as Y from "yjs";
 import { attachDatabasePool, upgradeWebSocket } from "@neon/functions";
+import { isAllowedOrigin } from "./origins.mjs";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const CLIENT_URL = process.env.CLIENT_URL;
@@ -674,8 +675,10 @@ async function handleMessage(conn, raw) {
 }
 
 function corsOk(request) {
-  const origin = request.headers.get("origin");
-  return !origin || !CLIENT_URL || origin === CLIENT_URL;
+  return isAllowedOrigin(request.headers.get("origin"), {
+    clientUrl: CLIENT_URL,
+    allowedOrigins: process.env.REALTIME_ALLOWED_ORIGINS,
+  });
 }
 
 export default {
