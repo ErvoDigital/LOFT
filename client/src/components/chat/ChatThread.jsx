@@ -122,7 +122,7 @@ function AttachmentIcon({ mimeType, className }) {
 export default function ChatThread({ conversation, headerStart, headerExtra }) {
   const roomy = useMediaQuery("(min-width: 640px)");
   const { user } = useAuth();
-  const { socket } = useSocket();
+  const { socket, connected } = useSocket();
   const { workspaces } = useWorkspaces();
   const confirm = useConfirm();
   const openProfile = useMemberProfile();
@@ -136,6 +136,7 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
   const [attachmentUpload, setAttachmentUpload] = useState(null); // { name, size, progress } | null
   const [attachError, setAttachError] = useState("");
   const [deleteError, setDeleteError] = useState("");
+  const [sendError, setSendError] = useState("");
   const [previewing, setPreviewing] = useState(null); // { assetId, version } | null
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [reactionPickerFor, setReactionPickerFor] = useState(null); // messageId | null
@@ -169,14 +170,36 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
     setMentionState(null);
     setReactionPickerFor(null);
     setDeleteError("");
+    setSendError("");
     messagesApi.getMessages(conversationId).then((msgs) => {
       shouldScrollToBottom.current = true;
       setMessages(msgs);
       setLoadingMessages(false);
     });
-    socket?.emit("conversation:join", conversationId);
-    return () => socket?.emit("conversation:leave", conversationId);
-  }, [conversationId, socket]);
+  }, [conversationId]);
+
+  // Joins the conversation's live room each time the connection comes up. A
+  // reconnect reuses the same socket object, so keying on `socket` alone left
+  // a restored connection outside the room and new messages stopped arriving.
+  // After a reconnect the thread is reloaded too, to pick up anything sent
+  // while the connection was down.
+  const lastJoined = useRef(null);
+  useEffect(() => {
+    if (!socket || !connected) return;
+    let cancelled = false;
+    if (lastJoined.current === conversationId) {
+      messagesApi
+        .getMessages(conversationId)
+        .then((msgs) => !cancelled && setMessages(msgs))
+        .catch(() => {});
+    }
+    lastJoined.current = conversationId;
+    socket.emit("conversation:join", conversationId);
+    return () => {
+      cancelled = true;
+      socket.emit("conversation:leave", conversationId);
+    };
+  }, [conversationId, socket, connected]);
 
   useEffect(() => {
     if (!shouldScrollToBottom.current) return;
@@ -243,13 +266,18 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
   function sendMessage(e) {
     e.preventDefault();
     const trimmed = draft.trim();
-    if ((!trimmed && !pendingAttachment) || !socket) return;
+    // Messages only travel over the live connection, and the socket drops
+    // anything emitted while it's down, so the draft stays put until it's back.
+    if ((!trimmed && !pendingAttachment) || !socket || !connected) return;
     const content = applyMentions(trimmed, mentionCandidates);
+    setSendError("");
     socket.emit(
       "message:send",
       { conversationId, content, attachmentAssetId: pendingAttachment?.assetId },
       (res) => {
-        if (res?.error) console.error(res.error);
+        if (!res?.error) return;
+        setSendError(`Your message wasn't sent: ${res.error}`);
+        setDraft((current) => current || trimmed);
       }
     );
     setDraft("");
@@ -549,6 +577,12 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
       <div className="border-t border-ink-200 bg-white p-2.5 dark:border-ink-700 dark:bg-ink-800 sm:p-4">
         {attachError && <p className="mb-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{attachError}</p>}
         {deleteError && <p className="mb-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{deleteError}</p>}
+        {sendError && <p className="mb-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{sendError}</p>}
+        {!connected && (
+          <p className="mb-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+            Connecting to chat… You can keep typing; Send works once the connection is back.
+          </p>
+        )}
 
         {mentionState && filteredMentions.length > 0 && (
           <div className="mb-2 max-h-40 overflow-y-auto rounded-lg border border-ink-200 bg-white shadow-panel dark:border-ink-700 dark:bg-ink-800">
@@ -625,7 +659,7 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
             onChange={handleDraftChange}
             onKeyDown={handleComposerKeyDown}
           />
-          <button type="submit" className="btn-primary shrink-0 max-sm:!px-3.5" disabled={!draft.trim() && !pendingAttachment}>
+          <button type="submit" className="btn-primary shrink-0 max-sm:!px-3.5" disabled={!connected || (!draft.trim() && !pendingAttachment)}>
             Send
           </button>
         </form>
