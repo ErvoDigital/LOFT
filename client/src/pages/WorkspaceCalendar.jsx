@@ -113,11 +113,13 @@ export default function WorkspaceCalendar() {
   const [monthDate, setMonthDate] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [events, setEvents] = useState([]);
+  const [meetingDrafts, setMeetingDrafts] = useState([]);
   const [members, setMembers] = useState([]);
   const [access, setAccess] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
+  const [editingDraft, setEditingDraft] = useState(null);
   const [draftStart, setDraftStart] = useState(null);
   // The open event is tracked by id, not by value, so a live edit or
   // cancellation from someone else flows straight into the open card.
@@ -126,14 +128,19 @@ export default function WorkspaceCalendar() {
   const confirm = useConfirm();
 
   const load = useCallback(() => {
-    Promise.all([eventsApi.listWorkspaceEvents(workspaceId), workspacesApi.getWorkspace(workspaceId)]).then(
-      ([evts, workspace]) => {
+    Promise.all([eventsApi.listWorkspaceEvents(workspaceId), workspacesApi.getWorkspace(workspaceId), eventsApi.listEventDrafts(workspaceId)]).then(
+      ([evts, workspace, drafts]) => {
+        setError("");
         setEvents(evts);
+        setMeetingDrafts(drafts);
         setMembers(workspace.members);
         setAccess(workspace);
         setLoading(false);
       }
-    );
+    ).catch((err) => {
+      setError(apiErrorMessage(err));
+      setLoading(false);
+    });
   }, [workspaceId]);
 
   useEffect(() => {
@@ -144,8 +151,9 @@ export default function WorkspaceCalendar() {
   useEffect(() => {
     if (!socket) return;
     const handler = () => load();
-    ["event:created", "event:updated", "event:cancelled"].forEach((e) => socket.on(e, handler));
-    return () => ["event:created", "event:updated", "event:cancelled"].forEach((e) => socket.off(e, handler));
+    const events = ["event:created", "event:updated", "event:cancelled", "event:draft-created", "event:draft-updated", "event:draft-deleted"];
+    events.forEach((e) => socket.on(e, handler));
+    return () => events.forEach((e) => socket.off(e, handler));
   }, [socket, load]);
 
   // Held steady across the clock's minute tick, so the week view isn't handed
@@ -200,6 +208,7 @@ export default function WorkspaceCalendar() {
     }
     select(day);
     setEditingEvent(null);
+    setEditingDraft(null);
     setDraftStart(start);
     setModalOpen(true);
   }
@@ -212,6 +221,7 @@ export default function WorkspaceCalendar() {
   }
 
   function editFromDetails() {
+    setEditingDraft(null);
     setEditingEvent(detailsEvent);
     setDraftStart(null);
     setDetailsId(null);
@@ -315,6 +325,20 @@ export default function WorkspaceCalendar() {
         <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>
       )}
 
+      {meetingDrafts.length > 0 && <section aria-label="Meeting drafts" className="card shrink-0 space-y-3 p-4">
+        <div>
+          <h2 className="text-sm font-semibold">Meeting drafts</h2>
+          <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">Complete the details when you're ready. Drafts stay off the schedule until you schedule them.</p>
+        </div>
+        {meetingDrafts.map((draft) => <div key={draft.id} className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">{draft.title}</p>
+            <p className="text-xs text-ink-500 dark:text-ink-400">Not scheduled</p>
+          </div>
+          <button type="button" className="btn-secondary shrink-0 text-xs" onClick={() => { setEditingEvent(null); setEditingDraft(draft); setDraftStart(null); setModalOpen(true); }}>Finish details</button>
+        </div>)}
+      </section>}
+
       {/* Explicit grid-cols-1: an implicit track grows to fit its widest
           content and pushes the week grid off-screen on phones. */}
       <div className="grid grid-cols-1 gap-5 xl:min-h-[38rem] xl:flex-1 xl:grid-cols-[minmax(0,1fr)_22rem] xl:grid-rows-[minmax(0,1fr)]">
@@ -371,13 +395,15 @@ export default function WorkspaceCalendar() {
         defaultDate={selectedDate}
         defaultStart={draftStart}
         event={editingEvent}
+        draft={editingDraft}
         onSaved={(saved) => {
+          if (editingDraft) { load(); return; }
           setEvents((prev) => {
             const exists = prev.some((e) => e.id === saved.id);
             return exists ? prev.map((e) => (e.id === saved.id ? saved : e)) : [...prev, saved];
           });
         }}
-        onDeleted={(id) => setEvents((prev) => prev.filter((e) => e.id !== id))}
+        onDeleted={(id) => { setEvents((prev) => prev.filter((e) => e.id !== id)); setMeetingDrafts((prev) => prev.filter((draft) => draft.id !== id)); }}
       />
     </div>
   );

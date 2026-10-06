@@ -9,3 +9,11 @@ export const updateEvent = (workspaceId, eventId, data) =>
   api.patch(`/workspaces/${workspaceId}/events/${eventId}`, data).then((r) => r.data.event);
 export const cancelEvent = (workspaceId, eventId) =>
   api.delete(`/workspaces/${workspaceId}/events/${eventId}`).then((r) => r.data);
+export const listEventDrafts = (workspaceId) =>
+  api.get(`/workspaces/${workspaceId}/events/drafts`).then((r) => r.data.drafts);
+export const updateEventDraft = (workspaceId, draftId, data) =>
+  api.patch(`/workspaces/${workspaceId}/events/drafts/${draftId}`, data).then((r) => r.data.draft);
+export const deleteEventDraft = (workspaceId, draftId) =>
+  api.delete(`/workspaces/${workspaceId}/events/drafts/${draftId}`).then((r) => r.data);
+export const scheduleEventDraft = (workspaceId, draftId, data) =>
+  api.post(`/workspaces/${workspaceId}/events/drafts/${draftId}/schedule`, data).then((r) => r.data.event);

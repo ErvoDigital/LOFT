@@ -13,7 +13,7 @@ const eventSchema = z.object({
   attendeeIds: z.array(z.string()).optional(),
 });
 
-function serialize(event) {
+export function serialize(event) {
   return {
     id: event.id,
     workspaceId: event.workspaceId,

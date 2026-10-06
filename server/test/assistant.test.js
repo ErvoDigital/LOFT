@@ -8,7 +8,7 @@ import jwt from "jsonwebtoken";
 process.env.JWT_SECRET = "assistant-test-secret-only";
 process.env.OPENCLAW_GATEWAY_TOKEN = "private-test-gateway-token";
 const { runOpenClaw } = await import("../src/services/openclaw.service.js");
-const { answerAssistant, signAction, verifyAction, confirmAction, eventAction, taskAction } = await import("../src/services/assistant.service.js");
+const { answerAssistant, signAction, verifyAction, confirmAction, eventAction, taskAction, eventDraftAction } = await import("../src/services/assistant.service.js");
 const { setPrismaClient, clearPrismaClient } = await import("../src/db/prisma.js");
 const { createApp } = await import("../src/app.js");
 const { signToken, verifyToken } = await import("../src/utils/jwt.js");
@@ -24,7 +24,7 @@ const eventData = { workspaceId, title: "Team meeting", startTime: "2026-10-09T1
 const messageOutput = (text) => ({ id: "response-final", output: [{ type: "message", content: [{ type: "output_text", text }] }] });
 
 function fakeDatabase() {
-  const records = { task: new Map(), event: new Map() };
+  const records = { task: new Map(), event: new Map(), eventDraft: new Map() };
   const queries = [];
   let revoked = false;
   let creates = 0;
@@ -44,14 +44,14 @@ function fakeDatabase() {
     realtimeEvent: { async create() { return {}; } },
     notification: { async create({ data }) { return { id: "notice", ...data }; } },
   };
-  for (const kind of ["task", "event"]) db[kind] = {
+  for (const kind of ["task", "event", "eventDraft"]) db[kind] = {
     async findMany(query) { queries.push(query); return []; },
     async findFirst() { return null; },
     async findUnique({ where }) { return records[kind].get(where.id) || null; },
     async create({ data }) {
       if (records[kind].has(data.id)) throw Object.assign(new Error("Duplicate"), { code: "P2002" });
       creates++;
-      const record = { ...data, workspace: { name: "School" }, attendees: [], assignee: { id: userId, name: "Tester" } };
+      const record = { ...data, workspace: { name: "School" }, attendees: [], assignee: data.assigneeId ? { id: data.assigneeId, name: "Tester" } : null };
       records[kind].set(data.id, record);
       return record;
     },
@@ -120,18 +120,22 @@ test("Read tools constrain queries to caller memberships, context and record lim
     await executeTool("list_my_tasks", {});
     await executeTool("list_upcoming_events", {});
     await executeTool("list_workspaces", {});
+    await executeTool("list_my_meeting_drafts", {});
     await assert.rejects(executeTool("list_workspace_members", { workspaceId: otherWorkspaceId }), /Switch workspace/);
     await assert.rejects(executeTool("exec", { command: "danger" }), /Unknown/);
     return "Done";
   });
   const queries = fake.queries.filter((q) => q.take === 100);
-  assert.equal(queries.length, 3);
+  assert.equal(queries.length, 4);
   assert.equal(queries[0].where.assigneeId, userId);
   assert.equal(queries[0].where.workspaceId, workspaceId);
   assert.equal(queries[0].where.workspace.members.some.userId, userId);
   assert.equal(queries[1].where.workspace.members.some.userId, userId);
   assert.equal(queries[2].where.members.some.userId, userId);
   assert.equal(queries[2].where.id, workspaceId);
+  assert.equal(queries[3].where.workspace.members.some.userId, userId);
+  assert.equal(queries[3].where.workspaceId, workspaceId);
+  assert.equal(queries[3].where.createdById, userId);
 });
 
 test("Unauthorized workspace is rejected before contacting the gateway", async () => {
@@ -170,11 +174,90 @@ test("Task proposals require resolved assignee and priority without silent defau
   }
 });
 
+test("Explicitly deferred task fields use visible defaults and preserve supplied details", async () => {
+  const fake = fakeDatabase();
+  const input = { workspaceId, title: "Presentation", description: "Keep this outline", dueDate: "2026-10-09T10:00:00+08:00", deferredFields: ["tier", "assigneeId"] };
+  const result = await answerAssistant({ userId, workspaceId, message: "Create the presentation task; I'll add the priority and assignee later." }, fake.db, async ({ instructions, executeTool }) => {
+    assert.match(instructions, /instead of repeatedly asking for those deferred details/);
+    const proposal = await executeTool("propose_task", input);
+    assert.equal(proposal.data.assigneeId, null);
+    assert.equal(proposal.data.tier, "TIER_3");
+    assert.equal(proposal.data.description, input.description);
+    assert.equal(proposal.data.dueDate, input.dueDate);
+    await assert.rejects(executeTool("propose_task", { ...input, deferredFields: ["description"] }));
+    await assert.rejects(executeTool("propose_task", { ...input, assigneeId: inaccessible }));
+    return "Confirm to create it; you can finish the details later.";
+  });
+  assert.equal(fake.creates, 0);
+  setPrismaClient(fake.db);
+  try {
+    await confirmAction(result.actions[0].token, userId);
+    const saved = fake.records.task.get(result.actions[0].id);
+    assert.equal(saved.assigneeId, null);
+    assert.equal(saved.tier, "TIER_3");
+    assert.equal(saved.description, input.description);
+  } finally { clearPrismaClient(fake.db); }
+});
+
+test("Deferred meeting details produce a caller-bound draft with no fabricated schedule", async () => {
+  const fake = fakeDatabase();
+  const data = { workspaceId, title: "Team planning", location: "LOFT meeting room", description: "Discuss the next release", deferredFields: ["startTime", "endTime", "attendeeIds"] };
+  assert.equal(eventDraftAction.safeParse({ ...data, deferredFields: ["description"] }).success, false);
+  assert.equal(eventDraftAction.safeParse({ ...data, workspaceId: undefined }).success, false);
+  const result = await answerAssistant({ userId, workspaceId, message: "Make a team planning meeting; I'll add the times and attendees later." }, fake.db, async ({ executeTool }) => {
+    const output = await executeTool("propose_event_draft", data);
+    assert.equal(output.kind, "event_draft");
+    assert.equal(output.data.startTime, undefined);
+    assert.equal(output.data.attendeeIds, undefined);
+    assert.equal(output.data.location, data.location);
+    await assert.rejects(executeTool("propose_event_draft", { ...data, workspaceId: otherWorkspaceId }), /Switch workspace/);
+    await assert.rejects(executeTool("propose_event_draft", { ...data, attendeeIds: [inaccessible] }), /not a member/);
+    return "The unscheduled draft is ready for confirmation.";
+  });
+  assert.equal(fake.creates, 0);
+  setPrismaClient(fake.db);
+  try {
+    const [a, b] = await Promise.all([confirmAction(result.actions[0].token, userId), confirmAction(result.actions[0].token, userId)]);
+    assert.equal(a.kind, "event_draft");
+    assert.equal(a.id, b.id);
+    assert.equal(fake.records.eventDraft.size, 1);
+    assert.equal(fake.records.event.size, 0);
+    assert.equal(fake.creates, 1);
+    const saved = fake.records.eventDraft.get(a.id);
+    assert.equal(saved.startTime, undefined);
+    assert.equal(saved.attendeeIds, undefined);
+    assert.equal(saved.description, data.description);
+    // Finishing the draft must not allow its original confirmation token to
+    // resurrect another draft after scheduling.
+    fake.records.eventDraft.delete(a.id);
+    fake.records.event.set(a.id, { ...saved, startTime: eventData.startTime, endTime: eventData.endTime });
+    const retry = await confirmAction(result.actions[0].token, userId);
+    assert.equal(retry.kind, "event");
+    assert.equal(retry.alreadyCreated, true);
+    assert.equal(fake.records.eventDraft.size, 0);
+    assert.equal(fake.creates, 1);
+    fake.revoke();
+    await assert.rejects(confirmAction(result.actions[0].token, userId), (e) => e.statusCode === 403);
+  } finally { clearPrismaClient(fake.db); }
+});
+
+test("Only an explicitly deferred title receives an untitled placeholder", async () => {
+  const fake = fakeDatabase();
+  await answerAssistant({ userId, workspaceId, message: "Make a task and a meeting draft; I'll fill all the details later." }, fake.db, async ({ executeTool }) => {
+    const task = await executeTool("propose_task", { workspaceId, deferredFields: ["title", "tier", "assigneeId"] });
+    assert.equal(task.data.title, "Untitled task");
+    const draft = await executeTool("propose_event_draft", { workspaceId, deferredFields: ["title", "startTime", "endTime", "attendeeIds"] });
+    assert.equal(draft.data.title, "Untitled meeting");
+    return "Confirm the requested placeholders.";
+  });
+  assert.equal(fake.creates, 0);
+});
+
 test("Every active-context tool call rejects membership revoked during inference", async () => {
   const fake = fakeDatabase();
   await answerAssistant({ userId, workspaceId, message: "My tasks?" }, fake.db, async ({ executeTool }) => {
     fake.revoke();
-    for (const name of ["list_workspaces", "list_my_tasks", "list_upcoming_events", "find_conflicts", "list_workspace_members", "propose_task", "propose_event"]) {
+    for (const name of ["list_workspaces", "list_my_tasks", "list_upcoming_events", "list_my_meeting_drafts", "find_conflicts", "list_workspace_members", "propose_task", "propose_event", "propose_event_draft"]) {
       await assert.rejects(executeTool(name, { workspaceId }), (e) => e.statusCode === 403);
     }
     return "Your access has changed.";

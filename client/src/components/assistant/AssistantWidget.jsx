@@ -472,16 +472,20 @@ export default function AssistantWidget() {
                 </div>
                 {m.actions?.map((action) => (
                   <div key={action.id} className="rounded-xl border border-ink-200 bg-white p-3 text-sm dark:border-ink-700 dark:bg-ink-800">
-                    <p className="font-semibold">{action.kind === "task" ? "Create task" : "Create meeting"}: {action.data.title}</p>
+                    <p className="font-semibold">{action.kind === "task" ? "Create task" : action.kind === "event_draft" ? "Save meeting draft" : "Create meeting"}: {action.data.title}</p>
                     <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">Workspace: {action.preview?.workspaceName || workspaces.find((w) => w.id === action.data.workspaceId)?.name || action.data.workspaceId}</p>
                     {action.data.description && <p className="mt-1 whitespace-pre-wrap">{action.data.description}</p>}
+                    {action.data.location && <p className="mt-1 text-xs">Location: {action.data.location}</p>}
                     {action.kind === "task" ? <>
-                      <p className="mt-1 text-xs">Priority: {PRIORITY_NAMES[action.data.tier]} · Assigned to {action.data.assigneeId === user?.id ? "you" : action.preview?.people?.[0]?.name || action.data.assigneeId}</p>
+                      <p className="mt-1 text-xs">Priority: {PRIORITY_NAMES[action.data.tier]}{action.data.deferredFields?.includes("tier") ? " (default until you edit it)" : ""} · {action.data.assigneeId ? `Assigned to ${action.data.assigneeId === user?.id ? "you" : action.preview?.people?.[0]?.name || action.data.assigneeId}` : "Unassigned"}</p>
                       {action.data.dueDate && <p className="mt-1 text-xs">Due: {new Date(action.data.dueDate).toLocaleString()}</p>}
                     </> : <>
-                      <p className="mt-1 text-xs">{new Date(action.data.startTime).toLocaleString()} – {new Date(action.data.endTime).toLocaleString()}</p>
-                      <p className="mt-1 text-xs">Attendees: {action.preview?.people?.map((p) => p.name).join(", ") || action.data.attendeeIds.join(", ")}</p>
+                      <p className="mt-1 text-xs">{action.kind === "event_draft" ? "Unscheduled draft — finish the details in your workspace calendar." : `${new Date(action.data.startTime).toLocaleString()} – ${new Date(action.data.endTime).toLocaleString()}`}</p>
+                      {action.kind === "event_draft" && action.data.startTime && <p className="mt-1 text-xs">Proposed start: {new Date(action.data.startTime).toLocaleString()}</p>}
+                      {action.kind === "event_draft" && action.data.endTime && <p className="mt-1 text-xs">Proposed end: {new Date(action.data.endTime).toLocaleString()}</p>}
+                      <p className="mt-1 text-xs">Attendees: {action.preview?.people?.map((p) => p.name).join(", ") || action.data.attendeeIds?.join(", ") || "To add later"}</p>
                     </>}
+                    {action.data.deferredFields?.length > 0 && <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">You can add the remaining details later.</p>}
                     {action.result ? <Link className="mt-2 inline-block text-brand-600 underline dark:text-brand-400" to={`/workspaces/${action.result.workspaceId}/${action.kind === "task" ? "tasks" : "calendar"}`}>Saved — open {action.kind === "task" ? "task board" : "calendar"}</Link>
                       : action.dismissed ? <p className="mt-2 text-xs">Dismissed</p>
                       : <div className="mt-3 flex gap-2"><button type="button" className="btn-primary" onClick={() => confirm(action)} disabled={Boolean(confirming) || thinking}>{confirming === action.id ? "Saving…" : "Confirm"}</button><button type="button" className="btn-secondary" onClick={() => dismiss(action.id)} disabled={Boolean(confirming)}>Dismiss</button></div>}

@@ -43,10 +43,12 @@ async function mount(t, overrides = {}) {
   const speech = [];
   const audio = [];
   const revoked = [];
+  const confirmations = [];
   let recorder;
   let stoppedTracks = 0;
   const api = {
     assistantStatus: async () => ({ configured: true }),
+    confirmAssistantAction: async (token) => { confirmations.push(token); return { id: "saved", workspaceId: "workspace" }; },
     sendAssistantMessage: async (body) => { messages.push(body); return overrides.reply ? overrides.reply.promise : { reply: "Your summary.", actions: [] }; },
     transcribeAssistantAudio: async () => overrides.transcript ? overrides.transcript.promise : { transcript: "What is due today?" },
     speakAssistantReply: async (text, context, signal) => {
@@ -61,7 +63,7 @@ async function mount(t, overrides = {}) {
     module: exported,
     require: createRequire(import.meta.url),
     mocks: {
-      "react-router-dom": { Link: () => null, useLocation: () => ({ pathname: "/" }), useParams: () => ({}) },
+      "react-router-dom": { Link: ({ to, children }) => React.createElement("a", { href: to }, children), useLocation: () => ({ pathname: "/" }), useParams: () => ({}) },
       "lucide-react": Object.fromEntries(["Layers", "Mic", "Sparkles", "Square", "Volume2", "VolumeX", "X"].map((name) => [name, () => null])),
       "../../context/AuthContext.jsx": { useAuth: () => ({ user: { id: "tester", name: "Tester" } }) },
       "../../context/WorkspaceContext.jsx": { useWorkspaces: () => ({ workspaces: [] }) },
@@ -106,8 +108,38 @@ async function mount(t, overrides = {}) {
   const submit = async () => { await act(async () => view.root.findByType("form").props.onSubmit({ preventDefault() {} })); };
   const record = async () => { await click("Enable voice mode"); await click("Record voice"); await click("Stop recording"); };
   await click("Open Lofty");
-  return { view, messages, speech, audio, revoked, click, type, submit, record, get recorder() { return recorder; }, get stoppedTracks() { return stoppedTracks; } };
+  return { view, messages, speech, audio, revoked, confirmations, click, type, submit, record, get recorder() { return recorder; }, get stoppedTracks() { return stoppedTracks; } };
 }
+
+test("Meeting draft previews handle absent dates and save only after confirmation", async (t) => {
+  const reply = deferred();
+  const widget = await mount(t, { reply });
+  await widget.type("Prepare a planning meeting. I'll add the details later.");
+  await widget.submit();
+  await act(async () => reply.resolve({ reply: "Confirm to save the draft.", actions: [{ id: "proposal", token: "signed-draft", kind: "event_draft", data: { title: "Planning", workspaceId: "workspace", location: "Room A", deferredFields: ["startTime", "endTime", "attendeeIds"] } }] }));
+  const content = JSON.stringify(widget.view.toJSON());
+  assert.match(content, /Save meeting draft/);
+  assert.match(content, /Unscheduled draft/);
+  assert.match(content, /To add later/);
+  assert.doesNotMatch(content, /Invalid Date/);
+  assert.equal(widget.confirmations.length, 0);
+  await act(async () => widget.view.root.findAllByType("button").find((b) => b.children.includes("Confirm")).props.onClick());
+  assert.deepEqual(widget.confirmations, ["signed-draft"]);
+  assert.equal(widget.view.root.findByType("a").props.href, "/workspaces/workspace/calendar");
+});
+
+test("Deferred task previews disclose the default priority and unassigned state", async (t) => {
+  const reply = deferred();
+  const widget = await mount(t, { reply });
+  await widget.type("Create a task; I'll add its details later.");
+  await widget.submit();
+  await act(async () => reply.resolve({ reply: "Confirm below.", actions: [{ id: "proposal", kind: "task", data: { title: "Untitled task", workspaceId: "workspace", tier: "TIER_3", assigneeId: null, deferredFields: ["title", "tier", "assigneeId"] } }] }));
+  const content = JSON.stringify(widget.view.toJSON());
+  assert.match(content, /Flexible/);
+  assert.match(content, /default until you edit it/);
+  assert.match(content, /Unassigned/);
+  assert.equal(widget.confirmations.length, 0);
+});
 
 test("Typed messages get text replies even if voice is enabled while the reply is pending", async (t) => {
   const reply = deferred();
