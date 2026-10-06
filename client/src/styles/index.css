@@ -472,3 +472,215 @@
     transition: none;
   }
 }
+
+/* The voice assistant's orb: a glass bubble of brand light. VoiceAssistant
+   writes two custom properties on an ancestor every frame: --level (0 to 1:
+   how loudly the user is speaking, or the pulse of each word read aloud)
+   and --turn (a running count of rotations, so the swirl can speed up and
+   slow down between states; changing an animation-duration instead makes
+   the blobs jump). data-state picks everything else. */
+.voice-orb {
+  --orb: 10rem;
+  position: relative;
+  flex-shrink: 0;
+  width: var(--orb);
+  height: var(--orb);
+}
+.voice-orb-sm {
+  --orb: 1.75rem;
+}
+.voice-orb-halo,
+.voice-orb-ring,
+.voice-orb-arc,
+.voice-orb-pulse,
+.voice-orb-body,
+.voice-orb-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+}
+/* The glow the orb sits in, swelling with the voice. */
+.voice-orb-halo {
+  inset: -38%;
+  background: radial-gradient(closest-side, rgb(var(--brand-400) / 0.5), rgb(var(--brand-500) / 0.16) 58%, transparent);
+  opacity: 0.55;
+  transform: scale(calc(0.78 + var(--level, 0) * 0.5));
+  transition: transform 140ms ease-out, opacity 0.4s ease;
+}
+.voice-orb-sm .voice-orb-halo {
+  inset: -24%;
+}
+.voice-orb[data-state="listening"] .voice-orb-halo,
+.voice-orb[data-state="speaking"] .voice-orb-halo {
+  opacity: 1;
+}
+.voice-orb[data-state="error"] .voice-orb-halo {
+  opacity: 0.25;
+}
+/* Listening: rings rippling outward. */
+.voice-orb-ring {
+  border: 1.5px solid rgb(var(--brand-300) / 0.55);
+  opacity: 0;
+}
+.voice-orb-sm .voice-orb-ring {
+  display: none;
+}
+.voice-orb[data-state="listening"] .voice-orb-ring {
+  animation: voice-orb-ripple 2.4s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+}
+.voice-orb[data-state="listening"] .voice-orb-ring + .voice-orb-ring {
+  animation-delay: 1.2s;
+}
+/* Thinking: a comet of light circling the rim. The mask cuts the conic
+   gradient down to a thin ring. */
+.voice-orb-arc {
+  --arc: max(2px, calc(var(--orb) * 0.018));
+  inset: -10%;
+  background: conic-gradient(from 0deg, transparent 0turn, rgb(var(--brand-300) / 0.95) 0.22turn, transparent 0.23turn);
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - var(--arc)), #000 calc(100% - var(--arc) + 0.5px), #000 99%, transparent 100%);
+  mask: radial-gradient(closest-side, transparent calc(100% - var(--arc)), #000 calc(100% - var(--arc) + 0.5px), #000 99%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.voice-orb[data-state="thinking"] .voice-orb-arc {
+  opacity: 1;
+  animation: voice-orb-spin 1.1s linear infinite;
+}
+.voice-orb[data-state="thinking"] .voice-orb-pulse {
+  animation: voice-orb-breathe 1.5s ease-in-out infinite;
+}
+.voice-orb[data-state="speaking"] .voice-orb-pulse {
+  animation: voice-orb-breathe 1s ease-in-out infinite;
+}
+/* The bubble itself: deep brand glass that wobbles like liquid and swells
+   with the voice. */
+.voice-orb-body {
+  overflow: hidden;
+  isolation: isolate;
+  background: radial-gradient(circle at 50% 62%, rgb(var(--brand-600)), rgb(var(--brand-800)) 58%, rgb(var(--brand-950)));
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.14),
+    inset 0 calc(var(--orb) * -0.1) calc(var(--orb) * 0.22) rgb(var(--brand-300) / 0.3),
+    0 calc(var(--orb) * 0.14) calc(var(--orb) * 0.4) calc(var(--orb) * -0.12) rgb(var(--brand-500) / 0.75);
+  transform: scale(calc(1 + var(--level, 0) * 0.14));
+  transition: transform 90ms ease-out, filter 0.4s ease;
+  animation: voice-orb-morph 5s ease-in-out infinite;
+}
+.voice-orb[data-state="error"] .voice-orb-body {
+  filter: saturate(0.35) brightness(0.8);
+}
+/* Light swirling inside the bubble. Each blob orbits a point off its own
+   center, at its own rate and direction. */
+.voice-orb-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(calc(var(--orb) * 0.08));
+  mix-blend-mode: screen;
+}
+.voice-orb-blob-a {
+  top: -16%;
+  left: -14%;
+  width: 80%;
+  height: 80%;
+  background: radial-gradient(circle, rgb(var(--brand-300)), rgb(var(--brand-300) / 0) 68%);
+  transform-origin: 72% 72%;
+  transform: rotate(calc(var(--turn, 0) * 1turn));
+}
+.voice-orb-blob-b {
+  right: -18%;
+  bottom: -20%;
+  width: 84%;
+  height: 84%;
+  background: radial-gradient(circle, rgb(var(--brand-400) / 0.9), rgb(var(--brand-400) / 0) 68%);
+  transform-origin: 28% 28%;
+  transform: rotate(calc(var(--turn, 0) * -1.3turn));
+}
+.voice-orb-blob-c {
+  top: 28%;
+  left: 34%;
+  width: 52%;
+  height: 52%;
+  background: radial-gradient(circle, rgb(var(--brand-100) / 0.85), rgb(var(--brand-100) / 0) 66%);
+  transform-origin: -20% 40%;
+  transform: rotate(calc(var(--turn, 0) * 0.8turn));
+}
+/* A specular highlight and a faint inner rim, so it reads as a glass
+   bubble rather than a flat disc. */
+.voice-orb-shine {
+  background:
+    radial-gradient(circle at 33% 24%, rgb(255 255 255 / 0.6), rgb(255 255 255 / 0) 26%),
+    radial-gradient(circle, transparent 62%, rgb(255 255 255 / 0.1) 76%, transparent 80%);
+}
+/* Behind the orb: the page frosted over, with brand light pooling where
+   the orb sits. */
+.voice-scrim {
+  background:
+    radial-gradient(36rem 28rem at 50% 42%, rgb(var(--brand-400) / 0.2), transparent 70%),
+    rgb(var(--ink-50) / 0.74);
+  -webkit-backdrop-filter: blur(20px) saturate(1.15);
+  backdrop-filter: blur(20px) saturate(1.15);
+}
+.dark .voice-scrim {
+  background:
+    radial-gradient(36rem 28rem at 50% 42%, rgb(var(--brand-500) / 0.22), transparent 70%),
+    rgb(var(--ink-950) / 0.8);
+}
+@keyframes voice-orb-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+@keyframes voice-orb-ripple {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.75);
+  }
+}
+@keyframes voice-orb-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.93);
+  }
+}
+@keyframes voice-orb-morph {
+  0%,
+  100% {
+    border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%;
+  }
+  25% {
+    border-radius: 55% 45% 52% 48% / 47% 54% 46% 53%;
+  }
+  50% {
+    border-radius: 46% 54% 47% 53% / 54% 47% 53% 46%;
+  }
+  75% {
+    border-radius: 52% 48% 56% 44% / 49% 53% 47% 51%;
+  }
+}
+@keyframes voice-orb-fade {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* Reduced motion keeps the orb still (VoiceAssistant also stops advancing
+   --turn) and marks thinking with a slow fade of the rim instead of a spin. */
+@media (prefers-reduced-motion: reduce) {
+  .voice-orb * {
+    animation: none !important;
+  }
+  .voice-orb[data-state="thinking"] .voice-orb-arc {
+    background: rgb(var(--brand-300) / 0.8);
+    animation: voice-orb-fade 1.6s ease-in-out infinite !important;
+  }
+}
