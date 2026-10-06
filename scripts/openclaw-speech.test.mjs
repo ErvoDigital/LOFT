@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { Readable } from "node:stream";
-import plugin, { createSpeechHandler, gatewaySpeechConfig } from "../infra/openclaw/plugins/loft-speech/index.js";
+import plugin, { createSpeechHandler, gatewaySpeechConfig, pcmToWav } from "../infra/openclaw/plugins/loft-speech/index.js";
 import { speechConfig, transcribeAssistantAudio, synthesizeAssistantSpeech } from "../server/src/services/speech.service.js";
 
 async function host(t, action, options) {
@@ -60,6 +60,44 @@ test("Invalid uploads and speech model overrides are rejected before any paid ca
     assert.equal((await fetch(speechUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).status, 400);
   }
   assert.equal((await fetch(speechUrl)).status, 405);
+});
+
+test("Gemini speech requests PCM and returns browser-playable WAV with intact samples", async (t) => {
+  const pcm = Buffer.from([0, 0, 255, 127, 0, 128]);
+  const url = await host(t, "speak", {
+    config: { apiKey: "gateway-key", baseUrl: "https://provider.example", ttsModel: "google/gemini-3.1-flash-tts-preview", ttsVoice: "Kore" },
+    fetchImpl: async (_url, init) => {
+      const body = JSON.parse(init.body);
+      assert.equal(body.response_format, "pcm");
+      assert.equal(body.voice, "Kore");
+      return new Response(pcm, { headers: { "Content-Type": "audio/pcm" } });
+    },
+  });
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: "Hello." }) });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "audio/wav");
+  const wav = Buffer.from(await res.arrayBuffer());
+  assert.equal(wav.toString("ascii", 0, 4), "RIFF");
+  assert.equal(wav.toString("ascii", 8, 16), "WAVEfmt ");
+  assert.equal(wav.readUInt32LE(4), wav.length - 8);
+  assert.equal(wav.readUInt16LE(20), 1);
+  assert.equal(wav.readUInt16LE(22), 1);
+  assert.equal(wav.readUInt32LE(24), 24000);
+  assert.equal(wav.readUInt32LE(28), 48000);
+  assert.equal(wav.readUInt16LE(32), 2);
+  assert.equal(wav.readUInt16LE(34), 16);
+  assert.equal(wav.toString("ascii", 36, 40), "data");
+  assert.equal(wav.readUInt32LE(40), pcm.length);
+  assert.deepEqual(wav.subarray(44), pcm);
+});
+
+test("Invalid PCM and non-audio gateway responses cannot be served as playable speech", async () => {
+  assert.throws(() => pcmToWav(Buffer.alloc(0)), /invalid PCM/);
+  assert.throws(() => pcmToWav(Buffer.from([1])), /invalid PCM/);
+  await assert.rejects(synthesizeAssistantSpeech({ text: "Hello." }, {
+    config: { token: "gateway-token", baseUrl: "https://gateway.example" },
+    fetchImpl: async () => Response.json({ error: "not audio" }),
+  }), /invalid audio response/);
 });
 
 test("Audio upload limits apply even without a content-length header", async () => {

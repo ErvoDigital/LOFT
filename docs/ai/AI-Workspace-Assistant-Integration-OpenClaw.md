@@ -76,7 +76,7 @@ User -> LOFT Assistant UI -> authenticated LOFT API
 
 ### Separate premium voice interaction
 
-Default text chat and premium voice are distinct user modes. Entering voice mode is explicit; it enables microphone input and spoken assistant replies for that session. Text chat must not invoke transcription or speech synthesis. Users can stop voice mode and continue typing, and voice displays the transcript, answer text, and normal confirmation previews.
+Default text chat and premium voice are distinct user modes. Entering voice mode is explicit; it enables microphone input and spoken assistant replies for that session. Text chat must not invoke transcription or speech synthesis. A typed submission switches back to text replies. Voice displays the recorded user's transcript, generated audio controls, and normal confirmation previews; the assistant's answer text is kept in conversation context and is not displayed as a reply bubble. Speech failures offer a retry while preserving the voice response.
 
 ```text
 Premium voice UI -> authenticated LOFT API -> entitlement + usage check
@@ -93,7 +93,7 @@ Use explicit OpenRouter STT/TTS model IDs. Gemini TTS is a candidate through Ope
 
 Control cost with push-to-talk or bounded utterances, an idle timeout, per-user voice allowances, shared rate/concurrency limits, and a global spend ceiling. Account for STT, reasoning, and TTS separately within the total budget; the current message limiter does not cover speech routes. Reserve usage atomically before provider calls so concurrent requests cannot exceed the allowance. Deduplicate retries, limit fallback attempts, and reuse generated audio for replay with user-scoped cache keys that include exact text, model, voice, and language. Clear browser audio on account/context changes and apply a short retention policy.
 
-Speak concise, complete answers while preserving names, dates, deadlines, and proposal state; keep the full written answer available. Do not silently truncate important content to save tokens. Generate audio only during an explicitly active voice session or a premium playback request. Cancellation stops capture and playback; already generated provider output can still be billed. Measure turn latency and actual OpenRouter usage before enabling streaming or selecting a premium allowance.
+Speak concise, complete answers while preserving names, dates, deadlines, and proposal state; keep the full answer internally for conversation context. Do not silently truncate important content to save tokens. Generate audio only during an explicitly active voice session or a premium playback request. Cancellation stops capture and playback; already generated provider output can still be billed. Measure turn latency and actual OpenRouter usage before enabling streaming or selecting a premium allowance.
 
 Premium release checks: non-premium callers cannot reach paid speech APIs, expired subscriptions and exhausted allowances are denied server-side, default text makes no speech calls, replay causes no new synthesis charge, account changes cannot expose cached audio, and voice proposals preserve the normal confirmation roundtrip. Existing voice plumbing is not proof that these checks pass.
 

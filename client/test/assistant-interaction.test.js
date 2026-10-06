@@ -51,6 +51,7 @@ async function mount(t, overrides = {}) {
     transcribeAssistantAudio: async () => overrides.transcript ? overrides.transcript.promise : { transcript: "What is due today?" },
     speakAssistantReply: async (text, context, signal) => {
       speech.push({ text, context, signal });
+      if (overrides.speechError) throw overrides.speechError;
       return overrides.speech ? overrides.speech.promise : new Blob(["audio"], { type: "audio/mpeg" });
     },
   };
@@ -82,8 +83,12 @@ async function mount(t, overrides = {}) {
       }
     },
     Audio: class {
-      constructor(url) { this.url = url; this.paused = false; this.played = false; audio.push(this); }
-      async play() { this.played = true; }
+      constructor(url) { this.url = url; this.paused = false; this.played = false; this.playCount = 0; audio.push(this); }
+      async play() {
+        this.playCount++;
+        if (overrides.blockAutoplay && this.playCount === 1) throw Object.assign(new Error("Autoplay blocked"), { name: "NotAllowedError" });
+        this.played = true;
+      }
       pause() { this.paused = true; }
     },
     URL: { createObjectURL: () => "blob:test-audio", revokeObjectURL: (url) => revoked.push(url) },
@@ -125,13 +130,18 @@ test("Voice recordings are submitted automatically and their replies play as aud
   assert.equal(widget.speech[0].text, "Your summary.");
   assert.equal(widget.audio[0].played, true);
   assert.ok(widget.stoppedTracks > 0);
-  assert.ok(widget.view.root.findAllByType("p").some((p) => p.children.includes("Your summary.")));
+  assert.equal(JSON.stringify(widget.view.toJSON()).includes("Your summary."), false);
+  await widget.click("Stop voice reply");
+  await widget.click("Play voice reply");
+  assert.equal(widget.audio[0].playCount, 2);
+  assert.equal(widget.speech.length, 1);
   await widget.type("Now give me the details");
   await widget.submit();
   assert.equal(widget.messages[1].interactionMode, "text");
   assert.equal(widget.speech.length, 1);
   assert.equal(widget.audio[0].paused, true);
-  assert.ok(widget.revoked.includes("blob:test-audio"));
+  // Audio remains cached for replay until the conversation is cleared.
+  assert.equal(widget.revoked.length, 0);
   assert.equal(widget.view.root.findAllByType("button").some((b) => b.props.title === "Enable voice mode"), true);
 });
 
@@ -175,7 +185,7 @@ test("Starting a new recording stops reply audio before opening the microphone",
   await widget.record();
   await widget.click("Record voice");
   assert.equal(widget.audio[0].paused, true);
-  assert.ok(widget.revoked.includes("blob:test-audio"));
+  assert.equal(widget.speech.length, 1);
   await widget.click("Exit voice mode");
   assert.equal(widget.recorder.state, "inactive");
   assert.equal(widget.messages.length, 1);
@@ -189,4 +199,46 @@ test("Closing Lofty prevents pending voice audio from playing", async (t) => {
   assert.equal(widget.speech[0].signal.aborted, true);
   await act(async () => speech.resolve(new Blob(["audio"])));
   assert.equal(widget.audio.length, 0);
+});
+
+test("Pending voice generation shows audio status without revealing the text reply", async (t) => {
+  const speech = deferred();
+  const widget = await mount(t, { speech });
+  await widget.record();
+  assert.equal(JSON.stringify(widget.view.toJSON()).includes("Your summary."), false);
+  assert.ok(widget.view.root.findAllByProps({ role: "status" }).some((p) => p.children.includes("Generating audio…")));
+  await act(async () => speech.resolve(new Blob(["audio"])));
+  assert.equal(widget.audio[0].played, true);
+});
+
+test("Voice generation errors keep the response in voice mode and offer a retry", async (t) => {
+  const overrides = { speechError: new Error("Voice generation is unavailable.") };
+  const widget = await mount(t, overrides);
+  await widget.record();
+  assert.equal(JSON.stringify(widget.view.toJSON()).includes("Your summary."), false);
+  assert.ok(widget.view.root.findByProps({ role: "alert" }).children.includes("Voice generation is unavailable."));
+  assert.equal(widget.audio.length, 0);
+  overrides.speechError = null;
+  await widget.click("Retry voice reply");
+  assert.equal(widget.messages.length, 1);
+  assert.equal(widget.speech.length, 2);
+  assert.equal(widget.audio[0].played, true);
+});
+
+test("Autoplay restrictions preserve generated audio for one-click playback", async (t) => {
+  const widget = await mount(t, { blockAutoplay: true });
+  await widget.record();
+  assert.ok(widget.view.root.findByProps({ role: "alert" }).children.includes("Audio is ready. Tap Play to listen."));
+  await widget.click("Play voice reply");
+  assert.equal(widget.audio[0].played, true);
+  assert.equal(widget.speech.length, 1);
+  assert.equal(JSON.stringify(widget.view.toJSON()).includes("Your summary."), false);
+});
+
+test("Generated audio URLs are released when the widget is unmounted", async (t) => {
+  const widget = await mount(t);
+  await widget.record();
+  await act(async () => widget.view.unmount());
+  assert.ok(widget.revoked.includes("blob:test-audio"));
+  assert.equal(widget.audio[0].paused, true);
 });

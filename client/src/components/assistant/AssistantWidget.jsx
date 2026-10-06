@@ -42,7 +42,8 @@ export default function AssistantWidget() {
   const transcribeRef = useRef(null);
   const ttsRef = useRef(null);
   const playbackRef = useRef(null);
-  const playbackUrlRef = useRef(null);
+  const voiceAudioRef = useRef(new Map());
+  const [playingReplyId, setPlayingReplyId] = useState(null);
   const recorderRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const recordingTimeoutRef = useRef(null);
@@ -64,11 +65,12 @@ export default function AssistantWidget() {
     contextVersion.current++;
     requestRef.current?.abort();
     transcribeRef.current?.abort();
-    ttsRef.current?.abort();
+    ttsRef.current?.controller.abort();
     playbackRef.current?.pause();
     playbackRef.current = null;
-    if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current);
-    playbackUrlRef.current = null;
+    for (const { url } of voiceAudioRef.current.values()) URL.revokeObjectURL(url);
+    voiceAudioRef.current.clear();
+    setPlayingReplyId(null);
     voiceEnabledRef.current = false;
     setVoiceMode(false);
     clearTimeout(recordingTimeoutRef.current);
@@ -87,11 +89,11 @@ export default function AssistantWidget() {
       contextVersion.current++;
       requestRef.current?.abort();
       transcribeRef.current?.abort();
-      ttsRef.current?.abort();
+      ttsRef.current?.controller.abort();
       playbackRef.current?.pause();
       playbackRef.current = null;
-      if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current);
-      playbackUrlRef.current = null;
+      for (const { url } of voiceAudioRef.current.values()) URL.revokeObjectURL(url);
+      voiceAudioRef.current.clear();
       clearTimeout(recordingTimeoutRef.current);
       if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -128,12 +130,19 @@ export default function AssistantWidget() {
   }, [messages, thinking, open]);
 
   function stopPlayback() {
-    ttsRef.current?.abort();
+    if (ttsRef.current) {
+      const { controller, messageId } = ttsRef.current;
+      controller.abort();
+      updateVoiceReply(messageId, { audioStatus: "canceled" });
+    }
     ttsRef.current = null;
     playbackRef.current?.pause();
     playbackRef.current = null;
-    if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current);
-    playbackUrlRef.current = null;
+    setPlayingReplyId(null);
+  }
+
+  function updateVoiceReply(messageId, patch) {
+    setMessages((items) => items.map((item) => item.id === messageId ? { ...item, ...patch } : item));
   }
 
   function changeVoiceMode(enabled) {
@@ -148,31 +157,66 @@ export default function AssistantWidget() {
     }
   }
 
-  async function playReply(text, version, voiceSession) {
+  async function playGeneratedReply(messageId) {
+    const entry = voiceAudioRef.current.get(messageId);
+    if (!entry) return;
+    stopPlayback();
+    if (!voiceEnabledRef.current) changeVoiceMode(true);
+    const version = contextVersion.current;
+    playbackRef.current = entry.audio;
+    setPlayingReplyId(messageId);
+    updateVoiceReply(messageId, { audioError: "" });
+    try {
+      await entry.audio.play();
+    } catch (err) {
+      if (version !== contextVersion.current || playbackRef.current !== entry.audio) return;
+      playbackRef.current = null;
+      setPlayingReplyId(null);
+      // Keep generated audio available when the browser requires a user click.
+      updateVoiceReply(messageId, { audioError: err.name === "NotAllowedError" ? "Audio is ready. Tap Play to listen." : "Could not play the voice reply. Tap Play to try again." });
+    }
+  }
+
+  async function playReply(text, version, voiceSession, messageId) {
     if (!voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || !text?.trim()) return;
     stopPlayback();
     const controller = new AbortController();
-    ttsRef.current = controller;
+    ttsRef.current = { controller, messageId };
+    updateVoiceReply(messageId, { audioStatus: "generating", audioError: "" });
     try {
       const audioBlob = await speakAssistantReply(text, { ...(workspaceId ? { workspaceId } : {}) }, controller.signal);
       if (controller.signal.aborted || !voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || version !== contextVersion.current) return;
+      ttsRef.current = null;
+      const previous = voiceAudioRef.current.get(messageId);
+      if (previous) URL.revokeObjectURL(previous.url);
       const url = URL.createObjectURL(audioBlob);
-      playbackUrlRef.current = url;
       const audio = new Audio(url);
-      playbackRef.current = audio;
-      const release = () => {
-        URL.revokeObjectURL(url);
-        if (playbackUrlRef.current === url) playbackUrlRef.current = null;
-        if (playbackRef.current === audio) playbackRef.current = null;
+      voiceAudioRef.current.set(messageId, { url, audio });
+      audio.onended = () => {
+        if (playbackRef.current === audio) {
+          playbackRef.current = null;
+          setPlayingReplyId(null);
+        }
       };
-      audio.onended = release;
-      audio.onerror = release;
-      await audio.play();
+      audio.onerror = () => {
+        if (version !== contextVersion.current) return;
+        if (playbackRef.current === audio) stopPlayback();
+        voiceAudioRef.current.delete(messageId);
+        URL.revokeObjectURL(url);
+        updateVoiceReply(messageId, { audioStatus: "failed", audioError: "The generated audio could not be played. Try again." });
+      };
+      updateVoiceReply(messageId, { audioStatus: "ready" });
+      await playGeneratedReply(messageId);
     } catch (err) {
       const reportError = !controller.signal.aborted && version === contextVersion.current;
-      if (ttsRef.current === controller) stopPlayback();
-      if (reportError) setError(apiErrorMessage(err));
+      if (ttsRef.current?.controller === controller) ttsRef.current = null;
+      if (reportError) updateVoiceReply(messageId, { audioStatus: "failed", audioError: apiErrorMessage(err) });
     }
+  }
+
+  function retryVoiceReply(message) {
+    if (!voiceEnabledRef.current) changeVoiceMode(true);
+    void playReply(message.content, contextVersion.current, voiceSessionRef.current, message.id);
   }
 
   async function beginRecording() {
@@ -264,8 +308,9 @@ export default function AssistantWidget() {
     try {
       const result = await sendAssistantMessage({ message: content, interactionMode: voice ? "voice" : "text", history, ...(workspaceId ? { workspaceId } : {}), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Manila" }, controller.signal);
       if (!controller.signal.aborted && version === contextVersion.current) {
-        setMessages((m) => [...m, { id: ++nextId, role: "assistant", content: result.reply, actions: result.actions }]);
-        if (voice) void playReply(result.reply, version, voiceSession);
+        const replyId = ++nextId;
+        setMessages((m) => [...m, { id: replyId, role: "assistant", content: result.reply, actions: result.actions, replyMode: voice ? "voice" : "text", ...(voice ? { audioStatus: "canceled" } : {}) }]);
+        if (voice) void playReply(result.reply, version, voiceSession, replyId);
       }
     } catch (err) {
       if (!controller.signal.aborted && version === contextVersion.current) {
@@ -395,7 +440,27 @@ export default function AssistantWidget() {
               {messages.map((m) => (
                 <div key={m.id} className="space-y-2">
                 <div className={`flex ${m.role === "user" ? "justify-end" : ""}`}>
-                  <p
+                  {m.replyMode === "voice" ? (
+                    <div role="group" aria-label="Lofty voice reply" className="max-w-[85%] space-y-2 rounded-2xl rounded-bl-sm border border-ink-200 bg-white px-3.5 py-3 text-sm shadow-soft dark:border-ink-700 dark:bg-ink-800">
+                      <div className="flex items-center gap-2 text-ink-800 dark:text-ink-100">
+                        <Volume2 className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                        <span>Voice reply</span>
+                      </div>
+                      {m.audioStatus === "generating" ? <p role="status" className="text-xs text-ink-500 dark:text-ink-400">Generating audio…</p> : (
+                        <button
+                          type="button"
+                          className="btn-secondary flex items-center gap-1.5 text-xs"
+                          aria-label={m.audioStatus === "ready" ? playingReplyId === m.id ? "Stop voice reply" : "Play voice reply" : "Retry voice reply"}
+                          disabled={recording || transcribing || thinking || Boolean(confirming) || !configured}
+                          onClick={() => m.audioStatus === "ready" ? playingReplyId === m.id ? stopPlayback() : void playGeneratedReply(m.id) : retryVoiceReply(m)}
+                        >
+                          {playingReplyId === m.id ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                          {m.audioStatus === "ready" ? playingReplyId === m.id ? "Stop" : "Play" : m.audioStatus === "failed" ? "Retry audio" : "Generate audio"}
+                        </button>
+                      )}
+                      {m.audioError && <p role="alert" className="text-xs text-red-700 dark:text-red-300">{m.audioError}</p>}
+                    </div>
+                  ) : <p
                     className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-soft ${
                       m.role === "user"
                         ? "rounded-br-sm bg-gradient-to-br from-brand-600 to-brand-800 text-white"
@@ -403,7 +468,7 @@ export default function AssistantWidget() {
                     }`}
                   >
                     {m.content}
-                  </p>
+                  </p>}
                 </div>
                 {m.actions?.map((action) => (
                   <div key={action.id} className="rounded-xl border border-ink-200 bg-white p-3 text-sm dark:border-ink-700 dark:bg-ink-800">

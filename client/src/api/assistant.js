@@ -9,6 +9,16 @@ export const transcribeAssistantAudio = (audioBlob, { workspaceId } = {}, signal
   if (workspaceId) form.append("workspaceId", workspaceId);
   return api.post("/assistant/transcribe", form, { signal, timeout: 70000 }).then((r) => r.data);
 };
-export const speakAssistantReply = (text, { workspaceId, voice } = {}, signal) => (
-  api.post("/assistant/speak", { text, ...(workspaceId ? { workspaceId } : {}), ...(voice ? { voice } : {}) }, { signal, timeout: 70000, responseType: "blob" }).then((r) => r.data)
-);
+export async function speakAssistantReply(text, { workspaceId, voice } = {}, signal) {
+  try {
+    const response = await api.post("/assistant/speak", { text, ...(workspaceId ? { workspaceId } : {}), ...(voice ? { voice } : {}) }, { signal, timeout: 70000, responseType: "blob" });
+    return response.data;
+  } catch (err) {
+    // Axios also returns JSON failures as blobs for an audio request.
+    // Decode them so the user sees the actual speech error and can retry.
+    if (err.response?.data instanceof Blob) {
+      try { err.response.data = JSON.parse(await err.response.data.text()); } catch { /* Keep the original error if the response was not JSON. */ }
+    }
+    throw err;
+  }
+}

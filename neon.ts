@@ -12,6 +12,8 @@ export default defineConfig({
         env: {
           JWT_SECRET: process.env.JWT_SECRET,
           CLIENT_URL: process.env.CLIENT_URL,
+          REALTIME_ALLOWED_ORIGINS: process.env.REALTIME_ALLOWED_ORIGINS
+            ?? "https://www.loft-client.site,https://loft-client.site,https://loft-client.vercel.app",
         },
       },
     },

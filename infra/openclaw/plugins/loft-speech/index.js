@@ -27,6 +27,26 @@ function json(res, statusCode, data) {
   res.end(JSON.stringify(data));
 }
 
+// Gemini speech is headerless 24 kHz, mono, signed 16-bit PCM. Browsers need
+// a container such as WAV to recognize and play those samples.
+export function pcmToWav(bytes) {
+  if (!bytes.length || bytes.length % 2) throw failure(502, "The speech provider returned invalid PCM audio.");
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + bytes.length, 4);
+  header.write("WAVEfmt ", 8);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(24000, 24);
+  header.writeUInt32LE(48000, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write("data", 36);
+  header.writeUInt32LE(bytes.length, 40);
+  return Buffer.concat([header, bytes]);
+}
+
 async function readBody(req, limit) {
   if (Number(req.headers["content-length"]) > limit) {
     req.resume();
@@ -107,15 +127,17 @@ export function createSpeechHandler(action, { config = gatewaySpeechConfig(), fe
         if (!data || typeof data !== "object" || Array.isArray(data) || Object.keys(data).some((key) => !["input", "voice"].includes(key))) throw failure(400, "Invalid speech request fields.");
         if (typeof data.input !== "string" || !data.input.trim() || data.input.length > SPEECH_LIMIT) throw failure(400, "Speech text must contain 1 to 2400 characters.");
         if (data.voice !== undefined && (typeof data.voice !== "string" || !data.voice.trim() || data.voice.length > 60)) throw failure(400, "Invalid speech voice.");
+        const format = config.ttsModel.startsWith("google/gemini-") ? "pcm" : "mp3";
         const response = await providerRequest("/audio/speech", {
-          model: config.ttsModel, input: data.input.trim(), voice: data.voice || config.ttsVoice, response_format: "mp3",
+          model: config.ttsModel, input: data.input.trim(), voice: data.voice || config.ttsVoice, response_format: format,
         }, config, fetchImpl, signal);
         const contentType = response.headers.get("content-type") || "audio/mpeg";
         if (!contentType.startsWith("audio/")) throw failure(502, "The speech provider returned an invalid audio response.");
         let bytes;
         try { bytes = Buffer.from(await response.arrayBuffer()); } catch { throw failure(502, "The speech provider returned invalid audio."); }
         if (!bytes.length) throw failure(502, "The speech provider returned empty audio.");
-        res.setHeader("Content-Type", contentType);
+        if (format === "pcm") bytes = pcmToWav(bytes);
+        res.setHeader("Content-Type", format === "pcm" ? "audio/wav" : contentType);
         res.setHeader("X-Loft-Speech-Model", config.ttsModel);
         res.end(bytes);
       }

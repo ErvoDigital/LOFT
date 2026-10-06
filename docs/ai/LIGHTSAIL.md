@@ -57,6 +57,8 @@ The check does not require a database. An authenticated model list verifies conn
 
 ## Upgrade an existing gateway for audio
 
+The Gemini PCM-to-WAV fix was deployed to `openclaw.loft-client.site` on October 6, 2026. OpenClaw was restarted, the authenticated gateway check passed, and a live speech request returned valid `audio/wav` with 24 kHz mono samples. The previous plugin is backed up on the VPS at `/home/ubuntu/loft-speech-upgrade-nm1mz5el/index.js.previous`. This deployment updated the gateway plugin; website changes have their own deployment.
+
 Update the VPS checkout with the new `plugins/loft-speech` directory, `openclaw.json`, `start.mjs`, Compose files and `Caddyfile`. Keep the existing gateway token and OpenRouter key. Run these commands from the checkout root on the VPS:
 
 ```bash

@@ -84,8 +84,10 @@ export async function synthesizeAssistantSpeech({ text, voice }, { fetchImpl = f
     throw new ApiError(503, "Voice playback is unavailable right now.");
   }
   if (!response.ok) throw speechProviderError(response, "playback");
+  const contentType = response.headers.get("content-type") || "audio/mpeg";
+  if (!contentType.toLowerCase().startsWith("audio/")) throw new ApiError(502, "Voice playback returned an invalid audio response.");
   let bytes;
   try { bytes = Buffer.from(await response.arrayBuffer()); } catch { throw new ApiError(502, "Voice playback returned an invalid response."); }
   if (!bytes.length) throw new ApiError(502, "Voice playback returned empty audio.");
-  return { bytes, contentType: response.headers.get("content-type") || "audio/mpeg", model: response.headers.get("x-loft-speech-model") || null };
+  return { bytes, contentType, model: response.headers.get("x-loft-speech-model") || null };
 }

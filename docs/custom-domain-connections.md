@@ -16,13 +16,20 @@ The local server credential can read/write/delete objects but returned `AccessDe
 
 The deployed realtime endpoint returned HTTP 403 to a WebSocket upgrade with origin `https://www.loft-client.site`, while the same authenticated request with origin `https://loft-client.vercel.app` upgraded successfully (HTTP 101).
 
-`realtime/src/index.js` accepts the single origin set in the function's `CLIENT_URL` environment variable. Set the production **Neon realtime function** environment variable to:
+Rechecked on 2026-10-06: WebSocket upgrade requests from both `https://www.loft-client.site` and `https://loft-client.site` returned HTTP 403. The same request from `https://loft-client.vercel.app` without a token returned HTTP 401, showing that the old origin passes the origin check and reaches JWT authentication. This blocks chat sends, meeting starts, and other realtime features on the custom domain.
+
+The updated `realtime/src/index.js` accepts `CLIENT_URL` plus the comma-separated `REALTIME_ALLOWED_ORIGINS` list, matched against exact HTTP/HTTPS origins. `neon.ts` supplies both custom-domain variants and the existing Vercel origin by default. Redeploy the **Neon realtime function** from this updated source; deploying the Vercel client alone does not apply the origin fix. The explicit production environment settings are:
 
 ```env
 CLIENT_URL=https://www.loft-client.site
+REALTIME_ALLOWED_ORIGINS=https://www.loft-client.site,https://loft-client.site,https://loft-client.vercel.app
 ```
 
 Apply/redeploy the function so the running instance receives the new value. `neon.ts` sources this value from the deployment environment's `CLIENT_URL`. Keep the local Express server's `CLIENT_URL=http://localhost:5173` for local development. The production Vercel API's `CLIENT_URL` should also match the custom client origin.
+
+Deploy the updated Vercel client for draft preservation, acknowledgement timeouts, reconnect recovery, and visible connection errors. The client now clears a draft only after a successful send acknowledgement. It does not replay uncertain requests automatically, since they may already have been saved. Meeting join failures return to the lobby; an interrupted call releases the camera/microphone and asks the user to rejoin.
+
+As of 2026-10-06, this repository has no `.github/workflows` deployment definition. GitHub's latest `main` checks/deployments show automatic Vercel deployments for `loft-client` and `loft-server`, with no Neon realtime deployment listed. A push that redeploys those Vercel projects does not establish that Neon received the updated source or environment. Run the separate Neon deployment through its configured deployment provider/account and verify the upgrade afterward.
 
 The local Vite realtime proxy must send the origin accepted by the deployed function; if the production function's accepted origin changes, set local `VITE_REALTIME_PROXY_ORIGIN=https://www.loft-client.site` and restart Vite.
 
