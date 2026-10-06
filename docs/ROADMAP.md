@@ -8,7 +8,7 @@ Status snapshot and a detailed plan for what's left. See the [README](../README.
 
 **Phase 2 — nearly done.** File storage with Frame.io-style version merging is built, now with folders and folder-level view/download restriction. WebRTC video meetings are built, including screen sharing, a live annotation tool, and a persistent mini-player that keeps a call running (as a small floating widget) while browsing other pages. Shared documents (real-time collaborative rich text, Yjs + Tiptap) are built. Global search, billing, and a platform-wide admin panel are not.
 
-**Phase 3 (AI) — not started.** Blocked on an LLM provider decision (see [Open decisions](#open-decisions) below).
+**Phase 3 (AI) — first integration implemented; live verification pending.** The assistant now connects through a private OpenClaw gateway using OpenRouter, with scoped task/event reads and confirmed task/meeting creation. Smart Priority and My Plan also exist. The V1 target is one reasoning model, deterministic Auto-Reprioritization, supported updates, drafts, and summaries. See the [consolidated AI plan](ai/AI-Workspace-Assistant-Integration-OpenClaw.md) for implemented versus remaining work and [AI setup](ai/README.md) for operations.
 
 ---
 
@@ -31,7 +31,7 @@ Along the way, a real pre-existing bug surfaced and got fixed: `chat.socket.js`'
 
 **Approach:**
 - Start simple: a single `GET /api/search?q=` endpoint that runs scoped queries in parallel against Task, Message, Asset, User (workspace-filtered by membership) using SQL `LIKE`/`contains`. This is enough for MVP search quality.
-- If/when moving to Postgres for production, swap to `tsvector`/`to_tsquery` full-text search on the same tables — cheap upgrade, no schema redesign needed.
+- The current database is PostgreSQL (Neon); when needed, upgrade to `tsvector`/`to_tsquery` full-text search on the same tables — cheap upgrade, no schema redesign needed.
 - UI: a search box in the Topbar (⌘K-style command palette is a nice touch — a `Modal` triggered by a keyboard shortcut, grouped results by type, click-through to the right workspace page).
 
 **Effort:** low-medium for the SQL-`LIKE` version; the command-palette UI is the larger half of the work.
@@ -45,7 +45,7 @@ As part of the same pass, the call itself was also made to survive navigation: t
 **Goal:** freemium tier + ₱100–300/month paid tier for orgs/leaders.
 
 **Approach:**
-- Needs a payment provider decision first (see [Open decisions](#open-decisions)) — Stripe is the default recommendation (best Node SDK, well-documented webhooks) but doesn't natively settle in PHP; **PayMongo** or **Xendit** are the common choices for PHP-denominated billing if that matters for the target users.
+- Needs a payment provider decision first (see [Open decisions](#open-decisions-and-verification-needs)) — Stripe is the default recommendation (best Node SDK, well-documented webhooks) but doesn't natively settle in PHP; **PayMongo** or **Xendit** are the common choices for PHP-denominated billing if that matters for the target users.
 - Add `Subscription` model (`workspaceId`, `plan`, `status`, `providerCustomerId`, `providerSubscriptionId`, `currentPeriodEnd`).
 - Gate paid features (workspace member cap, custom channels, storage quota, etc. — needs a product decision on what's actually gated) behind a `requirePlan()` middleware checking the workspace's active subscription.
 - Webhook endpoint to sync subscription status from the provider (`POST /api/billing/webhook`) — must verify the provider's signature.
@@ -65,71 +65,63 @@ As part of the same pass, the call itself was also made to survive navigation: t
 
 ---
 
-## Phase 3 — AI layer
+## Phase 3 — V1 AI workspace agent + Auto-Reprioritization
 
-Every item here needs an LLM provider + API key before any code is written (see [Open decisions](#open-decisions)). Assuming that's resolved, suggested build order and approach:
+The [consolidated AI integration plan](ai/AI-Workspace-Assistant-Integration-OpenClaw.md) is the source of truth for AI architecture, tool contracts, workstreams A–E, and acceptance tests. It combines both new AI documents with the current code. [AI setup](ai/README.md) describes the implemented integration; [Lightsail deployment](ai/LIGHTSAIL.md) describes gateway hosting.
 
-### 7. AI Assistant (build this first — the other four build on it)
-**Goal:** natural-language assistant in the dashboard that can answer questions and take action across the user's workspaces.
+Keep the product intent: ordinary language lets users understand and operate work across their permitted teams, while LOFT owns data, permissions, workflow logic, final actions, and deterministic priorities. The assistant is embedded in LOFT and uses its existing backend.
 
-**Approach:**
-- A chat-style panel (reuse a lot of `ChatThread.jsx`'s visual language) that sends the user's message plus relevant context to the LLM.
-- Use **tool calling**, not a bare chat completion: define tools like `list_my_tasks`, `create_task`, `list_upcoming_events`, `find_conflicts` that map directly onto the existing REST controllers. The model decides when to call them; your server executes them against the *real* DB scoped to `req.userId`, same auth as everything else — the AI layer is a new client of the existing API surface, not a parallel data path.
-- New `POST /api/assistant/message` endpoint, streaming the response back (SSE or a chunked Socket.io event) so it feels responsive.
-- No new DB tables strictly required — optionally a `AssistantMessage` table if you want conversation history persisted across sessions.
+### 7. Assistant foundation and V1 tools
 
-### 8. AI meeting scheduling
-**Goal:** suggest/auto-schedule meeting times based on participant availability across all their workspaces.
+**Implemented:** authenticated assistant API, private OpenClaw/OpenRouter integration, bounded tool loop, workspace/member discovery, scoped task/event reads, conflict detection, signed task/meeting proposals, confirmation/dismiss UI, and Docker/Lightsail helpers. Live inference and deployment verification remain pending.
 
-**Approach:**
-- This is mostly **not** an LLM problem — it's a scheduling/constraint problem. Compute free/busy windows per participant from `Event` rows across every workspace they're in (the data's already unified thanks to the dashboard's merged-calendar query), find overlapping free windows, rank candidates (soonest, avoids edges of the day, etc.).
-- The LLM's role is thin: turn a natural-language request ("find 30 min with Sarah and the design team next week") into a structured query (participants, duration, date range) via tool calling into the AI Assistant, then present the computed candidate slots back conversationally.
-- Reuses the AI Assistant's tool-calling infrastructure — build item 7 first.
+**Remaining:** verify and select the requested single GPT-5.6 model target (current config is `openrouter/auto`), add streaming/cancellation/tool progress, formalize server context, and finish date-range agenda access, supported task/meeting updates, permission-aware content retrieval/summarization, and message drafting. Sending remains optional. Use server UTC time plus validated user time zone, rather than trusting a client timestamp for relative dates.
 
-### 9. Meeting summarization
-**Goal:** auto-generate summaries from meeting transcripts/notes.
+All persisted V1 assistant mutations require preview and confirmation, including task creation and updates. Reads, drafts, and derived-plan recalculation require no approval. Reuse existing controllers, role checks, notification/realtime workflows, and idempotent confirmation. Backend authorization on Prisma/PostgreSQL (Neon) is the current boundary; Supabase/RLS is not an implemented dependency.
 
-**Approach:**
-- Needs a transcript source first. The built WebRTC meetings don't currently capture audio server-side (correctly so — it's peer-to-peer, the server never sees the media). Two paths:
-  - (a) Client-side: use the browser's `SpeechRecognition`/`MediaRecorder` API to capture a rough transcript locally, upload the text (not audio) to the server for summarization — cheapest, no new infra, imperfect accuracy.
-  - (b) Server-side: route meeting audio through an SFU or recording service and transcribe with a provider (e.g. Whisper), then summarize — much bigger lift, changes the meeting architecture from pure mesh to something with a server media component.
-- Recommend (a) for a first version given the existing architecture. Store the transcript + generated summary on a new `MeetingNote` model linked to the workspace (meetings themselves aren't persisted today — this would be the first record of a meeting having happened).
+### 8. Meeting creation and supported changes
 
-### 10. Action item extraction
-**Goal:** detect tasks mentioned in chats/meetings and suggest them as trackable tasks.
+**V1 goal:** translate ordinary scheduling requests into specific calendar-event proposals, clarify missing workspace/time/duration/attendees, and create or update only after approval. Creation proposals already exist; supported updates and end-to-end verification remain work.
 
-**Approach:**
-- Feed recent messages in a channel (or a meeting summary from item 9) to the LLM with a tool-calling schema that returns candidate action items (`title`, `suggestedAssignee`, `suggestedDueDate`).
-- Don't auto-create tasks — surface suggestions in the UI (a small "3 action items found" prompt in `ChatThread.jsx` or the dashboard) that the user accepts/edits/dismisses individually, calling the existing `POST /workspaces/:id/tasks` endpoint on accept. Keeps the AI from silently cluttering someone's task list.
+**Later:** automatic availability scheduling across teams. Compute free/busy candidates deterministically and let the model interpret/present them; do not make a constraint-solving project a V1 dependency or expose private event details from other teams.
 
-### 11. AI task reprioritization
-**Goal:** recommend or auto-adjust task priority when deadlines conflict across workspaces — this is the direct AI-powered answer to the "chain reaction" problem in the original pitch, and builds directly on `conflict.service.js`.
+### 9. Meeting and workspace summarization
 
-**Approach:**
-- The conflict detection already exists and is deterministic (`server/src/services/conflict.service.js`). This item is about turning a detected `DEADLINE_CLASH` into a *recommendation*, not building conflict detection again.
-- When `detectConflicts()` finds a same-day clash, pass the two (or more) colliding tasks' context (priority, workspace, how far off the due date, any explicit urgency in the title/description) to the LLM and ask it to recommend which should be bumped and to what priority/date, with a one-line rationale.
-- Surface as a suggestion attached to the existing `ConflictsPanel.jsx` card ("LOFT suggests: move 'Draft report' to High and reschedule to Thursday — reason: ...") with one-click accept that calls the existing task update endpoint. Same accept/dismiss pattern as item 10 — never auto-apply silently.
+**V1 goal:** summarize authorized retrieved content, user-supplied notes, or approved text transcripts using the same OpenClaw/model foundation. Return source references and validated summary/decision/action-item output.
+
+Live WebRTC calls do not currently supply transcripts. Recording/transcription and voice are optional later work. If notes/results are persisted, define workspace/resource access rules and optionally link to an existing calendar event; calendar events already exist, while live-call history is a separate concern.
+
+### 10. Action-item review
+
+Extract draft tasks from permitted content or meeting notes. Users review, edit, approve, or reject individual items. Only approved items become tasks through the normal validated confirmation workflow. Approving a summary does not approve all extracted tasks.
+
+### 11. Deterministic Auto-Reprioritization and explanations
+
+Smart Priority and My Plan already exist in `priority.service.js` and `plan.service.js`. Reuse their tier/deadline/overdue/pin/snooze scoring and effort/capacity allocation. `conflict.service.js` supplies deterministic conflicts; the model explains backend results rather than inventing rankings or modifying stored priorities.
+
+Add score reasons, configurable/tested weights, stable tie handling, scoped plan tools, user-time-zone consistency, and refresh after meaningful approved changes. Audit current membership filtering before exposing plan queries through assistant tools. Dependency impact is future work until modeled; estimated effort currently affects allocation, not the priority score.
+
+Auto-Reprioritization updates the derived ranking/plan. Changing a stored deadline, tier, or assignment is a separate proposal requiring approval. Demonstrate a meaningful factor change and accurate before/after reasons across permitted workspaces.
 
 ---
 
 ## Suggested sequencing
 
-1. ~~**Storage folders + permissions**~~ — done.
-2. ~~**Screen sharing**~~ — done (bundled with a persistent mini-player and a live annotation tool as related additions).
-3. ~~**Online document collaboration**~~ — done. Phase 2's last remaining item is global search.
-4. **Global search** (SQL-`LIKE` version) — no blocking decisions, moderate value, moderate effort. Good next pick.
-5. **AI Assistant** (item 7) — once an LLM provider is chosen, this unlocks items 8, 10, and 11 cheaply since they all ride on the same tool-calling infrastructure.
-6. **AI task reprioritization** (item 11) — highest-leverage AI feature given it directly extends the product's stated differentiator; cheap once item 7 exists.
-7. **AI meeting scheduling** (item 8) and **action item extraction** (item 10) — similarly cheap once item 7 exists.
-8. **Meeting summarization** (item 9) — do last among the AI items; needs the transcript-capture decision resolved.
-9. **Billing** — do whenever the business actually needs to charge someone; no reason to build it before there's a paying user, and pricing/gating rules should be settled by then anyway.
-10. **Platform admin panel** — do when there are enough real users/workspaces that moderation tooling is actually needed.
+1. Verify existing OpenClaw connectivity, the exact single-model target, live tool calling, confirmations, persistence, and notifications in a test workspace.
+2. Extend Smart Priority/My Plan with grounded explanations, scoped agenda/plan access, and time-zone consistency. Audit authorization at the shared backend boundary.
+3. Complete streaming, tool progress, preview/retry states, confirmed task/meeting updates, and affected-view refresh.
+4. Add bounded permission-aware content retrieval, summaries, and message drafts. Platform-wide search can reuse retrieval work but does not block the assistant demo.
+5. Add meeting action-item review and approved task conversion using supplied notes/transcripts.
+6. Run isolation/failure/idempotency checks, several days of measured cost/latency stress testing, and repeated full-demo rehearsals with a presentation budget buffer.
+7. Finish platform-wide search and revisit free/busy scheduling, live transcription, voice, and optional sending after core V1 acceptance.
+8. Build billing and platform administration when business requirements justify them; choose payment/gating rules before implementation.
 
-## Open decisions
+The detailed checklists and presentation exit tests live in the [consolidated AI plan](ai/AI-Workspace-Assistant-Integration-OpenClaw.md). Multiple providers/models/agents, routing, self-learning, autonomous background actions, custom training, and advanced semantic retrieval are deferred.
 
-Things I can't move forward on without a call from you:
+## Open decisions and verification needs
 
-- **LLM provider + API key** for all of Phase 3 (item 7 onward). Recommend Claude given the existing ecosystem here, but needs your account/key.
-- **Payment provider** for billing (item 5) — Stripe vs. PayMongo/Xendit for PHP settlement, plus what actually gets gated behind the paid tier.
-- **Production database** — currently SQLite for zero-setup local dev; the schema was deliberately kept portable (see `server/prisma/schema.prisma` header comment), so moving to PostgreSQL is a provider/URL change plus `prisma migrate dev`, not a rewrite. Worth doing before any real deployment — SQLite is fine for one process on one machine but won't hold up multi-instance.
-- **Hosting/deployment target** — not yet chosen. Affects the meeting feature specifically (TURN server needed for reliable WebRTC across restrictive networks — currently STUN-only) and the file storage feature (local disk today; a real deployment should move `server/src/utils/uploads.js` to object storage such as S3-compatible storage rather than the server's local filesystem).
+- **Single model and live access:** GPT-5.6 remains the requested V1 target. Verify the exact OpenRouter identifier, availability, tool support, credentials/credits, and measured budget before replacing `openrouter/auto`. Do not silently route if the target is unavailable.
+- **Gateway deployment:** Lightsail configuration/helpers are available, but a running host, DNS/TLS/network configuration, backend connectivity, and timeout compatibility still require verification. See [deployment guide](ai/LIGHTSAIL.md).
+- **Supported update fields and meeting-note storage:** finalize explicit allowlists and any notes/result persistence/access schema. Supplied notes avoid a live-transcription dependency.
+- **Payment provider and paid-tier rules:** resolve billing item 5 before implementing subscriptions and feature gates.
+- **Production readiness:** the current schema already uses PostgreSQL (Neon). Verify deployment-specific storage, backups, and TURN/network requirements separately from the AI plan; do not treat an SQLite-to-PostgreSQL migration as remaining AI work.

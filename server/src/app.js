@@ -18,6 +18,7 @@ import conversationsRoutes from "./routes/conversations.routes.js";
 import documentsRoutes from "./routes/documents.routes.js";
 import searchRoutes from "./routes/search.routes.js";
 import invitesRoutes from "./routes/invites.routes.js";
+import assistantRoutes from "./routes/assistant.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/error.js";
 
 export function createApp() {
@@ -46,6 +47,7 @@ export function createApp() {
   app.use("/api/plan", planRoutes);
   app.use("/api/search", searchRoutes);
   app.use("/api/invites", invitesRoutes);
+  app.use("/api/assistant", assistantRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

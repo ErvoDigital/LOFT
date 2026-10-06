@@ -13,7 +13,7 @@ const eventSchema = z.object({
   attendeeIds: z.array(z.string()).optional(),
 });
 
-function serialize(event) {
+export function serialize(event) {
   return {
     id: event.id,
     workspaceId: event.workspaceId,
@@ -79,6 +79,7 @@ export async function createEvent(req, res) {
 
   const event = await prisma.event.create({
     data: {
+      ...(req.assistantActionId ? { id: req.assistantActionId } : {}),
       workspaceId,
       title: data.title,
       description: data.description,

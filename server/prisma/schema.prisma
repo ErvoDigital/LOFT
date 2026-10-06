@@ -17,7 +17,12 @@ datasource db {
 
 model User {
   id               String    @id @default(uuid())
+  // What the rest of the app displays: firstName + lastName (see
+  // server/src/utils/userName.js), never written on its own.
   name             String
+  firstName        String?
+  lastName         String?
+  nickname         String?
   email            String    @unique
   phone            String?
   passwordHash     String?
@@ -38,6 +43,7 @@ model User {
   ownedWorkspaces      Workspace[]               @relation("WorkspaceOwner")
   memberships          WorkspaceMember[]
   createdEvents        Event[]                   @relation("EventCreator")
+  eventDrafts          EventDraft[]
   eventAttendances     EventAttendee[]
   createdTasks         Task[]                    @relation("TaskCreator")
   assignedTasks        Task[]                    @relation("TaskAssignee")
@@ -73,6 +79,7 @@ model Workspace {
   members       WorkspaceMember[]
   invites       WorkspaceInvite[]
   events        Event[]
+  eventDrafts   EventDraft[]
   tasks         Task[]
   taskStatuses  TaskStatus[]
   conversations Conversation[]
@@ -137,6 +144,28 @@ model Event {
   workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy User            @relation("EventCreator", fields: [createdById], references: [id])
   attendees EventAttendee[]
+}
+
+// Meetings explicitly saved for later have no calendar slot or invitations.
+// Attendee IDs are JSON-encoded in a String to keep the schema portable.
+model EventDraft {
+  id             String   @id @default(uuid())
+  workspaceId    String
+  title          String
+  description    String?
+  location       String?
+  startTime      DateTime?
+  endTime        DateTime?
+  attendeeIds    String?
+  deferredFields String   @default("")
+  createdById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdById])
 }
 
 model EventAttendee {

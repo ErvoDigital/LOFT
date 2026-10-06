@@ -4,7 +4,7 @@
 // components built against the old socket.io object keep working unchanged
 // against the realtime service's raw-WebSocket protocol.
 export class SocketLike {
-  constructor(url, token) {
+  constructor(url, token, { ackTimeoutMs = 15000 } = {}) {
     this.url = url;
     this.token = token;
     this.connected = false;
@@ -15,13 +15,18 @@ export class SocketLike {
     this._retry = 0;
     this._reconnectTimer = null;
     this._ws = null;
+    this._ackTimeoutMs = ackTimeoutMs;
     this._open();
   }
 
   _open() {
     if (this._closed) return;
-    const base = this.url.replace(/^http/, "ws").replace(/\/$/, "");
-    const ws = new WebSocket(`${base}/ws?token=${encodeURIComponent(this.token)}`);
+    const endpoint = new URL(this.url, globalThis.location?.href);
+    endpoint.protocol = endpoint.protocol.replace(/^http/, "ws");
+    endpoint.pathname = `${endpoint.pathname.replace(/\/$/, "")}/ws`;
+    endpoint.search = "";
+    endpoint.searchParams.set("token", this.token);
+    const ws = new WebSocket(endpoint.href);
     this._ws = ws;
 
     ws.onopen = () => {
@@ -31,6 +36,7 @@ export class SocketLike {
     };
     ws.onclose = () => {
       this.connected = false;
+      this._failPending("Connection lost. Check the conversation before retrying.");
       this._fire("disconnect");
       if (this._closed) return;
       const delay = Math.min(1000 * 2 ** this._retry++, 15000);
@@ -45,10 +51,11 @@ export class SocketLike {
         return;
       }
       if (msg.ackId != null) {
-        const cb = this._pendingAcks.get(msg.ackId);
-        if (cb) {
+        const pending = this._pendingAcks.get(msg.ackId);
+        if (pending) {
           this._pendingAcks.delete(msg.ackId);
-          cb(msg.data);
+          clearTimeout(pending.timer);
+          pending.callback(msg.data);
         }
         return;
       }
@@ -72,19 +79,46 @@ export class SocketLike {
   }
 
   emit(event, data, ack) {
-    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) return;
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
+      ack?.({ error: "Live connection unavailable. Please wait for it to reconnect." });
+      return;
+    }
     const msg = { event, data };
     if (ack) {
       const id = this._nextAckId++;
       msg.id = id;
-      this._pendingAcks.set(id, ack);
+      const timer = setTimeout(() => {
+        if (!this._pendingAcks.delete(id)) return;
+        ack({ error: "No response from the live service. Check the conversation before retrying." });
+      }, this._ackTimeoutMs);
+      this._pendingAcks.set(id, { callback: ack, timer });
     }
-    this._ws.send(JSON.stringify(msg));
+    try {
+      this._ws.send(JSON.stringify(msg));
+    } catch {
+      const pending = this._pendingAcks.get(msg.id);
+      if (pending) {
+        this._pendingAcks.delete(msg.id);
+        clearTimeout(pending.timer);
+        pending.callback({ error: "Couldn't send the request. Please try again." });
+      }
+    }
+  }
+
+  _failPending(error) {
+    const pending = [...this._pendingAcks.values()];
+    this._pendingAcks.clear();
+    for (const { callback, timer } of pending) {
+      clearTimeout(timer);
+      callback({ error });
+    }
   }
 
   disconnect() {
     this._closed = true;
     clearTimeout(this._reconnectTimer);
+    this.connected = false;
+    this._failPending("Live connection closed.");
     this._ws?.close();
   }
 }

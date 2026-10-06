@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { SocketLike } from "../lib/socketShim.js";
 import { useAuth } from "./AuthContext.jsx";
 
@@ -6,32 +6,33 @@ const SocketContext = createContext(null);
 
 export function SocketProvider({ children }) {
   const { user } = useAuth();
-  const socketRef = useRef(null);
+  const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     if (!user) {
-      socketRef.current?.disconnect();
-      socketRef.current = null;
+      setSocket(null);
       setConnected(false);
       return;
     }
 
     const token = localStorage.getItem("loft_token");
     const socket = new SocketLike(import.meta.env.VITE_REALTIME_URL || "/", token);
-    socketRef.current = socket;
+    let active = true;
+    setSocket(socket);
+    setConnected(false);
 
-    socket.on("connect", () => setConnected(true));
-    socket.on("disconnect", () => setConnected(false));
+    socket.on("connect", () => active && setConnected(true));
+    socket.on("disconnect", () => active && setConnected(false));
 
     return () => {
+      active = false;
       socket.disconnect();
-      socketRef.current = null;
     };
   }, [user?.id]);
 
   return (
-    <SocketContext.Provider value={{ socket: socketRef.current, connected }}>{children}</SocketContext.Provider>
+    <SocketContext.Provider value={{ socket, connected }}>{children}</SocketContext.Provider>
   );
 }
 

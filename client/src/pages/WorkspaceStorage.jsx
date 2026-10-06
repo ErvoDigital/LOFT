@@ -44,6 +44,15 @@ export default function WorkspaceStorage() {
   const [previewing, setPreviewing] = useState(null); // { asset, version } | null
   const fileInputRef = useRef(null);
 
+  async function downloadFile(assetId, version) {
+    setError("");
+    try {
+      await assetsApi.downloadVersion(workspaceId, assetId, version);
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message || "Couldn't download this file.");
+    }
+  }
+
   // Ids currently playing their entrance animation, and the folder (if any)
   // pulsing because something just landed inside it.
   const [materializeIds, setMaterializeIds] = useState(() => new Set());
@@ -399,7 +408,7 @@ export default function WorkspaceStorage() {
                       uploadProgress={versionUploads.get(a.id)}
                       onDropFile={(file) => uploadVersionFor(a.id, file)}
                       onMergeDrop={(sourceId) => merge(a.id, sourceId)}
-                      onDownload={(version) => assetsApi.downloadVersion(workspaceId, a.id, version)}
+                      onDownload={(version) => downloadFile(a.id, version)}
                       onPreview={(version) => setPreviewing({ asset: a, version })}
                       onMove={setMovingAsset}
                       onDelete={remove}

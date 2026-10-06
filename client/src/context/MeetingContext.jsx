@@ -353,12 +353,18 @@ export function MeetingProvider({ children }) {
   // getUserMedia a second time.
   function confirmJoin() {
     const workspaceId = pendingWorkspaceId;
-    if (!workspaceId || !localStreamRef.current) return;
+    if (!workspaceId || !localStreamRef.current || joining) return;
+    if (!socket?.connected) {
+      setError("Live connection unavailable. Wait for it to reconnect, then join again.");
+      return;
+    }
+    setError("");
     setJoining(true);
     socket.emit("meeting:join", workspaceId, (res) => {
-      if (res?.error) {
-        setError(res.error);
+      if (res?.error || !Array.isArray(res?.peers)) {
+        setError(res?.error || "Couldn't confirm the meeting connection. Please try again.");
         setJoining(false);
+        socket.emit("meeting:leave");
         return;
       }
       const meta = {};
@@ -412,6 +418,16 @@ export function MeetingProvider({ children }) {
     if (!joined) return;
     setLeaveConfirmOpen(true);
   }
+
+  useEffect(() => {
+    if (!socket || !joined) return;
+    const onDisconnect = () => {
+      leaveMeeting();
+      setError("The live connection was lost. Please rejoin the meeting once it reconnects.");
+    };
+    socket.on("disconnect", onDisconnect);
+    return () => socket.off("disconnect", onDisconnect);
+  }, [socket, joined]);
 
   function confirmLeave() {
     setLeaveConfirmOpen(false);
