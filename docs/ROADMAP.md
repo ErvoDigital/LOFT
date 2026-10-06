@@ -8,7 +8,7 @@ Status snapshot and a detailed plan for what's left. See the [README](../README.
 
 **Phase 2 — nearly done.** File storage with Frame.io-style version merging is built, now with folders and folder-level view/download restriction. WebRTC video meetings are built, including screen sharing, a live annotation tool, and a persistent mini-player that keeps a call running (as a small floating widget) while browsing other pages. Shared documents (real-time collaborative rich text, Yjs + Tiptap) are built. Global search, billing, and a platform-wide admin panel are not.
 
-**Phase 3 (AI) — not started.** Blocked on an LLM provider decision (see [Open decisions](#open-decisions) below).
+**Phase 3 (AI) — not started.** Stack decided: OpenClaw + GPT-5.6 over LOFT's own backend tools. The reference and the plan are in [docs/ai](ai/README.md).
 
 ---
 
@@ -67,7 +67,9 @@ As part of the same pass, the call itself was also made to survive navigation: t
 
 ## Phase 3 — AI layer
 
-Every item here needs an LLM provider + API key before any code is written (see [Open decisions](#open-decisions)). Assuming that's resolved, suggested build order and approach:
+> **Superseded for V1 by [docs/ai](ai/README.md).** V1 is OpenClaw + GPT-5.6, with the scope, tools and Phase 5 checklist set by the reference documents there. Items 7–11 below are kept for history; where they disagree with docs/ai, docs/ai wins. The biggest change is item 11: the ranking now comes from the deterministic Smart Priority engine (`priority.service.js`), and GPT-5.6 only explains it instead of deciding what to bump. Item 8 (scheduling) isn't in the V1 tool set.
+
+Original build order and approach:
 
 ### 7. AI Assistant (build this first — the other four build on it)
 **Goal:** natural-language assistant in the dashboard that can answer questions and take action across the user's workspaces.
@@ -129,7 +131,7 @@ Every item here needs an LLM provider + API key before any code is written (see 
 
 Things I can't move forward on without a call from you:
 
-- **LLM provider + API key** for all of Phase 3 (item 7 onward). Recommend Claude given the existing ecosystem here, but needs your account/key.
+- ~~**LLM provider + API key** for all of Phase 3~~ — decided: OpenClaw + GPT-5.6. What's still open for the AI layer (Gateway hosting, OpenAI vs. OpenRouter, what "reprioritize" writes) is listed in [docs/ai](ai/README.md#open-decisions).
 - **Payment provider** for billing (item 5) — Stripe vs. PayMongo/Xendit for PHP settlement, plus what actually gets gated behind the paid tier.
 - **Production database** — currently SQLite for zero-setup local dev; the schema was deliberately kept portable (see `server/prisma/schema.prisma` header comment), so moving to PostgreSQL is a provider/URL change plus `prisma migrate dev`, not a rewrite. Worth doing before any real deployment — SQLite is fine for one process on one machine but won't hold up multi-instance.
 - **Hosting/deployment target** — not yet chosen. Affects the meeting feature specifically (TURN server needed for reliable WebRTC across restrictive networks — currently STUN-only) and the file storage feature (local disk today; a real deployment should move `server/src/utils/uploads.js` to object storage such as S3-compatible storage rather than the server's local filesystem).
