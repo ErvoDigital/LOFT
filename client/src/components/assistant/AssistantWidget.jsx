@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
 import WorkspaceMark from "../common/WorkspaceMark.jsx";
 import VoiceRecordingIndicator from "./VoiceRecordingIndicator.jsx";
+import VoiceAssistant from "./VoiceAssistant.jsx";
 import { assistantStatus, sendAssistantMessage, confirmAssistantAction, speakAssistantReply, transcribeAssistantAudio } from "../../api/assistant.js";
 import { apiErrorMessage } from "../../api/client.js";
 
@@ -24,6 +25,7 @@ const hasBottomControls = (pathname) => /\/(chat|meeting)$/.test(pathname);
 
 let nextId = 0;
 const MAX_RECORDING_MS = 30000;
+const NO_SPEECH = "I didn't catch that. Hold M and try again.";
 
 // Conversation history stays in memory; tools and confirmations run on the server.
 export default function AssistantWidget() {
@@ -56,6 +58,10 @@ export default function AssistantWidget() {
   const [voiceMode, setVoiceMode] = useState(false);
   const voiceEnabledRef = useRef(false);
   const voiceSessionRef = useRef(0);
+  // The hold-M voice bubble: { fromId, holding } while it's up. Messages
+  // with ids above fromId are its current turn.
+  const [bubble, setBubble] = useState(null);
+  const bubbleHolding = useRef(false);
 
   const workspace = workspaces.find((w) => w.id === workspaceId);
   const firstName = user?.name?.trim().split(/\s+/)[0];
@@ -85,6 +91,8 @@ export default function AssistantWidget() {
     setTranscribing(false);
     setError("");
     setConfirming(null);
+    setBubble(null);
+    bubbleHolding.current = false;
     return () => {
       contextVersion.current++;
       requestRef.current?.abort();
@@ -101,6 +109,14 @@ export default function AssistantWidget() {
       mediaStreamRef.current = null;
     };
   }, [workspaceId, user?.id]);
+
+  // The voice bubble can start a turn without the panel ever opening, so the
+  // setup check also runs once up front.
+  useEffect(() => {
+    let current = true;
+    assistantStatus().then((status) => { if (current) setConfigured(status.configured); }).catch(() => {});
+    return () => { current = false; };
+  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -219,7 +235,9 @@ export default function AssistantWidget() {
     void playReply(message.content, contextVersion.current, voiceSessionRef.current, message.id);
   }
 
-  async function beginRecording() {
+  // `hold`: started by the voice bubble's hold-M, which may already have been
+  // released while the microphone was opening.
+  async function beginRecording({ hold = false } = {}) {
     if (!voiceEnabledRef.current || thinking || confirming || transcribing || !configured || recording) return;
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setError("Voice input is not supported in this browser.");
@@ -272,6 +290,7 @@ export default function AssistantWidget() {
       recorder.start();
       setRecording(true);
       recordingTimeoutRef.current = setTimeout(() => { if (recorder.state !== "inactive") recorder.stop(); }, MAX_RECORDING_MS);
+      if (hold && !bubbleHolding.current) recorder.stop();
     } catch {
       if (!voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || version !== contextVersion.current) return;
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -302,7 +321,7 @@ export default function AssistantWidget() {
     stopPlayback();
     const history = messages.filter((m) => !m.failed).slice(-12).map(({ role, content }) => ({ role, content: content.slice(0, 6000) }));
     const messageId = ++nextId;
-    setMessages((m) => [...m, { id: messageId, role: "user", content }]);
+    setMessages((m) => [...m, { id: messageId, role: "user", content, ...(voice ? { voice: true } : {}) }]);
     if (!voice) setDraft("");
     setThinking(true);
     try {
@@ -337,6 +356,58 @@ export default function AssistantWidget() {
     setMessages((m) => m.map((item) => ({ ...item, actions: item.actions?.map((a) => a.id === actionId ? { ...a, dismissed: true } : a) })));
   }
 
+  // The voice bubble runs its turns through voice mode, so its questions and
+  // answers land in this chat like any other voice turn.
+  function startBubbleTurn() {
+    // A question already on its way can't be cut off (send() would drop the
+    // new one), but a spoken answer can: recording stops the playback.
+    if (thinking || transcribing || confirming) return false;
+    setError("");
+    bubbleHolding.current = true;
+    setBubble({ fromId: nextId, holding: true });
+    if (!configured) {
+      setError(configured === false ? "Your team needs to finish assistant setup before Lofty can answer." : "Lofty is still starting up. Try again in a moment.");
+      return true;
+    }
+    if (!voiceEnabledRef.current) changeVoiceMode(true);
+    void beginRecording({ hold: true });
+    return true;
+  }
+
+  function endBubbleHold() {
+    bubbleHolding.current = false;
+    setBubble((b) => b && { ...b, holding: false });
+    stopRecording();
+  }
+
+  // Closing after a question continues in the chat panel, which already holds
+  // the turn (an answer still on its way lands there too). Closing before
+  // anything was heard just stops listening.
+  function closeBubble() {
+    if (!bubble) return;
+    const asked = messages.some((m) => m.id > bubble.fromId && m.role === "user");
+    bubbleHolding.current = false;
+    setBubble(null);
+    if (asked) {
+      stopPlayback();
+      setOpen(true);
+    } else {
+      changeVoiceMode(false);
+      setError("");
+    }
+  }
+
+  const bubbleTurn = bubble ? messages.filter((m) => m.id > bubble.fromId) : [];
+  const bubbleQuestion = bubbleTurn.findLast((m) => m.role === "user");
+  const bubbleAnswer = bubbleTurn.findLast((m) => m.role === "assistant");
+  const answerPlaying = Boolean(bubbleAnswer) && playingReplyId === bubbleAnswer.id;
+  const answerGenerating = bubbleAnswer?.audioStatus === "generating";
+  const bubblePhase = bubble?.holding || recording ? "listening"
+    : transcribing || thinking || answerGenerating ? "thinking"
+    : answerPlaying ? "speaking"
+    : error || !bubbleQuestion ? "error"
+    : "done";
+
   return (
     <div className="print:hidden">
       <button
@@ -346,7 +417,7 @@ export default function AssistantWidget() {
         aria-label="Open Lofty"
         aria-expanded={open}
         aria-controls="loft-assistant"
-        title="Lofty"
+        title="Lofty (or hold M to talk)"
         className={`brand-mark absolute right-3 z-30 flex h-12 w-12 items-center justify-center rounded-full text-white shadow-glow ring-1 ring-white/20 transition-[transform,opacity,filter] duration-200 hover:-translate-y-0.5 hover:brightness-110 active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 sm:right-5 sm:h-14 sm:w-14 ${
           raised ? "bottom-[4.75rem] sm:bottom-24" : "bottom-3 sm:bottom-5"
         } ${open ? "invisible scale-75 opacity-0" : ""}`}
@@ -446,6 +517,7 @@ export default function AssistantWidget() {
                         <Volume2 className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
                         <span>Voice reply</span>
                       </div>
+                      <p className="whitespace-pre-wrap leading-relaxed text-ink-800 dark:text-ink-100">{m.content}</p>
                       {m.audioStatus === "generating" ? <p role="status" className="text-xs text-ink-500 dark:text-ink-400">Generating audio…</p> : (
                         <button
                           type="button"
@@ -467,6 +539,7 @@ export default function AssistantWidget() {
                         : "rounded-bl-sm border border-ink-200 bg-white text-ink-800 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-100"
                     }`}
                   >
+                    {m.voice && <Mic className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px opacity-80" aria-hidden="true" />}
                     {m.content}
                   </p>}
                 </div>
@@ -568,6 +641,23 @@ export default function AssistantWidget() {
           </section>
         </>
       )}
+
+      <VoiceAssistant
+        raised={raised}
+        active={Boolean(bubble)}
+        phase={bubblePhase}
+        heard={bubbleQuestion?.content || ""}
+        reply={bubbleAnswer?.content || ""}
+        error={error || NO_SPEECH}
+        pendingActions={bubbleAnswer?.actions?.filter((a) => !a.result && !a.dismissed).length || 0}
+        micReady={recording}
+        stream={recording ? mediaStreamRef.current : null}
+        canSkip={answerPlaying || answerGenerating}
+        onHoldStart={startBubbleTurn}
+        onHoldEnd={endBubbleHold}
+        onSkip={stopPlayback}
+        onClose={closeBubble}
+      />
     </div>
   );
 }
