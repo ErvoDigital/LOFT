@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Minus, Sparkles, VolumeX, X } from "lucide-react";
+import { Minus, Volume2, VolumeX, X } from "lucide-react";
+import { spokenReplyAt } from "../../utils/assistantTranscript.js";
 
 // How long M has to be held before Lofty starts listening, so an accidental
 // tap does nothing.
@@ -108,7 +109,7 @@ function useMicLevel(stream) {
 
 // Push-to-talk for Lofty: holding M anywhere outside a text field brings up
 // the orb in the middle of the screen. The recording, transcription, reply
-// and spoken audio all belong to AssistantWidget's voice mode; this is the
+// and spoken audio belong to the bubble, with shared chat history; this is the
 // full-screen view of one turn, driven by these props:
 //
 // - phase: listening | thinking | speaking | done | error
@@ -127,17 +128,24 @@ export default function VoiceAssistant({
   phase,
   heard,
   reply,
+  replyId,
+  audio,
   error,
+  audioStatus,
   pendingActions,
   micReady,
   stream,
   canSkip,
+  canPlay,
+  onPrepareAudio,
+  onPlay,
   onHoldStart,
   onHoldEnd,
   onSkip,
   onClose,
 }) {
   const [minimized, setMinimized] = useState(false);
+  const [transcript, setTranscript] = useState({ audio: null, replyId: null, time: 0, text: "" });
   const holdTimer = useRef(null);
   const holding = useRef(false);
   const motion = useRef({ level: 0, pulse: 0, nextPulse: 0, speed: SPIN.done, turn: 0 });
@@ -148,9 +156,25 @@ export default function VoiceAssistant({
   // The window listeners are attached once, so they read the latest props
   // through this ref.
   const latest = useRef(null);
-  latest.current = { onHoldStart, onHoldEnd, onClose };
+  latest.current = { onHoldStart, onHoldEnd, onClose, onPrepareAudio };
 
   const overlayOpen = active && !minimized;
+
+  // Read the media clock so buffering, background tabs and replay do not let
+  // the transcript run ahead of the voice. Keep tracking while minimized.
+  useEffect(() => {
+    if (!active || phase !== "speaking" || !audio) return;
+    let frame;
+    function tick() {
+      const time = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+      const text = spokenReplyAt(reply, time, audio.duration);
+      setTranscript((previous) => previous.audio === audio && previous.replyId === replyId && previous.text === text
+        ? previous : { audio, replyId, time, text });
+      frame = requestAnimationFrame(tick);
+    }
+    tick();
+    return () => cancelAnimationFrame(frame);
+  }, [active, phase, audio, reply, replyId]);
 
   useEffect(() => {
     if (!active) setMinimized(false);
@@ -160,6 +184,7 @@ export default function VoiceAssistant({
     function onKeyDown(e) {
       if (!isTalkKey(e) || e.repeat || e.isComposing || holdTimer.current || holding.current) return;
       if (isTypingTarget(e.target)) return;
+      latest.current.onPrepareAudio?.();
       holdTimer.current = setTimeout(() => {
         holdTimer.current = null;
         if (latest.current.onHoldStart() === false) return;
@@ -263,7 +288,14 @@ export default function VoiceAssistant({
 
   const finished = phase === "done" || phase === "error";
   const closeLabel = heard ? "Close and continue in chat" : "Close";
-  const announcement = phase === "error" ? error : reply && finished ? reply : STATUS[phase];
+  const status = audioStatus === "generating" ? "Generating audio…" : STATUS[phase];
+  const playLabel = audioStatus === "ready" ? "Play voice reply" : "Retry voice reply";
+  const currentTime = Number.isFinite(audio?.currentTime) ? audio.currentTime : 0;
+  const playingText = transcript.audio === audio && transcript.replyId === replyId && transcript.time <= currentTime
+    ? transcript.text : spokenReplyAt(reply, currentTime, audio?.duration);
+  const spokenReply = phase === "speaking" ? playingText
+    : audio?.ended || currentTime > 0 || audioStatus === "failed" || audioStatus === "canceled" ? reply : "";
+  const announcement = phase === "error" ? error : spokenReply && finished ? reply : status;
 
   const overlay = createPortal(
     <div
@@ -290,23 +322,23 @@ export default function VoiceAssistant({
         {announcement}
       </p>
 
-      {/* Clicks fall through to the scrim everywhere but the answer card,
-          whose text stays selectable. my-auto centers the column until an
+      {/* Clicks fall through to the scrim except on the transcript and controls.
+          my-auto centers the column until an
           answer makes it taller than the screen, then it scrolls. */}
       <div className="pointer-events-none relative my-auto flex w-full max-w-xl flex-col items-center text-center">
         <VoiceOrb state={phase} />
 
         <div className="mt-12 flex w-full flex-col items-center gap-3">
-          {STATUS[phase] && (
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">
-              {STATUS[phase]}
+          {status && (
+            <p role="status" className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">
+              {status}
             </p>
           )}
 
           {heard ? (
             <p
               className={`max-w-lg text-balance font-medium tracking-tight transition-[font-size,color] duration-300 ${
-                reply ? "text-lg text-ink-500 dark:text-ink-400" : "text-2xl leading-snug text-ink-900 dark:text-ink-50 sm:text-[1.75rem]"
+                spokenReply ? "text-lg text-ink-500 dark:text-ink-400" : "text-2xl leading-snug text-ink-900 dark:text-ink-50 sm:text-[1.75rem]"
               }`}
             >
               {heard}
@@ -320,31 +352,38 @@ export default function VoiceAssistant({
           )}
 
           {phase === "error" && (
-            <p className="max-w-md text-balance text-lg font-medium leading-snug text-ink-800 dark:text-ink-100">{error}</p>
+            <p role="alert" className="max-w-md text-balance text-lg font-medium leading-snug text-ink-800 dark:text-ink-100">{error}</p>
+          )}
+
+          {spokenReply && (
+            <p aria-label="Lofty's spoken reply" className="pointer-events-auto max-w-lg whitespace-pre-wrap text-balance text-2xl font-medium leading-snug tracking-tight text-ink-900 dark:text-ink-50 sm:text-[1.75rem]">
+              {spokenReply}
+            </p>
           )}
 
           {reply && (
-            <div className="card pointer-events-auto mt-3 w-full animate-slide-fade-in p-4 text-left sm:p-5">
-              <div className="mb-2 flex items-center gap-2">
-                <span className="brand-mark flex h-6 w-6 items-center justify-center rounded-lg text-white shadow-glow-sm">
-                  <Sparkles className="h-3.5 w-3.5" />
-                </span>
-                <span className="text-xs font-semibold text-ink-900 dark:text-ink-50">Lofty</span>
+            <div className="pointer-events-auto mt-2 flex w-full flex-col items-center gap-3">
+              <div className="flex items-center justify-center gap-2">
+                {canPlay && (
+                  <button type="button" onClick={onPlay} aria-label={playLabel} className="btn-secondary inline-flex items-center gap-1.5 px-2 py-1 text-xs">
+                    <Volume2 className="h-3.5 w-3.5" />
+                    {audioStatus === "ready" ? "Play" : "Retry audio"}
+                  </button>
+                )}
                 {canSkip && (
                   <button
                     type="button"
                     onClick={skip}
                     title="Stop reading the answer aloud"
-                    className="-my-1 ml-auto inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-ink-500 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-400 dark:hover:bg-white/[0.08] dark:hover:text-ink-50"
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-ink-500 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-400 dark:hover:bg-white/[0.08] dark:hover:text-ink-50"
                   >
                     <VolumeX className="h-3.5 w-3.5" />
                     Skip
                   </button>
                 )}
               </div>
-              <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-ink-700 dark:text-ink-200">{reply}</p>
               {pendingActions > 0 && (
-                <p className="mt-3 border-t border-ink-900/[0.07] pt-3 text-xs text-ink-500 dark:border-white/[0.06] dark:text-ink-400">
+                <p className="max-w-md text-xs text-ink-500 dark:text-ink-400">
                   Lofty prepared {pendingActions === 1 ? "something" : `${pendingActions} things`} for you to confirm. Close this to
                   review {pendingActions === 1 ? "it" : "them"} in the chat.
                 </p>
@@ -385,8 +424,13 @@ export default function VoiceAssistant({
         className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-900/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-100 dark:hover:bg-white/[0.06]"
       >
         <VoiceOrb state={phase} small />
-        {PILL_LABEL[phase]}
+        {audioStatus === "generating" ? "Generating audio…" : PILL_LABEL[phase]}
       </button>
+      {canPlay && (
+        <button type="button" onClick={onPlay} aria-label={playLabel} title={audioStatus === "ready" ? "Play" : "Retry audio"} className="flex h-8 w-8 items-center justify-center rounded-full text-ink-500 hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-400 dark:hover:text-ink-50">
+          <Volume2 className="h-4 w-4" />
+        </button>
+      )}
       {canSkip && (
         <button
           type="button"

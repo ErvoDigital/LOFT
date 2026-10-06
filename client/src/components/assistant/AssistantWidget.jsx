@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { Layers, Mic, Sparkles, Square, Volume2, VolumeX, X } from "lucide-react";
+import { Layers, Mic, Sparkles, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
 import WorkspaceMark from "../common/WorkspaceMark.jsx";
-import VoiceRecordingIndicator from "./VoiceRecordingIndicator.jsx";
 import VoiceAssistant from "./VoiceAssistant.jsx";
+import { createAssistantAudio } from "../../utils/assistantAudio.js";
 import { assistantStatus, sendAssistantMessage, confirmAssistantAction, speakAssistantReply, transcribeAssistantAudio } from "../../api/assistant.js";
 import { apiErrorMessage } from "../../api/client.js";
 
@@ -35,8 +35,11 @@ export default function AssistantWidget() {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
   const [draft, setDraft] = useState("");
-  const [thinking, setThinking] = useState(false);
+  const [pendingReplyMode, setPendingReplyMode] = useState(null);
+  const thinking = pendingReplyMode !== null;
   const launcherRef = useRef(null);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
@@ -44,6 +47,7 @@ export default function AssistantWidget() {
   const transcribeRef = useRef(null);
   const ttsRef = useRef(null);
   const playbackRef = useRef(null);
+  const audioContextRef = useRef(null);
   const voiceAudioRef = useRef(new Map());
   const [playingReplyId, setPlayingReplyId] = useState(null);
   const recorderRef = useRef(null);
@@ -52,10 +56,10 @@ export default function AssistantWidget() {
   const contextVersion = useRef(0);
   const [configured, setConfigured] = useState(null);
   const [error, setError] = useState("");
+  const [voiceError, setVoiceError] = useState("");
   const [confirming, setConfirming] = useState(null);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
-  const [voiceMode, setVoiceMode] = useState(false);
   const voiceEnabledRef = useRef(false);
   const voiceSessionRef = useRef(0);
   // The hold-M voice bubble: { fromId, holding } while it's up. Messages
@@ -74,11 +78,10 @@ export default function AssistantWidget() {
     ttsRef.current?.controller.abort();
     playbackRef.current?.pause();
     playbackRef.current = null;
-    for (const { url } of voiceAudioRef.current.values()) URL.revokeObjectURL(url);
+    for (const { url } of voiceAudioRef.current.values()) if (url) URL.revokeObjectURL(url);
     voiceAudioRef.current.clear();
     setPlayingReplyId(null);
     voiceEnabledRef.current = false;
-    setVoiceMode(false);
     clearTimeout(recordingTimeoutRef.current);
     if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -86,10 +89,11 @@ export default function AssistantWidget() {
     mediaStreamRef.current = null;
     setMessages([]);
     setDraft("");
-    setThinking(false);
+    setPendingReplyMode(null);
     setRecording(false);
     setTranscribing(false);
     setError("");
+    setVoiceError("");
     setConfirming(null);
     setBubble(null);
     bubbleHolding.current = false;
@@ -100,8 +104,10 @@ export default function AssistantWidget() {
       ttsRef.current?.controller.abort();
       playbackRef.current?.pause();
       playbackRef.current = null;
-      for (const { url } of voiceAudioRef.current.values()) URL.revokeObjectURL(url);
+      for (const { url } of voiceAudioRef.current.values()) if (url) URL.revokeObjectURL(url);
       voiceAudioRef.current.clear();
+      audioContextRef.current?.close().catch(() => {});
+      audioContextRef.current = null;
       clearTimeout(recordingTimeoutRef.current);
       if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -119,10 +125,7 @@ export default function AssistantWidget() {
   }, []);
 
   useEffect(() => {
-    if (!open) {
-      changeVoiceMode(false);
-      return;
-    }
+    if (!open) return;
     let current = true;
     assistantStatus().then((status) => { if (current) setConfigured(status.configured); }).catch(() => { if (current) { setConfigured(null); setError("Could not check assistant setup. Close and reopen to retry."); } });
     return () => { current = false; };
@@ -164,7 +167,6 @@ export default function AssistantWidget() {
   function changeVoiceMode(enabled) {
     voiceSessionRef.current++;
     voiceEnabledRef.current = enabled;
-    setVoiceMode(enabled);
     if (!enabled) {
       stopPlayback();
       transcribeRef.current?.abort();
@@ -173,17 +175,30 @@ export default function AssistantWidget() {
     }
   }
 
-  async function playGeneratedReply(messageId) {
+  function prepareVoicePlayback() {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    try {
+      audioContextRef.current ||= new AudioContext();
+      // Called directly by keydown / Play, before asynchronous work starts.
+      return audioContextRef.current.resume().catch(() => {});
+    } catch { /* The audio element still offers Play if Web Audio is unavailable. */ }
+  }
+
+  async function playGeneratedReply(messageId, { prepare = false } = {}) {
+    const version = contextVersion.current;
+    const voiceSession = voiceSessionRef.current;
+    if (prepare) await prepareVoicePlayback();
+    if (!voiceEnabledRef.current || version !== contextVersion.current || voiceSession !== voiceSessionRef.current) return;
     const entry = voiceAudioRef.current.get(messageId);
     if (!entry) return;
     stopPlayback();
-    if (!voiceEnabledRef.current) changeVoiceMode(true);
-    const version = contextVersion.current;
     playbackRef.current = entry.audio;
-    setPlayingReplyId(messageId);
     updateVoiceReply(messageId, { audioError: "" });
     try {
+      if (entry.url) entry.audio.currentTime = 0;
       await entry.audio.play();
+      if (version === contextVersion.current && playbackRef.current === entry.audio) setPlayingReplyId(messageId);
     } catch (err) {
       if (version !== contextVersion.current || playbackRef.current !== entry.audio) return;
       playbackRef.current = null;
@@ -202,11 +217,14 @@ export default function AssistantWidget() {
     try {
       const audioBlob = await speakAssistantReply(text, { ...(workspaceId ? { workspaceId } : {}) }, controller.signal);
       if (controller.signal.aborted || !voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || version !== contextVersion.current) return;
+      const { audio, url } = await createAssistantAudio(audioBlob, audioContextRef.current);
+      if (controller.signal.aborted || !voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || version !== contextVersion.current) {
+        if (url) URL.revokeObjectURL(url);
+        return;
+      }
       ttsRef.current = null;
       const previous = voiceAudioRef.current.get(messageId);
-      if (previous) URL.revokeObjectURL(previous.url);
-      const url = URL.createObjectURL(audioBlob);
-      const audio = new Audio(url);
+      if (previous?.url) URL.revokeObjectURL(previous.url);
       voiceAudioRef.current.set(messageId, { url, audio });
       audio.onended = () => {
         if (playbackRef.current === audio) {
@@ -218,7 +236,7 @@ export default function AssistantWidget() {
         if (version !== contextVersion.current) return;
         if (playbackRef.current === audio) stopPlayback();
         voiceAudioRef.current.delete(messageId);
-        URL.revokeObjectURL(url);
+        if (url) URL.revokeObjectURL(url);
         updateVoiceReply(messageId, { audioStatus: "failed", audioError: "The generated audio could not be played. Try again." });
       };
       updateVoiceReply(messageId, { audioStatus: "ready" });
@@ -231,7 +249,7 @@ export default function AssistantWidget() {
   }
 
   function retryVoiceReply(message) {
-    if (!voiceEnabledRef.current) changeVoiceMode(true);
+    prepareVoicePlayback();
     void playReply(message.content, contextVersion.current, voiceSessionRef.current, message.id);
   }
 
@@ -240,10 +258,10 @@ export default function AssistantWidget() {
   async function beginRecording({ hold = false } = {}) {
     if (!voiceEnabledRef.current || thinking || confirming || transcribing || !configured || recording) return;
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setError("Voice input is not supported in this browser.");
+      setVoiceError("Voice input is not supported in this browser.");
       return;
     }
-    setError("");
+    setVoiceError("");
     stopPlayback();
     const version = contextVersion.current;
     const voiceSession = voiceSessionRef.current;
@@ -269,7 +287,7 @@ export default function AssistantWidget() {
         if (!voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || !chunks.length || contextVersion.current !== version) return;
         const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
         if (!blob.size) {
-          setError("No voice audio was captured. Please try again.");
+          setVoiceError("No voice audio was captured. Please try again.");
           return;
         }
         setTranscribing(true);
@@ -282,7 +300,7 @@ export default function AssistantWidget() {
             await send(result.transcript, { voice: true });
           }
         } catch (err) {
-          if (!controller.signal.aborted && contextVersion.current === version) setError(apiErrorMessage(err));
+          if (!controller.signal.aborted && contextVersion.current === version) setVoiceError(apiErrorMessage(err));
         } finally {
           if (contextVersion.current === version && voiceSession === voiceSessionRef.current) setTranscribing(false);
         }
@@ -296,7 +314,7 @@ export default function AssistantWidget() {
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
       mediaStreamRef.current = null;
       setRecording(false);
-      setError("Couldn't access your microphone. Check your browser permissions and try again.");
+      setVoiceError("Couldn't access your microphone. Check your browser permissions and try again.");
     }
   }
 
@@ -311,19 +329,19 @@ export default function AssistantWidget() {
     // The recorder callback retains the state from when recording started.
     // Voice submissions already passed the transcription and context checks.
     if (!content || thinking || confirming || (!voice && (transcribing || recording)) || !configured) return;
-    // Capture the input mode per request so later toggles cannot voice a text reply.
-    if (!voice) changeVoiceMode(false);
+    // The input feature owns the reply mode; text never generates speech or
+    // interrupts a bubble reply that is still generating or playing.
     const version = contextVersion.current;
     const voiceSession = voiceSessionRef.current;
     const controller = new AbortController();
     requestRef.current = controller;
-    setError("");
-    stopPlayback();
-    const history = messages.filter((m) => !m.failed).slice(-12).map(({ role, content }) => ({ role, content: content.slice(0, 6000) }));
+    (voice ? setVoiceError : setError)("");
+    if (voice) stopPlayback();
+    const history = messagesRef.current.filter((m) => !m.failed).slice(-12).map(({ role, content }) => ({ role, content: content.slice(0, 6000) }));
     const messageId = ++nextId;
     setMessages((m) => [...m, { id: messageId, role: "user", content, ...(voice ? { voice: true } : {}) }]);
     if (!voice) setDraft("");
-    setThinking(true);
+    setPendingReplyMode(voice ? "voice" : "text");
     try {
       const result = await sendAssistantMessage({ message: content, interactionMode: voice ? "voice" : "text", history, ...(workspaceId ? { workspaceId } : {}), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Manila" }, controller.signal);
       if (!controller.signal.aborted && version === contextVersion.current) {
@@ -333,11 +351,11 @@ export default function AssistantWidget() {
       }
     } catch (err) {
       if (!controller.signal.aborted && version === contextVersion.current) {
-        setError(apiErrorMessage(err));
+        (voice ? setVoiceError : setError)(apiErrorMessage(err));
         setMessages((m) => m.map((item) => item.id === messageId ? { ...item, failed: true } : item));
         if (!voice) setDraft(content);
       }
-    } finally { if (version === contextVersion.current) setThinking(false); }
+    } finally { if (version === contextVersion.current) setPendingReplyMode(null); }
   }
 
   async function confirm(action) {
@@ -356,20 +374,19 @@ export default function AssistantWidget() {
     setMessages((m) => m.map((item) => ({ ...item, actions: item.actions?.map((a) => a.id === actionId ? { ...a, dismissed: true } : a) })));
   }
 
-  // The voice bubble runs its turns through voice mode, so its questions and
-  // answers land in this chat like any other voice turn.
+  // Voice capture/playback belongs to the bubble; both features share history.
   function startBubbleTurn() {
     // A question already on its way can't be cut off (send() would drop the
     // new one), but a spoken answer can: recording stops the playback.
-    if (thinking || transcribing || confirming) return false;
-    setError("");
+    if (thinking || transcribing || confirming || recording || bubbleHolding.current) return false;
+    setVoiceError("");
     bubbleHolding.current = true;
     setBubble({ fromId: nextId, holding: true });
     if (!configured) {
-      setError(configured === false ? "Your team needs to finish assistant setup before Lofty can answer." : "Lofty is still starting up. Try again in a moment.");
+      setVoiceError(configured === false ? "Your team needs to finish assistant setup before Lofty can answer." : "Lofty is still starting up. Try again in a moment.");
       return true;
     }
-    if (!voiceEnabledRef.current) changeVoiceMode(true);
+    changeVoiceMode(true);
     void beginRecording({ hold: true });
     return true;
   }
@@ -380,32 +397,30 @@ export default function AssistantWidget() {
     stopRecording();
   }
 
-  // Closing after a question continues in the chat panel, which already holds
-  // the turn (an answer still on its way lands there too). Closing before
-  // anything was heard just stops listening.
+  // Closing voice stops its devices and pending speech. The synchronized text
+  // conversation remains available, including an answer still on its way.
   function closeBubble() {
     if (!bubble) return;
     const asked = messages.some((m) => m.id > bubble.fromId && m.role === "user");
     bubbleHolding.current = false;
     setBubble(null);
+    changeVoiceMode(false);
     if (asked) {
-      stopPlayback();
       setOpen(true);
     } else {
-      changeVoiceMode(false);
-      setError("");
+      setVoiceError("");
     }
   }
 
-  const bubbleTurn = bubble ? messages.filter((m) => m.id > bubble.fromId) : [];
+  const bubbleTurn = bubble ? messages.filter((m) => m.id > bubble.fromId && (m.voice || m.replyMode === "voice")) : [];
   const bubbleQuestion = bubbleTurn.findLast((m) => m.role === "user");
   const bubbleAnswer = bubbleTurn.findLast((m) => m.role === "assistant");
   const answerPlaying = Boolean(bubbleAnswer) && playingReplyId === bubbleAnswer.id;
   const answerGenerating = bubbleAnswer?.audioStatus === "generating";
   const bubblePhase = bubble?.holding || recording ? "listening"
-    : transcribing || thinking || answerGenerating ? "thinking"
+    : transcribing || pendingReplyMode === "voice" || answerGenerating ? "thinking"
     : answerPlaying ? "speaking"
-    : error || !bubbleQuestion ? "error"
+    : voiceError || bubbleAnswer?.audioError || !bubbleQuestion ? "error"
     : "done";
 
   return (
@@ -511,28 +526,7 @@ export default function AssistantWidget() {
               {messages.map((m) => (
                 <div key={m.id} className="space-y-2">
                 <div className={`flex ${m.role === "user" ? "justify-end" : ""}`}>
-                  {m.replyMode === "voice" ? (
-                    <div role="group" aria-label="Lofty voice reply" className="max-w-[85%] space-y-2 rounded-2xl rounded-bl-sm border border-ink-200 bg-white px-3.5 py-3 text-sm shadow-soft dark:border-ink-700 dark:bg-ink-800">
-                      <div className="flex items-center gap-2 text-ink-800 dark:text-ink-100">
-                        <Volume2 className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
-                        <span>Voice reply</span>
-                      </div>
-                      <p className="whitespace-pre-wrap leading-relaxed text-ink-800 dark:text-ink-100">{m.content}</p>
-                      {m.audioStatus === "generating" ? <p role="status" className="text-xs text-ink-500 dark:text-ink-400">Generating audio…</p> : (
-                        <button
-                          type="button"
-                          className="btn-secondary flex items-center gap-1.5 text-xs"
-                          aria-label={m.audioStatus === "ready" ? playingReplyId === m.id ? "Stop voice reply" : "Play voice reply" : "Retry voice reply"}
-                          disabled={recording || transcribing || thinking || Boolean(confirming) || !configured}
-                          onClick={() => m.audioStatus === "ready" ? playingReplyId === m.id ? stopPlayback() : void playGeneratedReply(m.id) : retryVoiceReply(m)}
-                        >
-                          {playingReplyId === m.id ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-                          {m.audioStatus === "ready" ? playingReplyId === m.id ? "Stop" : "Play" : m.audioStatus === "failed" ? "Retry audio" : "Generate audio"}
-                        </button>
-                      )}
-                      {m.audioError && <p role="alert" className="text-xs text-red-700 dark:text-red-300">{m.audioError}</p>}
-                    </div>
-                  ) : <p
+                  <p
                     className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-soft ${
                       m.role === "user"
                         ? "rounded-br-sm bg-gradient-to-br from-brand-600 to-brand-800 text-white"
@@ -541,7 +535,7 @@ export default function AssistantWidget() {
                   >
                     {m.voice && <Mic className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px opacity-80" aria-hidden="true" />}
                     {m.content}
-                  </p>}
+                  </p>
                 </div>
                 {m.actions?.map((action) => (
                   <div key={action.id} className="rounded-xl border border-ink-200 bg-white p-3 text-sm dark:border-ink-700 dark:bg-ink-800">
@@ -593,19 +587,7 @@ export default function AssistantWidget() {
               }}
               className="shrink-0 border-t border-ink-900/[0.06] px-3 pb-3 pt-3 dark:border-white/[0.06]"
             >
-              {recording && <VoiceRecordingIndicator stream={mediaStreamRef.current} maxDurationMs={MAX_RECORDING_MS} />}
               <div className="flex items-center gap-2">
-                {voiceMode && <button
-                  type="button"
-                  onClick={recording ? stopRecording : beginRecording}
-                  disabled={thinking || Boolean(confirming) || transcribing || !configured}
-                  className={`btn-secondary shrink-0 ${recording ? "border-red-300 bg-red-50 text-red-700 ring-2 ring-red-500/20 dark:border-red-700 dark:bg-red-950/40 dark:text-red-300" : ""}`}
-                  title={recording ? "Stop recording" : "Record voice"}
-                  aria-label={recording ? "Stop recording" : "Record voice"}
-                  aria-pressed={recording}
-                >
-                  {recording ? <><Square className="h-3.5 w-3.5 fill-current" /><span className="ml-1.5 text-xs">Stop</span></> : <Mic className="h-4 w-4" />}
-                </button>}
                 <input
                   ref={inputRef}
                   className="input min-w-0"
@@ -619,21 +601,9 @@ export default function AssistantWidget() {
                   Send
                 </button>
               </div>
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <p className="text-[11px] text-ink-400 dark:text-ink-500">
-                  {recording ? "Recording… tap stop to ask Lofty (max 30s)." : transcribing ? "Transcribing voice…" : voiceMode ? "Speak to get a voice reply. Send text to switch to text replies." : "Type for text replies, or enable voice to talk to Lofty."}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => changeVoiceMode(!voiceEnabledRef.current)}
-                  className="flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-ink-500 transition-colors hover:text-ink-800 dark:text-ink-400 dark:hover:text-ink-200"
-                  aria-pressed={voiceMode}
-                  title={voiceMode ? "Exit voice mode" : "Enable voice mode"}
-                >
-                  {voiceMode ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
-                  {voiceMode ? "Voice mode on" : "Voice mode off"}
-                </button>
-              </div>
+              <p className="mt-2 text-[11px] text-ink-400 dark:text-ink-500">
+                Type for text replies. Hold M outside a text field to talk in the voice bubble.
+              </p>
               <p className="mt-2 text-center text-[11px] text-ink-400 dark:text-ink-500">
                 {configured ? "Check suggestions before confirming. Chat clears when you change workspace or reload." : "Your team needs to finish assistant setup before you can send messages."}
               </p>
@@ -648,11 +618,22 @@ export default function AssistantWidget() {
         phase={bubblePhase}
         heard={bubbleQuestion?.content || ""}
         reply={bubbleAnswer?.content || ""}
-        error={error || NO_SPEECH}
+        replyId={bubbleAnswer?.id}
+        audio={bubbleAnswer ? voiceAudioRef.current.get(bubbleAnswer.id)?.audio : null}
+        error={voiceError || bubbleAnswer?.audioError || NO_SPEECH}
+        audioStatus={bubbleAnswer?.audioStatus}
         pendingActions={bubbleAnswer?.actions?.filter((a) => !a.result && !a.dismissed).length || 0}
         micReady={recording}
         stream={recording ? mediaStreamRef.current : null}
         canSkip={answerPlaying || answerGenerating}
+        canPlay={Boolean(bubbleAnswer) && !answerPlaying && !answerGenerating && voiceEnabledRef.current}
+        onPrepareAudio={prepareVoicePlayback}
+        onPlay={() => {
+          if (!bubbleAnswer) return;
+          if (bubbleAnswer.audioStatus === "ready") {
+            void playGeneratedReply(bubbleAnswer.id, { prepare: true });
+          } else retryVoiceReply(bubbleAnswer);
+        }}
         onHoldStart={startBubbleTurn}
         onHoldEnd={endBubbleHold}
         onSkip={stopPlayback}
