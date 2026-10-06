@@ -12,6 +12,7 @@ router.use(requireAuth);
 const uploadAudio = multer({ storage: multer.memoryStorage(), limits: { files: 1, fileSize: 8 * 1024 * 1024 } });
 const requestSchema = z.object({
   message: z.string().trim().min(1).max(4000),
+  interactionMode: z.enum(["text", "voice"]).default("text"),
   workspaceId: z.string().uuid().optional(),
   history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(6000) }).strict()).max(12).default([]),
   timeZone: z.string().max(100).default("Asia/Manila").refine((value) => { try { new Intl.DateTimeFormat("en", { timeZone: value }); return true; } catch { return false; } }, "Invalid time zone"),

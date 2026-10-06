@@ -97,7 +97,7 @@ export default function VoiceRecordingIndicator({ stream, maxDurationMs }) {
         })}
       </div>
       <p className="mt-2 text-[11px] text-ink-500 dark:text-ink-400">
-        {signal.muted ? "Check your microphone connection or mute switch." : signal.available ? "Speak naturally. Tap stop to review your message." : "Tap stop to review your message. Live audio levels are unavailable."}
+        {signal.muted ? "Check your microphone connection or mute switch." : signal.available ? "Speak naturally. Tap stop to ask Lofty." : "Tap stop to ask Lofty. Live audio levels are unavailable."}
       </p>
     </div>
   );

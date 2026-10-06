@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "node --test test/*.test.js",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -42,7 +43,9 @@
     "@tailwindcss/container-queries": "^0.1.1",
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
+    "esbuild": "^0.21.5",
     "postcss": "^8.4.47",
+    "react-test-renderer": "^18.3.1",
     "tailwindcss": "^3.4.13",
     "vite": "^5.4.8"
   }

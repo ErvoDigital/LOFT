@@ -18,7 +18,7 @@
     "ai:lightsail:stop": "node scripts/openclaw.mjs stop --lightsail",
     "ai:lightsail:logs": "node scripts/openclaw.mjs logs --lightsail",
     "ai:lightsail:check": "node scripts/openclaw.mjs check --lightsail",
-    "ai:test": "node --test scripts/openclaw.test.mjs scripts/openclaw-speech.test.mjs server/test/assistant.test.js",
+    "ai:test": "node --test scripts/openclaw.test.mjs scripts/openclaw-speech.test.mjs server/test/assistant.test.js client/test/assistant-interaction.test.js",
     "dev": "concurrently -n SERVER,CLIENT -c blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
     "dev:server": "npm run dev -w server",
     "dev:client": "npm run dev -w client",
