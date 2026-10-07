@@ -1,6 +1,5 @@
 {
-  "name": "LOFT - Multi-Team Workspace",
-  "description": "One home for all your teams. No more app switching. LOFT pulls chats, tasks, schedules, and files into one unified workspace.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "name": "LOFT — One home for all your teams",
+  "description": "Shared workspaces, tasks, calendars, chat, meetings, documents, and files, with a personal view and conflict alerts across your teams.",
+  "requestFramePermissions": []
 }
