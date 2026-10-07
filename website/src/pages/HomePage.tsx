@@ -31,7 +31,7 @@ export function HomePage() {
       <section className="hero container">
         <p className="hero-pill">
           <span />
-          Your work, across every workspace
+          Free Beta · One home for all your teams
         </p>
         <h1>
           All your teams.
@@ -39,12 +39,13 @@ export function HomePage() {
           <span className="text-brand">One clear plan.</span>
         </h1>
         <p className="hero-description">
-          School, work, organizations, and community. LOFT brings your tasks,
-          calendars, conversations, meetings, documents, and files together, so
-          you can see what matters across every team.
+          School, work, organizations, and community. Currently in free beta,
+          LOFT brings your tasks, calendars, conversations, meetings, documents,
+          files, and Lofty, our AI assistant, together so you can see what
+          matters across every team.
         </p>
         <div className="hero-actions">
-          <GetStartedLink />
+          <GetStartedLink>Try free beta</GetStartedLink>
           <button
             className="button button-secondary"
             onClick={() =>
@@ -64,7 +65,7 @@ export function HomePage() {
         <div className="hero-notes">
           <span>
             <CheckCircle2 size={15} aria-hidden="true" />
-            One account for your teams
+            Free beta (freemium at launch)
           </span>
           <span>
             <CalendarRange size={15} aria-hidden="true" />
@@ -170,7 +171,7 @@ export function HomePage() {
           <div>
             <p className="eyebrow">
               <Sparkles size={16} aria-hidden="true" />
-              The LOFT assistant
+              Meet Lofty — Your AI Assistant
             </p>
             <h2>
               A little help with
@@ -179,22 +180,22 @@ export function HomePage() {
             </h2>
             <p>
               Ask about your tasks, priorities, events, or schedule conflicts.
-              When enabled, LOFT’s assistant can propose tasks and meetings
+              When enabled, Lofty, our AI assistant, can propose tasks and meetings
               using text or voice.
             </p>
             <p className="assistant-note">
               You review the details and confirm before anything is saved.
             </p>
             <a className="text-link" href="#/features">
-              Meet your assistant
+              Meet Lofty
               <ArrowRight size={16} aria-hidden="true" />
             </a>
           </div>
           <div
             className="assistant-example"
-            aria-label="Example of an assistant proposal"
+            aria-label="Example of an assistant proposal from Lofty"
           >
-            <p className="sample-label">Example conversation</p>
+            <p className="sample-label">Conversation with Lofty</p>
             <p className="sample-message">
               Add a task to prepare Friday’s presentation for my project team.
             </p>
@@ -203,7 +204,7 @@ export function HomePage() {
                 <Sparkles size={19} aria-hidden="true" />
               </span>
               <div>
-                <strong>Task proposal</strong>
+                <strong>Lofty's task proposal</strong>
                 <p>Prepare Friday’s presentation</p>
                 <p className="muted text-sm">Workspace: Project team</p>
                 <span className="review-badge">

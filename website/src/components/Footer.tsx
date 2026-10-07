@@ -18,8 +18,8 @@ export function Footer() {
           <nav aria-label="Product links">
             <h2>Product</h2>
             <a href="#/features">Explore features</a>
-            <a href="#/pricing">Pricing</a>
-            <a href={LOGIN_URL}>Try for free</a>
+            <a href="#/pricing">Pricing & Beta</a>
+            <a href={LOGIN_URL}>Try free beta</a>
           </nav>
           <nav aria-label="About links">
             <h2>LOFT</h2>

@@ -10,6 +10,7 @@ export function Brand() {
         L
       </span>
       <span>LOFT</span>
+      <span className="beta-badge">Beta</span>
     </span>
   );
 }
@@ -80,14 +81,16 @@ export function StartSection() {
     <section className="container section">
       <div className="start-panel">
         <div>
-          <p className="eyebrow">Make room for what matters</p>
+          <p className="eyebrow">Free Beta · Make room for what matters</p>
           <h2>Bring your teams into LOFT.</h2>
           <p>
-            Your work, conversations, and commitments. One place to see what’s
-            next.
+            Experience the free beta today with all features and Lofty, our AI
+            assistant. LOFT will feature a freemium model upon official release.
           </p>
         </div>
-        <GetStartedLink className="shrink-0" />
+        <GetStartedLink className="shrink-0">
+          Try the free beta
+        </GetStartedLink>
       </div>
     </section>
   );

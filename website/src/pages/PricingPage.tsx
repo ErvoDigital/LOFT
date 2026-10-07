@@ -8,6 +8,7 @@ import {
 const included = [
   "Shared workspaces and member roles",
   "Personal dashboard and cross-workspace conflict alerts",
+  "Lofty, our AI assistant (text & voice support)",
   "Task boards, Smart Priority, and My Plan",
   "Shared calendars and event reminders",
   "Workspace channels and direct messages",
@@ -22,16 +23,17 @@ export function PricingPage() {
   return (
     <>
       <section className="container page-hero">
-        <p className="eyebrow">Get started with LOFT</p>
+        <p className="eyebrow">Free Beta Access</p>
         <h1>
           Make space for your teams.
           <br />
-          <span className="text-brand">Try LOFT for free.</span>
+          <span className="text-brand">Free during public beta.</span>
         </h1>
         <p className="hero-description">
-          Bring your work into one place and explore how LOFT fits your day.
-          Start from the login page, with registration available for new
-          accounts.
+          LOFT is currently in free beta, giving you full access to all workspace
+          features, cross-team conflict alerts, and Lofty, our AI assistant.
+          Upon official release, LOFT will transition to a freemium model with both
+          free and premium tiers.
         </p>
       </section>
       <section className="container pricing-section">
@@ -42,15 +44,22 @@ export function PricingPage() {
             </span>
             <p className="eyebrow mt-6">Current access</p>
             <h2>LOFT</h2>
-            <p className="price-label">Free to get started</p>
-            <p>For people coordinating work and life across multiple teams.</p>
-            <GetStartedLink />
+            <p className="price-label">Free Beta</p>
+            <div className="pricing-beta-tag">
+              <span>Freemium model at official release</span>
+            </div>
+            <p>
+              Explore all features without cost while LOFT is in beta. When officially
+              released, LOFT will adopt a freemium model with a free tier for everyday
+              use alongside premium plans for larger teams and organizations.
+            </p>
+            <GetStartedLink>Try the free beta</GetStartedLink>
             <p className="text-sm muted">
               Already have an account? Sign in and pick up where you left off.
             </p>
           </div>
           <div className="pricing-included">
-            <h3>Explore the LOFT service</h3>
+            <h3>Included during free beta</h3>
             <ul>
               {included.map((item) => (
                 <li key={item}>
@@ -60,26 +69,47 @@ export function PricingPage() {
               ))}
             </ul>
             <p className="pricing-note">
-              The AI assistant and voice features are available when enabled for
-              your LOFT deployment.
+              Lofty, our AI assistant, and voice features are available when enabled for
+              your LOFT deployment. All beta users receive full access during this preview period.
             </p>
           </div>
         </div>
       </section>
       <section className="container section pricing-faq">
         <SectionHeading
-          eyebrow="Straightforward access"
-          title="Start with the service that’s here today."
+          eyebrow="Beta & pricing details"
+          title="Clear, transparent access today and tomorrow."
         />
         <div className="faq-list">
           <details>
             <summary>
-              Are there paid plans?<span aria-hidden="true">+</span>
+              Is LOFT currently free to use?<span aria-hidden="true">+</span>
             </summary>
             <p>
-              LOFT does not currently offer paid subscriptions. Pricing, billing
-              options, and plan limits will be published here if paid plans
-              become available.
+              Yes! LOFT is currently in free beta. You can explore all
+              features — including multi-workspace collaboration and Lofty,
+              our AI assistant — completely free of charge.
+            </p>
+          </details>
+          <details>
+            <summary>
+              What pricing model will LOFT use at official release?<span aria-hidden="true">+</span>
+            </summary>
+            <p>
+              LOFT will feature a freemium model in its official release. A generous
+              free tier will always remain available for individuals and small groups
+              coordinating across workspaces. Paid tiers will be introduced for teams
+              requiring advanced administration, expanded storage, and enhanced tooling.
+            </p>
+          </details>
+          <details>
+            <summary>
+              Will I keep my workspaces when LOFT officially launches?<span aria-hidden="true">+</span>
+            </summary>
+            <p>
+              Yes. Your workspaces, members, tasks, documents, and calendar data
+              created during the free beta will seamlessly carry over to the official
+              release under the freemium structure.
             </p>
           </details>
           <details>
@@ -87,7 +117,7 @@ export function PricingPage() {
               How do I create an account?<span aria-hidden="true">+</span>
             </summary>
             <p>
-              Choose “Try for free” to open the LOFT login page, then use the
+              Choose “Try the free beta” to open the LOFT login page, then use the
               registration link. You can sign in with a password or Google and
               complete email verification.
             </p>

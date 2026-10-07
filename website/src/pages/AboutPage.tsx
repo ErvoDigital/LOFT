@@ -9,18 +9,19 @@ export function AboutPage() {
   return (
     <>
       <section className="container page-hero">
-        <p className="eyebrow">Why LOFT exists</p>
+        <p className="eyebrow">Why LOFT exists · Free Beta</p>
         <h1>
           You belong to more
           <br />
           <span className="text-brand">than one team.</span>
         </h1>
         <p className="hero-description">
-          Your tools should make room for that. LOFT is a productivity and
+          Your tools should make room for that. Currently in open free beta ahead
+          of our freemium official release, LOFT is a productivity and
           collaboration platform for people balancing school, work,
           organizations, and community in one life.
         </p>
-        <GetStartedLink />
+        <GetStartedLink>Try the free beta</GetStartedLink>
       </section>
       <section className="container section split-section">
         <div>

@@ -35,7 +35,7 @@ export function FeaturesPage() {
   return (
     <>
       <section className="container page-hero">
-        <p className="eyebrow">The LOFT service</p>
+        <p className="eyebrow">The LOFT service · Free Beta</p>
         <h1>
           Everything your teams need.
           <br />
@@ -43,8 +43,8 @@ export function FeaturesPage() {
         </h1>
         <p className="hero-description">
           Shared workspaces for your people. A personal dashboard for your whole
-          day. Explore the tools that bring planning, collaboration, and
-          organization into LOFT.
+          day. Explore the tools that bring planning, collaboration,
+          organization, and Lofty, our AI assistant, into LOFT.
         </p>
         <GetStartedLink />
       </section>
@@ -67,7 +67,7 @@ export function FeaturesPage() {
           <div>
             <p className="eyebrow">
               <Sparkles size={16} aria-hidden="true" />
-              AI with your review built in
+              Lofty — AI with your review built in
             </p>
             <h2>
               Ask naturally.
@@ -75,23 +75,23 @@ export function FeaturesPage() {
               Stay in charge.
             </h2>
             <p>
-              The assistant works with the LOFT tasks and events you’re allowed
+              Lofty, our AI assistant, works with the LOFT tasks and events you’re allowed
               to access. Ask what’s due, what to focus on, or why your schedule
               has a conflict.
             </p>
             <p>
-              For changes, it presents a task, meeting, or meeting-draft
+              For changes, Lofty presents a task, meeting, or meeting-draft
               proposal. Review it and choose whether to confirm.
             </p>
           </div>
           <div className="assistant-capabilities">
-            <h3>When the assistant is enabled</h3>
+            <h3>When Lofty is enabled</h3>
             {[
-              "Read your tasks and upcoming events",
-              "Explain Smart Priority and schedule clashes",
-              "Propose new tasks and meetings",
+              "Ask Lofty to read your tasks and upcoming events",
+              "Understand Smart Priority and schedule clashes",
+              "Review Lofty's proposals for new tasks and meetings",
               "Prepare a meeting draft for details you’ll add later",
-              "Use text, or voice when speech is configured",
+              "Use text, or push-to-talk voice when speech is configured",
             ].map((item) => (
               <p key={item}>
                 <CheckCircle2 size={17} aria-hidden="true" />

@@ -33,14 +33,14 @@ export const PAGES: {
     label: "Features",
     title: "LOFT features — Plan, collaborate, and stay organized",
     description:
-      "Explore LOFT’s shared workspaces, My Plan, task boards, conflict alerts, real-time chat, video meetings, collaborative documents, storage, and AI assistant.",
+      "Explore LOFT’s shared workspaces, My Plan, task boards, conflict alerts, real-time chat, video meetings, collaborative documents, storage, and Lofty, our AI assistant.",
   },
   {
     id: "pricing",
     label: "Pricing",
-    title: "LOFT pricing — Try LOFT for free",
+    title: "LOFT pricing — Free Beta & Upcoming Freemium Release",
     description:
-      "Get started with LOFT and bring your teams into one workspace platform. Explore the current service and sign in to try it for free.",
+      "LOFT is currently in free beta with all workspace features unlocked. Experience the platform now ahead of our freemium official release.",
   },
   {
     id: "about",
@@ -225,12 +225,12 @@ export const FEATURES = [
     id: "assistant",
     group: "access",
     Icon: Sparkles,
-    title: "Ask LOFT for a hand",
+    title: "Meet Lofty, your AI assistant",
     description:
-      "When the AI assistant is enabled, ask about tasks, events, priorities, and conflicts using text or voice. Review task and meeting proposals before confirming them.",
+      "When Lofty, our AI assistant, is enabled, ask about tasks, events, priorities, and conflicts using text or voice. Review task and meeting proposals before confirming them.",
     details: [
-      "Questions about your permitted tasks and events",
-      "Text and voice with speech services configured",
+      "Questions answered by Lofty about permitted tasks and events",
+      "Text and voice interaction with speech services configured",
       "Task, meeting, and meeting-draft proposals you confirm",
     ],
   },
@@ -243,9 +243,14 @@ export const FAQS = [
       "LOFT is for people who belong to more than one team: students, professionals, project groups, organizations, and community groups. Each team gets its own workspace, while you get a personal view across your memberships.",
   },
   {
+    question: "Is LOFT free to use?",
+    answer:
+      "Yes. LOFT is currently in free beta with all workspace features unlocked. When officially released, LOFT will feature a freemium model with a generous free tier alongside premium plans for advanced team and organizational needs.",
+  },
+  {
     question: "What does “Try for free” open?",
     answer:
-      "It opens the LOFT login page. Sign in with your existing account, or choose the registration link there to create an account. LOFT verifies sign-in with an emailed code.",
+      "It opens the LOFT login page to access the free beta. Sign in with your existing account, or choose the registration link to create a new account. LOFT verifies sign-in with an emailed code.",
   },
   {
     question: "Do my teams see each other’s work?",
@@ -263,8 +268,8 @@ export const FAQS = [
       "LOFT provides its own tasks, calendars, chat, meetings, documents, and storage. Google sign-in is supported; syncing Slack, Notion, Jira, or other external workspaces is not currently part of the service.",
   },
   {
-    question: "What can the AI assistant do?",
+    question: "What can Lofty, our AI assistant, do?",
     answer:
-      "When enabled, the assistant can read permitted tasks and events, explain priorities and conflicts, and propose tasks, meetings, or meeting drafts. You review and confirm proposals before they are saved. Automatic scheduling and live meeting transcription are not currently available.",
+      "When enabled, Lofty can read permitted tasks and events, explain priorities and conflicts, and propose tasks, meetings, or meeting drafts. You review and confirm proposals before they are saved. Automatic scheduling and live meeting transcription are not currently available.",
   },
 ];
