@@ -11,6 +11,8 @@ export default defineConfig({
         source: "realtime/src/index.js",
         env: {
           JWT_SECRET: process.env.JWT_SECRET,
+          // Keep realtime on the API's database, even when hosted on another branch.
+          DATABASE_URL: process.env.DATABASE_URL,
           CLIENT_URL: process.env.CLIENT_URL ?? "https://app.loft-client.site",
           REALTIME_ALLOWED_ORIGINS: process.env.REALTIME_ALLOWED_ORIGINS
             ?? "https://app.loft-client.site,https://www.loft-client.site,https://loft-client.site,https://loft-client.vercel.app",

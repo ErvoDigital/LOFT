@@ -27,7 +27,15 @@ REALTIME_ALLOWED_ORIGINS=https://app.loft-client.site,https://www.loft-client.si
 
 Apply/redeploy the function so the running instance receives the new value. `neon.ts` sources this value from the deployment environment's `CLIENT_URL`. Keep the local Express server's `CLIENT_URL=http://localhost:5173` for local development. The production Vercel API's `CLIENT_URL` should also match the custom client origin.
 
-On 2026-10-08, the local Neon configuration and `client/.env` were updated for `https://app.loft-client.site`. A live unauthenticated WebSocket probe still returned HTTP 403 for the app subdomain, while `https://www.loft-client.site` returned HTTP 401 (the origin check passed). Applying the live change requires a Neon login or API key; no usable local Neon CLI credential was present. Until deployment is verified, the local configuration does not establish that the live function accepts the new origin.
+On 2026-10-08, realtime was deployed to the Singapore LOFT project `summer-field-34192813`, production branch `br-rough-lab-aztdrmhw`. Deployment 3 completed successfully using the current Neon CLI bundler, resolving the previous bundle's `Dynamic require of "buffer" is not supported` failure. The running function accepts `https://app.loft-client.site`: an authenticated WebSocket connection returned HTTP 101, an unauthenticated connection returned HTTP 401, and an unrelated origin returned HTTP 403. The existing Vercel API also returned HTTP 200 for an authenticated read with `Access-Control-Allow-Origin: https://app.loft-client.site`.
+
+The Singapore branch's own database has no users or workspaces. The function explicitly uses the existing API's `DATABASE_URL` and matching `JWT_SECRET`, preserving the application's current data in Ohio. `neon.ts` now declares this database override; load both values from the API's environment on subsequent deployments. Hosting realtime in Singapore does not migrate the database. The ignored local `.neon/project.json` links future Neon operations to the Singapore production branch, and `client/.env` points the development WebSocket proxy at Singapore.
+
+The published client still pointed to the Ohio realtime endpoint when checked on 2026-10-08. The user will complete the frontend change in Vercel: open the **loft-client** project's environment variables, set the following value for **Production** (and for Preview if those builds should use production realtime), then redeploy the client. This Vite variable is read at build time:
+
+```env
+VITE_REALTIME_URL=https://br-rough-lab-aztdrmhw-realtime.compute.c-3.ap-southeast-1.aws.neon.tech
+```
 
 Deploy the updated Vercel client for draft preservation, acknowledgement timeouts, reconnect recovery, and visible connection errors. The client now clears a draft only after a successful send acknowledgement. It does not replay uncertain requests automatically, since they may already have been saved. Meeting join failures return to the lobby; an interrupted call releases the camera/microphone and asks the user to rejoin.
 
