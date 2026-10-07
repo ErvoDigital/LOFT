@@ -144,6 +144,40 @@
   .brand-mark {
     @apply bg-gradient-to-br from-brand-500 to-brand-800;
   }
+  /* The active workspace's border and halo reuse its logo pixels, with the
+     workspace color underneath transparent logos and as the initials fallback. */
+  .workspace-rail-mark::before,
+  .workspace-rail-mark::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: calc(0.875rem + 3px);
+    pointer-events: none;
+    background-color: var(--workspace-color);
+    background-image: var(--workspace-logo);
+    background-position: center;
+    background-size: cover;
+    opacity: 0;
+    transition: opacity 180ms ease-out;
+  }
+  .workspace-rail-mark::before {
+    filter: blur(7px) brightness(1.4) saturate(1.2);
+  }
+  .workspace-rail-mark::after {
+    filter: blur(0.5px) brightness(1.4) saturate(1.2);
+  }
+  .workspace-rail-mark.is-active::before {
+    opacity: 0.8;
+  }
+  .workspace-rail-mark.is-active::after {
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .workspace-rail-mark::before,
+    .workspace-rail-mark::after {
+      transition: none;
+    }
+  }
   /* Dashboard hero. The brand gradient taken a step deeper than `.brand-mark`
      (600 rather than 500 at its lightest corner) so small white text on it
      still clears 4.5:1, with a mint glow pooling in the top-right. */
@@ -471,6 +505,21 @@
   .dash-grid .react-grid-item {
     transition: none;
   }
+}
+
+/* Older spoken lines fade out at the top as the transcript follows the voice.
+   Keep all text available for manual scrolling and disable scroll anchoring
+   so new words never move a reader who has scrolled back. */
+.voice-transcript {
+  max-height: min(10rem, 22dvh);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  overflow-anchor: none;
+  padding-block: 0.75rem;
+}
+.voice-transcript[data-scrolled="true"] {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 1.5rem);
+  mask-image: linear-gradient(to bottom, transparent, black 1.5rem);
 }
 
 /* The voice assistant's orb: a glass bubble of brand light. VoiceAssistant

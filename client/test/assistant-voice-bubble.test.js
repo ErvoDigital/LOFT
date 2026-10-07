@@ -47,7 +47,9 @@ async function mount(t, overrides = {}) {
     setTimeout: (fn) => { timers.set(1, fn); return 1; }, clearTimeout: (id) => timers.delete(id),
   });
   let view;
-  await act(async () => { view = create(React.createElement(exported.exports.default, props)); });
+  await act(async () => { view = create(React.createElement(exported.exports.default, props), {
+    createNodeMock: ({ props: nodeProps }) => nodeProps["aria-label"] === "Lofty's voice transcript" ? overrides.transcriptViewport || null : null,
+  }); });
   t.after(() => act(() => view.unmount()));
   const click = async (label) => act(async () => view.root.findAllByType("button").find((b) => b.props["aria-label"] === label || b.props.title === label).props.onClick());
   const update = async (changes) => { Object.assign(props, changes); await act(async () => view.update(React.createElement(exported.exports.default, props))); };
@@ -149,4 +151,63 @@ test("Autoplay-blocked replies wait for playback while retaining Play controls",
   assert.equal(bubble.spokenText(), "");
   await bubble.click("Play voice reply");
   assert.deepEqual(bubble.events, ["play"]);
+});
+
+function scrollViewport() {
+  let top = 0;
+  return {
+    clientHeight: 100,
+    scrollHeight: 220,
+    get scrollTop() { return top; },
+    set scrollTop(value) { top = Math.max(0, Math.min(value, this.scrollHeight - this.clientHeight)); },
+  };
+}
+
+test("The spoken transcript follows new words, yields to manual scrolling and resumes at the bottom", async (t) => {
+  const viewport = scrollViewport();
+  const audio = { currentTime: 3, duration: 10, ended: false };
+  const bubble = await mount(t, { phase: "speaking", reply: "One two three four", replyId: 1, audio, transcriptViewport: viewport });
+  const transcript = () => bubble.view.root.findByProps({ "aria-label": "Lofty's voice transcript" });
+  const scroll = async (top) => {
+    viewport.scrollTop = top;
+    await act(async () => transcript().props.onScroll({ currentTarget: viewport }));
+  };
+  assert.equal(viewport.scrollTop, 120);
+  assert.equal(transcript().props["data-scrolled"], true);
+  await scroll(0);
+  assert.equal(transcript().props["data-scrolled"], false);
+  viewport.scrollHeight = 280;
+  audio.currentTime = 6;
+  await bubble.tick();
+  assert.equal(bubble.spokenText(), "One two three");
+  assert.equal(viewport.scrollTop, 0);
+  await scroll(180);
+  viewport.scrollHeight = 340;
+  audio.currentTime = 9;
+  await bubble.tick();
+  assert.equal(viewport.scrollTop, 240);
+  assert.equal(bubble.spokenText(), "One two three four");
+});
+
+test("Replay and new replies restore automatic transcript scrolling after reading older lines", async (t) => {
+  const viewport = scrollViewport();
+  const audio = { currentTime: 10, duration: 10, ended: true };
+  const bubble = await mount(t, { phase: "done", reply: "One two three four", replyId: 1, audio, transcriptViewport: viewport });
+  const scrollBack = async () => {
+    viewport.scrollTop = 0;
+    await act(async () => bubble.view.root.findByProps({ "aria-label": "Lofty's voice transcript" }).props.onScroll({ currentTarget: viewport }));
+  };
+  await scrollBack();
+  audio.currentTime = 0;
+  audio.ended = false;
+  viewport.scrollHeight = 40;
+  await bubble.update({ phase: "speaking" });
+  assert.equal(bubble.spokenText(), "One");
+  viewport.scrollHeight = 220;
+  audio.currentTime = 6;
+  await bubble.tick();
+  assert.equal(viewport.scrollTop, 120);
+  await scrollBack();
+  await bubble.update({ replyId: 2, reply: "A different longer answer" });
+  assert.equal(viewport.scrollTop, 120);
 });

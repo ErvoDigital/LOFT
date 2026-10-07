@@ -44,13 +44,8 @@ export default function WorkspaceStorage() {
   const [previewing, setPreviewing] = useState(null); // { asset, version } | null
   const fileInputRef = useRef(null);
 
-  async function downloadFile(assetId, version) {
-    setError("");
-    try {
-      await assetsApi.downloadVersion(workspaceId, assetId, version);
-    } catch (err) {
-      setError(err?.response?.data?.error || err.message || "Couldn't download this file.");
-    }
+  function downloadFile(assetId, version) {
+    return assetsApi.downloadVersion(workspaceId, assetId, version);
   }
 
   // Ids currently playing their entrance animation, and the folder (if any)

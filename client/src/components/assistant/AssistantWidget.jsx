@@ -337,22 +337,34 @@ export default function AssistantWidget() {
     requestRef.current = controller;
     (voice ? setVoiceError : setError)("");
     if (voice) stopPlayback();
-    const history = messagesRef.current.filter((m) => !m.failed).slice(-12).map(({ role, content }) => ({ role, content: content.slice(0, 6000) }));
+    const history = messagesRef.current.filter((m) => !m.failed && !m.streaming).slice(-12).map(({ role, content }) => ({ role, content: content.slice(0, 6000) }));
     const messageId = ++nextId;
+    const replyId = ++nextId;
     setMessages((m) => [...m, { id: messageId, role: "user", content, ...(voice ? { voice: true } : {}) }]);
     if (!voice) setDraft("");
     setPendingReplyMode(voice ? "voice" : "text");
+    let partialReply = "";
+    const showProgress = (event) => {
+      if (controller.signal.aborted || version !== contextVersion.current) return;
+      partialReply = event.type === "reset" ? "" : partialReply + (event.text || "");
+      setMessages((items) => {
+        const existing = items.some((item) => item.id === replyId);
+        if (!partialReply) return items.filter((item) => item.id !== replyId);
+        const reply = { id: replyId, role: "assistant", content: partialReply, replyMode: "text", streaming: true };
+        return existing ? items.map((item) => item.id === replyId ? reply : item) : [...items, reply];
+      });
+    };
     try {
-      const result = await sendAssistantMessage({ message: content, interactionMode: voice ? "voice" : "text", history, ...(workspaceId ? { workspaceId } : {}), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Manila" }, controller.signal);
+      const result = await sendAssistantMessage({ message: content, interactionMode: voice ? "voice" : "text", history, ...(workspaceId ? { workspaceId } : {}), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Manila" }, controller.signal, voice ? undefined : showProgress);
       if (!controller.signal.aborted && version === contextVersion.current) {
-        const replyId = ++nextId;
-        setMessages((m) => [...m, { id: replyId, role: "assistant", content: result.reply, actions: result.actions, replyMode: voice ? "voice" : "text", ...(voice ? { audioStatus: "canceled" } : {}) }]);
+        const reply = { id: replyId, role: "assistant", content: result.reply, actions: result.actions, replyMode: voice ? "voice" : "text", ...(voice ? { audioStatus: "canceled" } : {}) };
+        setMessages((m) => [...m.filter((item) => item.id !== replyId), reply]);
         if (voice) void playReply(result.reply, version, voiceSession, replyId);
       }
     } catch (err) {
       if (!controller.signal.aborted && version === contextVersion.current) {
         (voice ? setVoiceError : setError)(apiErrorMessage(err));
-        setMessages((m) => m.map((item) => item.id === messageId ? { ...item, failed: true } : item));
+        setMessages((m) => m.filter((item) => item.id !== replyId).map((item) => item.id === messageId ? { ...item, failed: true } : item));
         if (!voice) setDraft(content);
       }
     } finally { if (version === contextVersion.current) setPendingReplyMode(null); }

@@ -1,15 +1,30 @@
-import { useState } from "react";
-import { Download, Eye, FolderInput, Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { Download, Eye, FolderInput, Loader2, Trash2 } from "lucide-react";
 import Avatar from "../common/Avatar.jsx";
 import { ASSET_DRAG_TYPE } from "./dragTypes.js";
 import { FileIcon, formatSize, timeAgo } from "../../lib/fileIcons.jsx";
+import { fileFailure } from "../../lib/fileFeedback.js";
+import FileFailureNotice from "./FileFailureNotice.jsx";
 
 export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, onDownload, onPreview, onMove, onDelete, uploadProgress, materializing }) {
   const [expanded, setExpanded] = useState(false);
   const [dragState, setDragState] = useState(null); // "merge" | "version" | null
+  const [downloading, setDownloading] = useState(null);
+  const [downloadFailure, setDownloadFailure] = useState(null);
+  const downloadPending = useRef(false);
 
   const latest = asset.latestVersion;
   const isMultiVersion = asset.versionCount > 1;
+
+  async function download(version) {
+    if (downloadPending.current) return;
+    downloadPending.current = true;
+    setDownloading(version?.id || "missing");
+    setDownloadFailure(null);
+    try { await onDownload(version); }
+    catch (err) { setDownloadFailure({ ...fileFailure(err), version }); }
+    finally { downloadPending.current = false; setDownloading(null); }
+  }
 
   function handleDragStart(e) {
     e.dataTransfer.setData(ASSET_DRAG_TYPE, asset.id);
@@ -53,7 +68,7 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
             : ""
       } ${materializing ? "animate-slide-fade-in" : ""}`}
     >
-      {isMultiVersion && (
+      {isMultiVersion && latest && (
         <span className="absolute right-3 top-3 rounded-full brand-mark px-2 py-0.5 text-[11px] font-semibold text-white shadow-glow-sm">
           V{latest.version}
         </span>
@@ -112,12 +127,13 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => onDownload(latest)}
-            title="Download"
-            aria-label="Download"
+            onClick={() => download(latest)}
+            disabled={Boolean(downloading)}
+            title={downloading ? "Preparing download…" : "Download"}
+            aria-label={downloading ? "Preparing download" : "Download"}
             className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
           >
-            <Download className="h-3.5 w-3.5" />
+            {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           </button>
           {canManage && (
             <>
@@ -158,18 +174,20 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
                   <Eye className="h-3.5 w-3.5" />
                 </button>
                 <button
-                  onClick={() => onDownload(v)}
-                  title="Download"
-                  aria-label="Download"
+                  onClick={() => download(v)}
+                  disabled={Boolean(downloading)}
+                  title={downloading === v.id ? "Preparing download…" : "Download"}
+                  aria-label={downloading === v.id ? "Preparing download" : "Download"}
                   className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
                 >
-                  <Download className="h-3.5 w-3.5" />
+                  {downloading === v.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                 </button>
               </div>
             </div>
           ))}
         </div>
       )}
+      {downloadFailure && <div className="mt-3"><FileFailureNotice failure={downloadFailure} filename={downloadFailure.version?.originalName || asset.name} onRetry={() => download(downloadFailure.version)} onDismiss={() => setDownloadFailure(null)} busy={Boolean(downloading)} /></div>}
     </div>
   );
 }

@@ -28,6 +28,7 @@ import * as workspacesApi from "../../api/workspaces.js";
 import Avatar from "../common/Avatar.jsx";
 import WorkspaceModal from "./WorkspaceModal.jsx";
 import WorkspaceMark from "../common/WorkspaceMark.jsx";
+import { displayColor } from "../../lib/colors.js";
 
 const COLLAPSE_KEY = "loft:sidebar-collapsed";
 
@@ -38,16 +39,24 @@ function WorkspaceIcon({ workspace, active }) {
       aria-label={workspace.name}
       className="group relative flex items-center"
     >
-      <WorkspaceMark
-        name={workspace.name}
-        color={workspace.color}
-        logoUrl={workspace.logoUrl}
-        className={`h-9 w-9 rounded-xl text-sm transition-all ${
-          active
-            ? "ring-2 ring-brand-400 ring-offset-2 ring-offset-ink-950 shadow-glow-sm"
-            : "opacity-60 hover:opacity-100 hover:ring-2 hover:ring-white/20"
-        }`}
-      />
+      <span
+        className={`workspace-rail-mark relative isolate flex h-9 w-9 shrink-0 rounded-xl ${active ? "is-active" : ""}`}
+        style={{
+          "--workspace-color": displayColor(workspace.color),
+          "--workspace-logo": workspace.logoUrl ? `url(${JSON.stringify(workspace.logoUrl)})` : "none",
+        }}
+      >
+        <WorkspaceMark
+          name={workspace.name}
+          color={workspace.color}
+          logoUrl={workspace.logoUrl}
+          className={`relative z-10 h-9 w-9 rounded-xl text-sm transition-all ${
+            active
+              ? "ring-1 ring-ink-950"
+              : "opacity-60 hover:opacity-100 hover:ring-2 hover:ring-white/20"
+          }`}
+        />
+      </span>
       <span className="pointer-events-none absolute left-full z-10 ml-3 whitespace-nowrap rounded-lg border border-white/10 bg-ink-950/90 px-2.5 py-1 text-xs font-medium text-white opacity-0 shadow-glass backdrop-blur-xl transition-opacity group-hover:opacity-100">
         {workspace.name}
       </span>

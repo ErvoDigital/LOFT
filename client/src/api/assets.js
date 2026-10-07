@@ -63,46 +63,52 @@ export const deleteAsset = (workspaceId, assetId) =>
 export const moveAsset = (workspaceId, assetId, folderId) =>
   api.patch(`/workspaces/${workspaceId}/assets/${assetId}/folder`, { folderId }).then((r) => r.data.asset);
 
-export const getVersionDownloadUrl = (workspaceId, assetId, version) =>
-  api
-    .get(`/workspaces/${workspaceId}/assets/${assetId}/versions/${version.id}/download`)
+export const getVersionDownloadUrl = (workspaceId, assetId, version, signal) => {
+  if (!version?.id) return Promise.reject(Object.assign(new Error("File is unavailable"), { code: "FILE_MISSING" }));
+  const path = `/workspaces/${workspaceId}/assets/${assetId}/versions/${version.id}/download`;
+  return (signal ? api.get(path, { signal }) : api.get(path))
     .then((response) => {
       const url = response.data?.url;
       let protocol;
       try {
         protocol = new URL(url).protocol;
       } catch {
-        throw new Error("File download link is unavailable");
+        throw Object.assign(new Error("File download link is unavailable"), { code: "FILE_LINK_UNAVAILABLE" });
       }
       if (protocol !== "https:" && protocol !== "http:") {
-        throw new Error("File download link is unavailable");
+        throw Object.assign(new Error("File download link is unavailable"), { code: "FILE_LINK_UNAVAILABLE" });
       }
       return url;
     });
+};
 
 // Authorization happens at the LOFT API first. The returned presigned URL is
 // then fetched directly so the browser sends the app's Origin to S3. LOFT's
 // bearer token is never forwarded to object storage.
-export async function fetchVersionBlob(workspaceId, assetId, version) {
-  const signedUrl = await getVersionDownloadUrl(workspaceId, assetId, version);
+export async function fetchVersionBlob(workspaceId, assetId, version, signal) {
+  const signedUrl = await getVersionDownloadUrl(workspaceId, assetId, version, signal);
   let response;
   try {
-    response = await fetch(signedUrl, { credentials: "omit" });
+    response = await fetch(signedUrl, { credentials: "omit", ...(signal ? { signal } : {}) });
   } catch {
-    throw new Error("File could not be downloaded");
+    throw Object.assign(new Error("File could not be downloaded"), { code: "FILE_NETWORK_ERROR" });
   }
-  if (!response.ok) throw new Error("File could not be downloaded");
-  return response.blob();
+  if (!response.ok) throw Object.assign(new Error("File could not be downloaded"), { fileSource: "storage", status: response.status });
+  try { return await response.blob(); }
+  catch { throw Object.assign(new Error("File could not be downloaded"), { code: "FILE_NETWORK_ERROR" }); }
 }
 
 export async function downloadVersion(workspaceId, assetId, version) {
   const blob = await fetchVersionBlob(workspaceId, assetId, version);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url;
-  a.download = version.originalName;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  try {
+    a.href = url;
+    a.download = version.originalName || "download";
+    document.body.appendChild(a);
+    a.click();
+  } finally {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
 }

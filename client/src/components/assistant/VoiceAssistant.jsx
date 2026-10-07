@@ -70,6 +70,50 @@ function CornerButton({ label, onClick, children }) {
   );
 }
 
+function VoiceTranscript({ text, replyId, audio }) {
+  const viewportRef = useRef(null);
+  const following = useRef(true);
+  const previousLength = useRef(0);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    following.current = true;
+    previousLength.current = 0;
+  }, [replyId, audio]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    // Replaying starts the transcript over, including its scroll behavior.
+    if (text.length < previousLength.current) following.current = true;
+    previousLength.current = text.length;
+    if (following.current) viewport.scrollTop = viewport.scrollHeight;
+    setScrolled(viewport.scrollTop > 1);
+  }, [text, replyId, audio]);
+
+  function handleScroll(event) {
+    const viewport = event.currentTarget;
+    following.current = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 12;
+    setScrolled(viewport.scrollTop > 1);
+  }
+
+  return (
+    <div
+      ref={viewportRef}
+      role="region"
+      aria-label="Lofty's voice transcript"
+      tabIndex={0}
+      onScroll={handleScroll}
+      data-scrolled={scrolled}
+      className="voice-transcript pointer-events-auto w-full max-w-lg rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60"
+    >
+      <p aria-label="Lofty's spoken reply" className="whitespace-pre-wrap break-words px-2 text-lg font-medium leading-relaxed tracking-tight text-ink-900 dark:text-ink-50 sm:text-xl">
+        {text}
+      </p>
+    </div>
+  );
+}
+
 // Measures how loudly the user is speaking into the recorder's stream, 0 to
 // 1. It only reads the stream; it never plays the microphone back.
 function useMicLevel(stream) {
@@ -323,8 +367,7 @@ export default function VoiceAssistant({
       </p>
 
       {/* Clicks fall through to the scrim except on the transcript and controls.
-          my-auto centers the column until an
-          answer makes it taller than the screen, then it scrolls. */}
+          The reply scrolls within its own viewport, keeping the orb in place. */}
       <div className="pointer-events-none relative my-auto flex w-full max-w-xl flex-col items-center text-center">
         <VoiceOrb state={phase} />
 
@@ -356,9 +399,7 @@ export default function VoiceAssistant({
           )}
 
           {spokenReply && (
-            <p aria-label="Lofty's spoken reply" className="pointer-events-auto max-w-lg whitespace-pre-wrap text-balance text-2xl font-medium leading-snug tracking-tight text-ink-900 dark:text-ink-50 sm:text-[1.75rem]">
-              {spokenReply}
-            </p>
+            <VoiceTranscript text={spokenReply} replyId={replyId} audio={audio} />
           )}
 
           {reply && (

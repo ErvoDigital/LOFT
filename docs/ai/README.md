@@ -66,6 +66,14 @@ If voice reports insufficient OpenRouter credits (HTTP 402), top up the OpenRout
 
 The official image is pinned by digest in `infra/openclaw/compose.yml` for reproducibility. Upgrade deliberately and repeat gateway contract tests. Startup copies the read-only config template into the private writable state volume and applies its plugin settings through `openclaw config set`, then invokes the official image activation (including Doctor) before running the gateway. Existing installations keep authored settings in SQLite, so copying a JSON seed alone does not update their active configuration. Startup applies the template's plugin settings to that store; use the OpenClaw configuration CLI for other changes to an existing gateway.
 
+## Response latency
+
+Typed replies now display incrementally through the gateway's supported [SSE response stream](https://docs.openclaw.ai/gateway/openresponses-http-api#streaming-sse). LOFT relays text deltas as newline-delimited JSON when the client requests `Accept: application/x-ndjson`; clients that request ordinary JSON retain the existing response format. Tool-round preambles are cleared before the next round, and confirmation previews arrive only with the completed reply. Failed or interrupted streams discard provisional text and leave the question available to retry. Disconnecting the browser request cancels gateway inference.
+
+Independent read tools run concurrently within each batch, and conflict checks fetch tasks and events together. Proposal creation stays sequential, preserving the three-proposal cap. All reads still perform their existing live membership checks. Default voice replies use two to four short sentences, reducing the amount of text to generate and synthesize; users can request longer explanations.
+
+Voice still completes transcription, reasoning and whole-reply audio synthesis in sequence. It does not stream speech yet. For live latency measurements, inspect the `/assistant/transcribe`, `/assistant/message` and `/assistant/speak` requests separately before choosing a different model or adding streaming audio. These changes require updated LOFT client and server deployments; provider models and gateway configuration are unchanged. No live provider speedup has been benchmarked by the mock tests.
+
 ## Brief local voice test
 
 Testing is available before the premium paywall is implemented. Use localhost or HTTPS in a browser that supports microphone recording. Voice starts through the bubble and stops when the bubble closes or the account/workspace changes.

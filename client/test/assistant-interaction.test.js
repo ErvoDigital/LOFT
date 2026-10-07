@@ -45,12 +45,13 @@ async function mount(t, overrides = {}) {
   const audio = [];
   const revoked = [];
   const confirmations = [];
+  let progress;
   let recorder;
   let stoppedTracks = 0;
   const api = {
     assistantStatus: async () => ({ configured: true }),
     confirmAssistantAction: async (token) => { confirmations.push(token); return { id: "saved", workspaceId: "workspace" }; },
-    sendAssistantMessage: async (body) => { messages.push(body); return overrides.reply ? overrides.reply.promise : { reply: "Your summary.", actions: [] }; },
+    sendAssistantMessage: async (body, signal, onProgress) => { messages.push(body); progress = onProgress; return overrides.reply ? overrides.reply.promise : { reply: "Your summary.", actions: [] }; },
     transcribeAssistantAudio: async () => overrides.transcript ? overrides.transcript.promise : { transcript: "What is due today?" },
     speakAssistantReply: async (text, context, signal) => {
       speech.push({ text, context, signal });
@@ -117,8 +118,39 @@ async function mount(t, overrides = {}) {
   const startRecording = async () => { await act(async () => { bubble().onPrepareAudio(); return bubble().onHoldStart(); }); };
   const record = async () => { await startRecording(); await act(async () => bubble().onHoldEnd()); };
   if (!overrides.closed) await click("Open Lofty");
-  return { view, messages, speech, audio, revoked, confirmations, click, type, submit, record, startRecording, get bubble() { return bubble(); }, get recorder() { return recorder; }, get stoppedTracks() { return stoppedTracks; } };
+  return { view, messages, speech, audio, revoked, confirmations, click, type, submit, record, startRecording, get progress() { return progress; }, get bubble() { return bubble(); }, get recorder() { return recorder; }, get stoppedTracks() { return stoppedTracks; } };
 }
+
+test("Chat renders streamed text early and replaces tool preambles with one final reply", async (t) => {
+  const reply = deferred();
+  const widget = await mount(t, { reply });
+  await widget.type("Help me plan");
+  await widget.submit();
+  await act(async () => widget.progress({ type: "delta", text: "Checking your tasks." }));
+  assert.ok(JSON.stringify(widget.view.toJSON()).includes("Checking your tasks."));
+  assert.equal(widget.bubble.onHoldStart(), false);
+  assert.equal(widget.confirmations.length, 0);
+  await act(async () => widget.progress({ type: "reset" }));
+  assert.ok(!JSON.stringify(widget.view.toJSON()).includes("Checking your tasks."));
+  await act(async () => widget.progress({ type: "delta", text: "Your plan" }));
+  await act(async () => reply.resolve({ reply: "Your plan is ready.", actions: [] }));
+  const replies = widget.view.root.findAllByType("p").filter((p) => p.children.includes("Your plan is ready."));
+  assert.equal(replies.length, 1);
+  assert.equal(widget.speech.length, 0);
+  assert.equal(widget.bubble.onHoldStart(), true);
+});
+
+test("A failed stream removes provisional text and restores the question for retry", async (t) => {
+  const reply = deferred();
+  const widget = await mount(t, { reply });
+  await widget.type("Plan my day");
+  await widget.submit();
+  await act(async () => widget.progress({ type: "delta", text: "An unfinished answer" }));
+  await act(async () => reply.reject(new Error("Stream interrupted")));
+  assert.ok(!JSON.stringify(widget.view.toJSON()).includes("An unfinished answer"));
+  assert.equal(widget.view.root.findByType("input").props.value, "Plan my day");
+  assert.ok(JSON.stringify(widget.view.toJSON()).includes("Stream interrupted"));
+});
 
 test("Meeting draft previews handle absent dates and save only after confirmation", async (t) => {
   const reply = deferred();

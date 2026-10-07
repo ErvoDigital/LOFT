@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Pencil, Maximize2, Minimize2, Pin, Moon, Calendar, Clock3, Paperclip, File, Image, Film, Music, FileText, Trash2, Loader2, Download } from "lucide-react";
+import { X, Pencil, Maximize2, Minimize2, Pin, Moon, Calendar, Clock3, Paperclip, File, Image, Film, Music, FileText, Trash2, Loader2, Eye } from "lucide-react";
 import Avatar from "../common/Avatar.jsx";
 import { TierBadge } from "../common/Badges.jsx";
 import PreviewModal from "../storage/PreviewModal.jsx";
@@ -7,6 +7,8 @@ import * as assetsApi from "../../api/assets.js";
 import { apiErrorMessage } from "../../api/client.js";
 import { displayColor } from "../../lib/colors.js";
 import { ACCEPTED_UPLOAD_TYPES } from "../../lib/uploads.js";
+import { fileFailure } from "../../lib/fileFeedback.js";
+import FileFailureNotice from "../storage/FileFailureNotice.jsx";
 
 function formatDuration(minutes) {
   const m = Number(minutes) || 0;
@@ -52,6 +54,9 @@ export default function TaskDetailsPanel({ open, task, workspaceId, statuses, on
   const [uploading, setUploading] = useState(false);
   const [attachmentsError, setAttachmentsError] = useState("");
   const [previewing, setPreviewing] = useState(null);
+  const [downloading, setDownloading] = useState(null);
+  const [downloadFailure, setDownloadFailure] = useState(null);
+  const downloadPending = useRef(false);
   const fileInputRef = useRef(null);
   const requestId = useRef(0);
 
@@ -72,16 +77,18 @@ export default function TaskDetailsPanel({ open, task, workspaceId, statuses, on
 
   useEffect(() => {
     if (!mounted) return;
-    const onKey = (e) => e.key === "Escape" && onClose();
+    const onKey = (e) => e.key === "Escape" && !previewing && onClose();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [mounted, onClose]);
+  }, [mounted, onClose, previewing]);
 
   useEffect(() => {
     if (!open || !task) return;
     const id = ++requestId.current;
     setAttachmentsLoading(true);
     setAttachmentsError("");
+    setDownloadFailure(null);
+    setPreviewing(null);
     assetsApi
       .listTaskAttachments(workspaceId, task.id)
       .then((assets) => {
@@ -127,8 +134,15 @@ export default function TaskDetailsPanel({ open, task, workspaceId, statuses, on
     }
   }
 
-  function handleDownload(asset) {
-    if (asset.latestVersion) assetsApi.downloadVersion(workspaceId, asset.id, asset.latestVersion);
+  async function handleDownload(asset) {
+    if (downloadPending.current) return;
+    downloadPending.current = true;
+    const context = requestId.current;
+    setDownloading(asset.id);
+    setDownloadFailure(null);
+    try { await assetsApi.downloadVersion(workspaceId, asset.id, asset.latestVersion); }
+    catch (err) { if (context === requestId.current) setDownloadFailure({ ...fileFailure(err), asset }); }
+    finally { downloadPending.current = false; setDownloading(null); }
   }
 
   return (
@@ -267,6 +281,7 @@ export default function TaskDetailsPanel({ open, task, workspaceId, statuses, on
               </div>
 
               {attachmentsError && <p className="mb-2 text-xs text-red-500">{attachmentsError}</p>}
+              {downloadFailure && <div className="mb-2"><FileFailureNotice failure={downloadFailure} filename={downloadFailure.asset.name} onRetry={() => handleDownload(downloadFailure.asset)} onDismiss={() => setDownloadFailure(null)} busy={Boolean(downloading)} /></div>}
 
               {attachmentsLoading ? (
                 <p className="text-sm text-ink-300">Loading attachments…</p>
@@ -285,12 +300,15 @@ export default function TaskDetailsPanel({ open, task, workspaceId, statuses, on
                       <button
                         type="button"
                         onClick={() => handleDownload(asset)}
+                        disabled={Boolean(downloading)}
                         className="min-w-0 flex-1 text-left"
-                        title="Download"
+                        title={downloading === asset.id ? "Preparing download…" : "Download"}
                       >
                         <p className="truncate text-sm font-medium text-ink-800 hover:text-brand-600 dark:text-ink-100">{asset.name}</p>
                         {asset.latestVersion && <p className="text-xs text-ink-400">{formatSize(asset.latestVersion.size)}</p>}
+                        {downloading === asset.id && <p role="status" className="text-xs text-brand-600 dark:text-brand-400">Preparing download…</p>}
                       </button>
+                      <button type="button" onClick={() => setPreviewing(asset)} title="Preview attachment" aria-label={`Preview ${asset.name}`} className="shrink-0 rounded-md p-1 text-ink-400 hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"><Eye className="h-3.5 w-3.5" /></button>
                       <button
                         type="button"
                         onClick={() => handleDeleteAttachment(asset)}
@@ -314,6 +332,7 @@ export default function TaskDetailsPanel({ open, task, workspaceId, statuses, on
           </div>
         </div>
       </div>
+      <PreviewModal open={Boolean(previewing)} onClose={() => setPreviewing(null)} workspaceId={workspaceId} assetId={previewing?.id} version={previewing?.latestVersion} name={previewing?.name} onDownload={() => assetsApi.downloadVersion(workspaceId, previewing.id, previewing.latestVersion)} />
     </div>
   );
 }

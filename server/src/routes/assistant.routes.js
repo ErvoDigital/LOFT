@@ -33,8 +33,35 @@ router.post("/message", async (req, res) => {
   if (active.has(req.userId) || times.length >= 10) throw new ApiError(429, "Please wait before sending another assistant message.");
   recent.set(req.userId, [...times, now]);
   active.add(req.userId);
-  try { res.json(await answerAssistant({ ...data, userId: req.userId })); }
-  finally { active.delete(req.userId); }
+  const controller = new AbortController();
+  const cancel = () => { if (!res.writableEnded) controller.abort(); };
+  res.on("close", cancel);
+  const streaming = req.get("Accept")?.includes("application/x-ndjson");
+  const sendProgress = (event) => {
+    if (res.destroyed || controller.signal.aborted) return;
+    if (!res.headersSent) {
+      res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders();
+    }
+    res.write(JSON.stringify(event) + "\n");
+  };
+  try {
+    const result = await answerAssistant({ ...data, userId: req.userId, signal: controller.signal, ...(streaming ? { onProgress: sendProgress } : {}) });
+    if (!controller.signal.aborted) {
+      if (streaming) { sendProgress({ type: "result", ...result }); res.end(); }
+      else res.json(result);
+    }
+  } catch (err) {
+    if (controller.signal.aborted) return;
+    if (!res.headersSent) throw err;
+    sendProgress({ type: "error", status: err instanceof ApiError ? err.statusCode : 500, error: err instanceof ApiError ? err.message : "The assistant could not complete the response. Please try again." });
+    res.end();
+  } finally {
+    res.off("close", cancel);
+    active.delete(req.userId);
+  }
 });
 router.post("/confirm", async (req, res) => {
   const { token } = z.object({ token: z.string().min(1).max(12000) }).strict().parse(req.body);

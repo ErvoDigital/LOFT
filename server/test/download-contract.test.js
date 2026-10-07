@@ -136,6 +136,34 @@ describe("presigned download endpoint", () => {
 });
 
 describe("browser preview and download contract", () => {
+  it("preserves useful failure codes and forwards preview cancellation to both requests", async () => {
+    const originalGet = api.get;
+    const originalFetch = globalThis.fetch;
+    const controller = new AbortController();
+    let fetchCalled = false;
+    api.get = async (path, options) => {
+      assert.equal(options.signal, controller.signal);
+      return { data: { url: signedUrl } };
+    };
+    globalThis.fetch = async (url, options) => {
+      fetchCalled = true;
+      assert.equal(options.signal, controller.signal);
+      assert.equal(options.credentials, "omit");
+      assert.equal(options.headers, undefined);
+      return { ok: false, status: 404 };
+    };
+    try {
+      await assert.rejects(fetchVersionBlob("ws", "asset", null), (error) => error.code === "FILE_MISSING");
+      assert.equal(fetchCalled, false);
+      await assert.rejects(fetchVersionBlob("ws", "asset", { id: "version" }, controller.signal), (error) => error.status === 404 && error.fileSource === "storage");
+      globalThis.fetch = async () => ({ ok: true, blob: async () => { throw new Error("Private storage response and signed URL"); } });
+      await assert.rejects(fetchVersionBlob("ws", "asset", { id: "version" }, controller.signal), (error) => error.code === "FILE_NETWORK_ERROR" && !error.message.includes("Private"));
+    } finally {
+      api.get = originalGet;
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("requests JSON authorization first, then fetches the signed URL without credentials", async () => {
     const originalGet = api.get;
     const originalFetch = globalThis.fetch;
