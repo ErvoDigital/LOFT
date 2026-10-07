@@ -46,9 +46,9 @@ Visit http://localhost:5173. The Vite dev server proxies `/api` and `/socket.io`
 
 No application code changes needed — the schema deliberately avoids SQLite-incompatible features it wouldn't otherwise need (native enums, arrays, `Json` columns), so it's portable as-is.
 
-### Password recovery in dev
+### Email and sign-in verification
 
-Email goes out over SMTP only for workspace invites (set the `SMTP_*` variables in `server/.env`, see `.env.example`); password recovery doesn't use it yet. `/api/auth/forgot-password` returns the reset token directly in the JSON response when `NODE_ENV !== "production"`, and the Forgot Password page surfaces it as a clickable link so the full flow is testable without SMTP.
+Configure SMTP for welcome emails, password recovery, workspace invitations, password-change codes and email verification before account access. Password and Google sign-in both require an emailed code before a session token is issued. See [email setup and delivery checks](docs/email.md). Recovery tokens and verification codes are never returned through the API or in-app notifications.
 
 ## Feature status
 

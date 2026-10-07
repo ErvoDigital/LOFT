@@ -175,7 +175,10 @@ describe("Workspace invites (in-memory)", () => {
     setPrismaClient(fake);
 
     sentMail = [];
-    setMailTransport({ sendMail: async (message) => sentMail.push(message) });
+    setMailTransport({ sendMail: async (message) => {
+      sentMail.push(message);
+      return { accepted: [message.to], rejected: [] };
+    } });
 
     tokens = {
       admin: signToken({ sub: "u-admin" }),
@@ -256,7 +259,7 @@ describe("Workspace invites (in-memory)", () => {
 
     assert.equal(sentMail.length, 2);
     const toNew = sentMail.find((m) => m.to === "new@x.test");
-    assert.equal(toNew.subject, "Ada Admin invited you to join Studio <b>One</b> on LOFT");
+    assert.equal(toNew.subject, "Ada Admin invited you to join Studio <b>One</b> on Loft");
     assert.ok(toNew.html.includes("Studio &lt;b&gt;One&lt;/b&gt;"), "workspace name is escaped in the HTML");
     assert.ok(!toNew.html.includes("<b>One</b>"));
 
@@ -363,5 +366,28 @@ describe("Workspace invites (in-memory)", () => {
     } finally {
       process.env.SMTP_HOST = "smtp.test";
     }
+  });
+
+  it("reports SMTP recipient rejection as an email failure and allows retry", async () => {
+    const { setMailTransport } = await import("../src/services/mail.service.js");
+    setMailTransport({ sendMail: async () => ({ accepted: [], rejected: ["retry@x.test"] }) });
+    try {
+      const res = await call("POST", "/workspaces/ws-1/invites", {
+        token: tokens.admin, body: { emails: ["retry@x.test"] },
+      });
+      assert.equal(res.status, 201);
+      assert.equal(res.body.results[0].emailed, false);
+      assert.match(res.body.results[0].emailError, /could not be sent/);
+      assert.ok(fake.db.invites.some((invite) => invite.email === "retry@x.test"));
+    } finally {
+      setMailTransport({ sendMail: async (message) => {
+        sentMail.push(message);
+        return { accepted: [message.to], rejected: [] };
+      } });
+    }
+    const retried = await call("POST", "/workspaces/ws-1/invites", {
+      token: tokens.admin, body: { emails: ["retry@x.test"] },
+    });
+    assert.equal(retried.body.results[0].emailed, true);
   });
 });

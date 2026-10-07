@@ -1,38 +1,101 @@
 import nodemailer from "nodemailer";
+import { ApiError } from "../utils/ApiError.js";
+import { logStructuredError } from "../utils/logger.js";
 
-// Outgoing email over SMTP. Gmail (with an app password), Resend, Brevo,
-// SendGrid and Mailgun all accept SMTP, so switching providers is only a
-// change to the SMTP_* variables in .env.example. Without them LOFT still
-// runs: isMailConfigured() is false, and callers fall back to what works
-// without email (in-app notifications, links an admin can copy).
 let transporter = null;
+let transportKey = null;
+let injectedTransport = null;
+
+export function mailConfig() {
+  const host = process.env.SMTP_HOST?.trim() || "";
+  const user = process.env.SMTP_USER?.trim() || "";
+  // Google displays app passwords in groups separated by spaces.
+  const pass = /^(smtp\.gmail\.com|smtp\.googlemail\.com)$/i.test(host)
+    ? (process.env.SMTP_PASS || "").replace(/\s/g, "")
+    : process.env.SMTP_PASS || "";
+  const port = Number(process.env.SMTP_PORT?.trim() || 587);
+  return { host, user, pass, port };
+}
 
 export function isMailConfigured() {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  const { host, user, pass, port } = mailConfig();
+  return Boolean(host && user && pass && Number.isInteger(port) && port > 0 && port <= 65535);
 }
 
 function getTransporter() {
-  if (!transporter) {
-    const port = Number(process.env.SMTP_PORT) || 587;
+  if (!isMailConfigured()) {
+    throw new ApiError(503, "Email is unavailable. Please ask the administrator to check the SMTP settings.");
+  }
+  if (injectedTransport) return injectedTransport;
+  const { host, user, pass, port } = mailConfig();
+  const key = JSON.stringify({ host, user, pass, port });
+  if (!transporter || transportKey !== key) {
+    transporter?.close();
     transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
+      host,
       port,
-      secure: port === 465, // 465 is TLS from the first byte; 587 upgrades with STARTTLS
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      secure: port === 465,
+      requireTLS: port !== 465,
+      auth: { user, pass },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
+    transportKey = key;
   }
   return transporter;
 }
 
-// Tests swap in a fake that records messages instead of opening a socket.
+// Tests replace the connection while retaining delivery-result checks.
 export function setMailTransport(fake) {
-  transporter = fake;
+  injectedTransport = fake;
+}
+
+export function closeMailTransport() {
+  transporter?.close();
+  transporter = null;
+  transportKey = null;
+}
+
+function mailFailure(error) {
+  if (error instanceof ApiError) return error;
+  logStructuredError("mail.delivery_failed", {
+    code: error?.code || "UNKNOWN",
+    command: error?.command,
+    responseCode: error?.responseCode,
+  });
+  return new ApiError(503, "The email could not be sent. Please try again or contact the administrator.");
+}
+
+export async function verifyMailConnection() {
+  try {
+    return await getTransporter().verify();
+  } catch (error) {
+    throw mailFailure(error);
+  }
+}
+
+export function senderIdentity() {
+  const configured = process.env.MAIL_FROM?.trim() || mailConfig().user;
+  const address = configured.match(/<([^<>]+)>/)?.[1]?.trim() || configured;
+  const reply = process.env.MAIL_REPLY_TO?.trim();
+  return {
+    from: { name: "Loft", address },
+    ...(reply ? { replyTo: { name: "Loft", address: reply.match(/<([^<>]+)>/)?.[1]?.trim() || reply } } : {}),
+  };
 }
 
 export async function sendMail({ to, subject, text, html }) {
-  if (!isMailConfigured()) throw new Error("Email is not configured on this server");
-  const from = process.env.MAIL_FROM || `LOFT <${process.env.SMTP_USER}>`;
-  await getTransporter().sendMail({ from, to, subject, text, html });
+  try {
+    const result = await getTransporter().sendMail({ ...senderIdentity(), to, subject, text, html });
+    // A resolved promise can still contain rejected recipients.
+    if (!result?.accepted?.length || result.rejected?.length) {
+      throw Object.assign(new Error("SMTP rejected the recipient"), { code: "ERECIPIENT" });
+    }
+    return result;
+  } catch (error) {
+    throw mailFailure(error);
+  }
 }
 
 // Where links in an email point: the web client, not this API.

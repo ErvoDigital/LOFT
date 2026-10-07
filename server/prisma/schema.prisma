@@ -61,6 +61,23 @@ model User {
   followsRequested     Follow[]                  @relation("FollowRequester")
   followsReceived      Follow[]                  @relation("FollowAddressee")
   sentInvites          WorkspaceInvite[]         @relation("WorkspaceInviteSender")
+  emailChallenges      EmailChallenge[]
+}
+
+// One active challenge per user and purpose, shared across server instances.
+// LOGIN codes never double as password-change or password-reset credentials.
+model EmailChallenge {
+  id         String   @id
+  userId     String
+  purpose    String
+  codeHash   String
+  expiresAt  DateTime
+  sentAt     DateTime
+  attempts   Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, purpose])
 }
 
 model Workspace {

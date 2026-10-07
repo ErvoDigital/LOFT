@@ -20,26 +20,29 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = useCallback(async (email, password) => {
-    const { token, user } = await authApi.login(email, password);
-    localStorage.setItem("loft_token", token);
-    setUser(user);
-    return user;
+  const completeAuthentication = useCallback((result) => {
+    if (result.token && result.user) {
+      localStorage.setItem("loft_token", result.token);
+      setUser(result.user);
+    }
+    return result;
   }, []);
+
+  const login = useCallback(async (email, password) => {
+    return completeAuthentication(await authApi.login(email, password));
+  }, [completeAuthentication]);
+
+  const verifyTwoFactor = useCallback(async (challengeId, code) => {
+    return completeAuthentication(await authApi.verifyTwoFactor(challengeId, code));
+  }, [completeAuthentication]);
 
   const register = useCallback(async (firstName, lastName, email, phone, password) => {
-    const { token, user } = await authApi.register(firstName, lastName, email, phone, password);
-    localStorage.setItem("loft_token", token);
-    setUser(user);
-    return user;
-  }, []);
+    return completeAuthentication(await authApi.register(firstName, lastName, email, phone, password));
+  }, [completeAuthentication]);
 
   const loginWithGoogle = useCallback(async (credential) => {
-    const { token, user } = await authApi.googleLogin(credential);
-    localStorage.setItem("loft_token", token);
-    setUser(user);
-    return user;
-  }, []);
+    return completeAuthentication(await authApi.googleLogin(credential));
+  }, [completeAuthentication]);
 
   const logout = useCallback(() => {
     localStorage.removeItem("loft_token");
@@ -47,7 +50,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, login, register, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, setUser, loading, login, register, loginWithGoogle, verifyTwoFactor, logout }}>
       {children}
     </AuthContext.Provider>
   );

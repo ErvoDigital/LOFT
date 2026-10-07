@@ -23,6 +23,7 @@ function Outcome({ result }) {
       </span>
     );
   }
+  if (result.emailError) return <span className="text-amber-700 dark:text-amber-300">Email failed. Try sending the invite again.</span>;
   if (result.notified) return <span className="text-ink-500 dark:text-ink-300">Not emailed, but notified in LOFT</span>;
   return <span className="text-amber-700 dark:text-amber-300">Not emailed. Copy their link from Pending invites</span>;
 }

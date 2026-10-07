@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import AuthLayout from "../components/common/AuthLayout.jsx";
 import GoogleSignInButton from "../components/common/GoogleSignInButton.jsx";
 import PasswordInput from "../components/common/PasswordInput.jsx";
+import TwoFactorForm from "../components/common/TwoFactorForm.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { apiErrorMessage } from "../api/client.js";
 
@@ -14,6 +15,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [challenge, setChallenge] = useState(null);
   const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
@@ -22,14 +24,30 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
-      navigate(location.state?.from || "/", { replace: true });
+      finishSignIn(await login(email, password));
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {
       setLoading(false);
     }
   }
+
+  function finishSignIn(result) {
+    if (result.twoFactorRequired) {
+      setPassword("");
+      setChallenge(result);
+    } else {
+      navigate(location.state?.from || "/", { replace: true });
+    }
+  }
+
+  if (challenge) return (
+    <AuthLayout title="Verify your sign-in" subtitle="One more step to access your account">
+      <TwoFactorForm challenge={challenge}
+        onVerified={() => navigate(location.state?.from || "/", { replace: true })}
+        onCancel={() => { setChallenge(null); setError(""); }} />
+    </AuthLayout>
+  );
 
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to your LOFT workspace">
@@ -55,7 +73,7 @@ export default function Login() {
       <div className="my-5">
         <GoogleSignInButton
           onCredential={loginWithGoogle}
-          onSuccess={() => navigate(location.state?.from || "/", { replace: true })}
+          onSuccess={finishSignIn}
           onError={setError}
         />
       </div>

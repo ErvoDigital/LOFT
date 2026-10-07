@@ -11,7 +11,7 @@ export default function ChangePasswordModal({ open, onClose, onDone, email, hasP
   const [step, setStep] = useState("sending"); // sending | verify | reset | done
   const [error, setError] = useState("");
   const [code, setCode] = useState("");
-  const [devCode, setDevCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -21,7 +21,7 @@ export default function ChangePasswordModal({ open, onClose, onDone, email, hasP
     setStep("sending");
     setError("");
     setCode("");
-    setDevCode("");
+    setCodeSent(false);
     setNewPassword("");
     setConfirmPassword("");
     sendCode();
@@ -32,8 +32,8 @@ export default function ChangePasswordModal({ open, onClose, onDone, email, hasP
     setError("");
     setBusy(true);
     try {
-      const res = await usersApi.sendPasswordChangeCode();
-      setDevCode(res.code || "");
+      await usersApi.sendPasswordChangeCode();
+      setCodeSent(true);
       setStep("verify");
     } catch (err) {
       setError(apiErrorMessage(err));
@@ -84,18 +84,14 @@ export default function ChangePasswordModal({ open, onClose, onDone, email, hasP
 
       {step === "verify" && (
         <form onSubmit={verifyCode} className="space-y-3">
-          <p className="text-sm text-ink-500">Enter the 6-digit code we sent to {email}.</p>
-          {devCode && (
-            <p className="rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
-              No email provider is configured yet, so here's your code directly: <strong>{devCode}</strong>
-            </p>
-          )}
+          <p className="text-sm text-ink-500">{codeSent ? `Enter the 6-digit code emailed to ${email}. Check your spam folder too.` : "Request a code to continue."}</p>
           <input
             className="input text-center text-lg tracking-[0.5em]"
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
             maxLength={6}
             inputMode="numeric"
+            autoComplete="one-time-code"
             autoFocus
             required
           />
@@ -103,7 +99,7 @@ export default function ChangePasswordModal({ open, onClose, onDone, email, hasP
             <button type="button" onClick={sendCode} disabled={busy} className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline">
               Resend code
             </button>
-            <button type="submit" disabled={busy || code.length !== 6} className="btn-primary">
+            <button type="submit" disabled={busy || !codeSent || code.length !== 6} className="btn-primary">
               {busy ? "Verifying…" : "Verify"}
             </button>
           </div>

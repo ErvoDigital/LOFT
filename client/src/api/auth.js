@@ -7,6 +7,10 @@ export const register = (firstName, lastName, email, phone, password) =>
     .post("/auth/register", { name: `${firstName} ${lastName}`.trim(), firstName, lastName, email, phone, password })
     .then((r) => r.data);
 export const googleLogin = (credential) => api.post("/auth/google", { credential }).then((r) => r.data);
+export const verifyTwoFactor = (challengeId, code) =>
+  api.post("/auth/2fa/verify", { challengeId, code }).then((r) => r.data);
+export const resendTwoFactor = (challengeId) =>
+  api.post("/auth/2fa/resend", { challengeId }).then((r) => r.data);
 export const fetchMe = () => api.get("/auth/me").then((r) => r.data.user);
 export const forgotPassword = (email) => api.post("/auth/forgot-password", { email }).then((r) => r.data);
 export const resetPassword = (token, password) =>

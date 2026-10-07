@@ -1,5 +1,4 @@
 import { z } from "zod";
-import crypto from "crypto";
 import { prisma } from "../db/prisma.js";
 import { hashPassword } from "../utils/password.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -9,6 +8,7 @@ import { publicUser } from "../utils/publicUser.js";
 import { findFollowRow, followState } from "./follows.controller.js";
 import { imageDataUrlSchema } from "../utils/imageDataUrl.js";
 import { fullName } from "../utils/userName.js";
+import { issueEmailChallenge, verifyEmailChallenge } from "../services/emailChallenge.service.js";
 
 // Blank clears the field.
 const optionalNamePart = z
@@ -29,29 +29,14 @@ const updateSchema = z.object({
   avatarUrl: imageDataUrlSchema,
 });
 
-const verifyPasswordCodeSchema = z.object({ code: z.string().length(6) });
+const verifyPasswordCodeSchema = z.object({ code: z.string().regex(/^\d{6}$/) });
 
 const changePasswordSchema = z.object({
-  code: z.string().length(6),
+  code: z.string().regex(/^\d{6}$/),
   newPassword: z.string().min(8).max(200),
 });
 
 const linkGoogleSchema = z.object({ credential: z.string().min(1) });
-
-const PASSWORD_CODE_TTL_MS = 10 * 60 * 1000;
-
-function generateCode() {
-  return String(crypto.randomInt(0, 1000000)).padStart(6, "0");
-}
-
-function isCodeValid(user, code) {
-  return Boolean(
-    user.passwordChangeCode &&
-      user.passwordChangeCode === code &&
-      user.passwordChangeCodeExpiry &&
-      user.passwordChangeCodeExpiry > new Date()
-  );
-}
 
 export async function updateProfile(req, res) {
   const data = updateSchema.parse(req.body);
@@ -65,48 +50,31 @@ export async function updateProfile(req, res) {
   res.json({ user: publicUser(user) });
 }
 
-// Changing (or, for a Google-only account, setting) a password is gated on
-// emailing a 6-digit code rather than the current password — no email
-// provider is wired up yet (see server/.env.example's GOOGLE_CLIENT_ID
-// neighbors for the pattern to follow), so for now the code also goes out
-// as an in-app notification, the one delivery channel that already works,
-// and — like forgotPassword below — is returned directly in the response
-// outside production so the flow is testable without one.
+// Password changes require access to the account's mailbox. Never expose
+// the code in notifications or API responses, including in development.
 export async function sendPasswordChangeCode(req, res) {
   const user = await prisma.user.findUnique({ where: { id: req.userId } });
-  const code = generateCode();
-  await prisma.user.update({
-    where: { id: req.userId },
-    data: { passwordChangeCode: code, passwordChangeCodeExpiry: new Date(Date.now() + PASSWORD_CODE_TTL_MS) },
-  });
-
-  await notify(req.userId, {
-    type: "PASSWORD_CHANGE_CODE",
-    title: "Password change verification code",
-    body: `Your code is ${code}. It expires in 10 minutes.`,
-  });
-
-  const devOnly = process.env.NODE_ENV !== "production" ? { code } : {};
-  res.json({ message: `A verification code was sent to ${user.email}.`, ...devOnly });
+  if (!user) throw new ApiError(404, "User not found");
+  await issueEmailChallenge(user, "PASSWORD_CHANGE");
+  res.json({ message: `A verification code was sent to ${user.email}.` });
 }
 
 export async function verifyPasswordChangeCode(req, res) {
   const { code } = verifyPasswordCodeSchema.parse(req.body);
-  const user = await prisma.user.findUnique({ where: { id: req.userId } });
-  if (!isCodeValid(user, code)) throw new ApiError(400, "That code is invalid or has expired");
+  await verifyEmailChallenge({ userId: req.userId, purpose: "PASSWORD_CHANGE", code, consume: false });
   res.json({ verified: true });
 }
 
 export async function changePassword(req, res) {
   const { code, newPassword } = changePasswordSchema.parse(req.body);
   const user = await prisma.user.findUnique({ where: { id: req.userId } });
-  if (!isCodeValid(user, code)) throw new ApiError(400, "That code is invalid or has expired");
-
   const passwordHash = await hashPassword(newPassword);
+  await verifyEmailChallenge({ userId: req.userId, purpose: "PASSWORD_CHANGE", code });
   const updated = await prisma.user.update({
     where: { id: req.userId },
     data: { passwordHash, passwordChangeCode: null, passwordChangeCodeExpiry: null },
   });
+  await prisma.emailChallenge.deleteMany({ where: { userId: req.userId, purpose: "LOGIN" } });
   res.json({ message: user.passwordHash ? "Password updated" : "Password set", user: publicUser(updated) });
 }
 

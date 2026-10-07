@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import AuthLayout from "../components/common/AuthLayout.jsx";
 import * as authApi from "../api/auth.js";
 import { apiErrorMessage } from "../api/client.js";
@@ -7,19 +7,16 @@ import { apiErrorMessage } from "../api/client.js";
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
-  const [devToken, setDevToken] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const res = await authApi.forgotPassword(email);
+      await authApi.forgotPassword(email);
       setSent(true);
-      if (res.resetToken) setDevToken(res.resetToken);
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {
@@ -31,18 +28,7 @@ export default function ForgotPassword() {
     <AuthLayout title="Reset your password" subtitle="We'll send you a link to get back in">
       {sent ? (
         <div className="space-y-4 text-center">
-          <p className="text-sm text-ink-600 dark:text-ink-200">If an account exists for {email}, a reset link has been generated.</p>
-          {devToken && (
-            <div className="rounded-lg bg-accent-50 px-3 py-2 text-left text-xs text-accent-600 dark:bg-accent-500/15 dark:text-accent-400">
-              <p className="mb-1 font-medium">Dev mode — no email service configured:</p>
-              <button
-                className="font-medium text-brand-600 dark:text-brand-400 hover:underline"
-                onClick={() => navigate(`/reset-password?token=${devToken}`)}
-              >
-                Click here to continue to reset
-              </button>
-            </div>
-          )}
+          <p className="text-sm text-ink-600 dark:text-ink-200">If an account exists for {email}, a reset link has been sent. Check your inbox and spam folder.</p>
           <Link to="/login" className="btn-secondary w-full">
             Back to sign in
           </Link>

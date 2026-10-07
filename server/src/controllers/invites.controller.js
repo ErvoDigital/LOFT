@@ -90,6 +90,7 @@ export async function sendInvites(req, res) {
     }
 
     let emailed = false;
+    let emailError;
     if (emailEnabled) {
       try {
         await sendMail({
@@ -104,11 +105,11 @@ export async function sendInvites(req, res) {
         });
         emailed = true;
       } catch (err) {
-        console.error(`invite email to ${email} failed`, err);
+        emailError = err.message;
       }
     }
 
-    return { email, status: "invited", emailed, notified: Boolean(account) };
+    return { email, status: "invited", emailed, notified: Boolean(account), ...(emailError ? { emailError } : {}) };
   }
 
   const results = [];

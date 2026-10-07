@@ -4,6 +4,7 @@ import AuthLayout from "../components/common/AuthLayout.jsx";
 import GoogleSignInButton from "../components/common/GoogleSignInButton.jsx";
 import PasswordInput from "../components/common/PasswordInput.jsx";
 import TermsModal from "../components/common/TermsModal.jsx";
+import TwoFactorForm from "../components/common/TwoFactorForm.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { apiErrorMessage } from "../api/client.js";
 
@@ -20,6 +21,7 @@ export default function Register() {
   const [termsOpen, setTermsOpen] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [challenge, setChallenge] = useState(null);
   const { register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
@@ -32,14 +34,30 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      await register(firstName.trim(), lastName.trim(), email, phone, password);
-      navigate(returnTo, { replace: true });
+      finishSignIn(await register(firstName.trim(), lastName.trim(), email, phone, password));
     } catch (err) {
       setError(apiErrorMessage(err));
     } finally {
       setLoading(false);
     }
   }
+
+  function finishSignIn(result) {
+    if (result.twoFactorRequired) {
+      setPassword("");
+      setConfirmPassword("");
+      setChallenge(result);
+    } else {
+      navigate(returnTo, { replace: true });
+    }
+  }
+
+  if (challenge) return (
+    <AuthLayout title="Verify your email" subtitle="Your account is ready. Confirm your email to continue.">
+      <TwoFactorForm challenge={challenge} onVerified={() => navigate(returnTo, { replace: true })}
+        onCancel={() => navigate("/login", { state: location.state })} />
+    </AuthLayout>
+  );
 
   return (
     <AuthLayout title="Sign up" subtitle="Let's get you all set up so you can access your workspace">
@@ -108,7 +126,7 @@ export default function Register() {
       <div className="my-5">
         <GoogleSignInButton
           onCredential={loginWithGoogle}
-          onSuccess={() => navigate(returnTo, { replace: true })}
+          onSuccess={finishSignIn}
           onError={setError}
         />
       </div>
