@@ -11,9 +11,9 @@ export default defineConfig({
         source: "realtime/src/index.js",
         env: {
           JWT_SECRET: process.env.JWT_SECRET,
-          CLIENT_URL: process.env.CLIENT_URL,
+          CLIENT_URL: process.env.CLIENT_URL ?? "https://app.loft-client.site",
           REALTIME_ALLOWED_ORIGINS: process.env.REALTIME_ALLOWED_ORIGINS
-            ?? "https://www.loft-client.site,https://loft-client.site,https://loft-client.vercel.app",
+            ?? "https://app.loft-client.site,https://www.loft-client.site,https://loft-client.site,https://loft-client.vercel.app",
         },
       },
     },

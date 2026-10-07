@@ -1,6 +1,6 @@
 # Custom domain storage and realtime access
 
-The production client uses `https://www.loft-client.site`. Moving the client to a custom domain also requires updating the origins allowed by S3 and the realtime function.
+The production client uses `https://app.loft-client.site`. Moving the client to a custom domain also requires updating the origins allowed by S3 and the realtime function.
 
 ## S3 preview and download
 
@@ -18,23 +18,25 @@ The deployed realtime endpoint returned HTTP 403 to a WebSocket upgrade with ori
 
 Rechecked on 2026-10-06: WebSocket upgrade requests from both `https://www.loft-client.site` and `https://loft-client.site` returned HTTP 403. The same request from `https://loft-client.vercel.app` without a token returned HTTP 401, showing that the old origin passes the origin check and reaches JWT authentication. This blocks chat sends, meeting starts, and other realtime features on the custom domain.
 
-The updated `realtime/src/index.js` accepts `CLIENT_URL` plus the comma-separated `REALTIME_ALLOWED_ORIGINS` list, matched against exact HTTP/HTTPS origins. `neon.ts` supplies both custom-domain variants and the existing Vercel origin by default. Redeploy the **Neon realtime function** from this updated source; deploying the Vercel client alone does not apply the origin fix. The explicit production environment settings are:
+The updated `realtime/src/index.js` accepts `CLIENT_URL` plus the comma-separated `REALTIME_ALLOWED_ORIGINS` list, matched against exact HTTP/HTTPS origins. `neon.ts` defaults to the app subdomain and includes the existing custom-domain and Vercel origins. Redeploy the **Neon realtime function** from this updated source; deploying the Vercel client alone does not apply the origin fix. The explicit production environment settings are:
 
 ```env
-CLIENT_URL=https://www.loft-client.site
-REALTIME_ALLOWED_ORIGINS=https://www.loft-client.site,https://loft-client.site,https://loft-client.vercel.app
+CLIENT_URL=https://app.loft-client.site
+REALTIME_ALLOWED_ORIGINS=https://app.loft-client.site,https://www.loft-client.site,https://loft-client.site,https://loft-client.vercel.app
 ```
 
 Apply/redeploy the function so the running instance receives the new value. `neon.ts` sources this value from the deployment environment's `CLIENT_URL`. Keep the local Express server's `CLIENT_URL=http://localhost:5173` for local development. The production Vercel API's `CLIENT_URL` should also match the custom client origin.
+
+On 2026-10-08, the local Neon configuration and `client/.env` were updated for `https://app.loft-client.site`. A live unauthenticated WebSocket probe still returned HTTP 403 for the app subdomain, while `https://www.loft-client.site` returned HTTP 401 (the origin check passed). Applying the live change requires a Neon login or API key; no usable local Neon CLI credential was present. Until deployment is verified, the local configuration does not establish that the live function accepts the new origin.
 
 Deploy the updated Vercel client for draft preservation, acknowledgement timeouts, reconnect recovery, and visible connection errors. The client now clears a draft only after a successful send acknowledgement. It does not replay uncertain requests automatically, since they may already have been saved. Meeting join failures return to the lobby; an interrupted call releases the camera/microphone and asks the user to rejoin.
 
 As of 2026-10-06, this repository has no `.github/workflows` deployment definition. GitHub's latest `main` checks/deployments show automatic Vercel deployments for `loft-client` and `loft-server`, with no Neon realtime deployment listed. A push that redeploys those Vercel projects does not establish that Neon received the updated source or environment. Run the separate Neon deployment through its configured deployment provider/account and verify the upgrade afterward.
 
-The local Vite realtime proxy must send the origin accepted by the deployed function; if the production function's accepted origin changes, set local `VITE_REALTIME_PROXY_ORIGIN=https://www.loft-client.site` and restart Vite.
+The local Vite realtime proxy must send the origin accepted by the deployed function; if the production function's accepted origin changes, set local `VITE_REALTIME_PROXY_ORIGIN=https://app.loft-client.site` and restart Vite.
 
 ## Verify
 
-Refresh the client and request a new download link; links expire after five minutes. Confirm the S3 response includes `Access-Control-Allow-Origin: https://www.loft-client.site`, and the realtime connection returns HTTP 101. Do not copy signed URLs or authentication tokens into diagnostics that are published or committed.
+Refresh the client and request a new download link; links expire after five minutes. Confirm the S3 response includes `Access-Control-Allow-Origin: https://app.loft-client.site`, and the realtime connection returns HTTP 101. Do not copy signed URLs or authentication tokens into diagnostics that are published or committed.
 
 The pasted upload HTTP 400 is a separate request. The deployed authenticated asset-list GET returned HTTP 200. Inspect the failed upload response body for its validation error before changing upload behavior.
