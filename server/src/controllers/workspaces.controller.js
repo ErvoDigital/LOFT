@@ -78,7 +78,7 @@ export async function listMyWorkspaces(req, res) {
     },
     orderBy: { createdAt: "asc" },
   });
-  res.json({ workspaces: workspaces.map(workspaceSummary) });
+  res.json({ workspaces: workspaces.map((workspace) => workspaceSummary(workspace)) });
 }
 
 export async function createWorkspace(req, res) {

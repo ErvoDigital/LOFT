@@ -1,6 +1,7 @@
 import "express-async-errors";
 import express from "express";
 import cors from "cors";
+import { clientOrigins } from "./config/clientOrigins.js";
 
 import authRoutes from "./routes/auth.routes.js";
 import usersRoutes from "./routes/users.routes.js";
@@ -24,7 +25,18 @@ import { notFoundHandler, errorHandler } from "./middleware/error.js";
 export function createApp() {
   const app = express();
 
-  app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
+  // API responses contain account-specific data. Send a full response even
+  // when an old browser cache supplies validators from before an origin change.
+  app.disable("etag");
+  app.use("/api", (req, res, next) => {
+    res.setHeader("Cache-Control", "private, no-store");
+    if (req.method === "GET" || req.method === "HEAD") {
+      delete req.headers["if-none-match"];
+      delete req.headers["if-modified-since"];
+    }
+    next();
+  });
+  app.use(cors({ origin: clientOrigins(), credentials: true }));
   app.use(express.json({ limit: "2mb" })); // avatar uploads are data URIs in the JSON body
 
   app.get("/api/health", (req, res) => res.json({ status: "ok" }));

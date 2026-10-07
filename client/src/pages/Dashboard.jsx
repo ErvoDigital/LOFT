@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AlarmClock, CalendarClock, ListChecks, Plus, ShieldCheck, Video } from "lucide-react";
 import * as dashboardApi from "../api/dashboard.js";
+import { apiErrorMessage } from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketContext.jsx";
 import { useWorkspaces } from "../context/WorkspaceContext.jsx";
@@ -20,6 +21,20 @@ import WorkspaceModal from "../components/layout/WorkspaceModal.jsx";
 
 // The server caps the pending-task list; past it the count is a floor.
 const PENDING_TASK_CAP = 50;
+
+function LoadError({ title, message, onRetry, retrying }) {
+  return (
+    <section role="alert" className="card flex flex-wrap items-center justify-between gap-4 p-5">
+      <div>
+        <h2 className="text-sm font-semibold text-ink-800 dark:text-ink-100">{title}</h2>
+        <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">{message}</p>
+      </div>
+      <button type="button" className="btn btn-secondary" onClick={onRetry} disabled={retrying}>
+        {retrying ? "Retrying…" : "Try again"}
+      </button>
+    </section>
+  );
+}
 
 function greeting() {
   const h = new Date().getHours();
@@ -216,20 +231,37 @@ function buildMetrics({ today, pendingTasks, upcomingEvents }) {
 export default function Dashboard() {
   const { user } = useAuth();
   const { socket } = useSocket();
-  const { workspaces } = useWorkspaces();
+  const { workspaces, loading: workspacesLoading, error: workspacesError, refresh: refreshWorkspaces } = useWorkspaces();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const requestId = useRef(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
   const navigate = useNavigate();
 
-  const load = useCallback(() => {
-    dashboardApi.getDashboard().then(setData).finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    const currentRequest = ++requestId.current;
+    setLoading(true);
+    try {
+      const result = await dashboardApi.getDashboard();
+      if (currentRequest === requestId.current) {
+        setData(result);
+        setError(null);
+      }
+    } catch (err) {
+      if (currentRequest === requestId.current) setError(apiErrorMessage(err));
+    } finally {
+      if (currentRequest === requestId.current) setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     load();
+    return () => { requestId.current++; };
   }, [load]);
+
+  const retryWorkspaces = () => refreshWorkspaces().catch(() => {});
 
   useEffect(() => {
     if (!socket) return;
@@ -274,7 +306,15 @@ export default function Dashboard() {
   // the layout is being edited, so it can still be placed.
   const isAvailable = useCallback((id, editing) => id !== "clashes" || editing || conflictCount > 0, [conflictCount]);
 
-  if (loading) {
+  if (workspacesError && workspaces.length === 0) {
+    return (
+      <div className="p-4 sm:p-6">
+        <LoadError title="Couldn't load your workspaces" message={workspacesError} onRetry={retryWorkspaces} retrying={workspacesLoading} />
+      </div>
+    );
+  }
+
+  if ((workspacesLoading && workspaces.length === 0) || (loading && !data)) {
     return (
       <div className="flex h-full items-center justify-center">
         <Spinner />
@@ -301,6 +341,18 @@ export default function Dashboard() {
             <Plus className="h-4 w-4" /> Add your first workspace
           </button>
         </section>
+        <WorkspaceModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="p-4 sm:p-6">
+        <LoadError title="Couldn't load your dashboard" message={error} onRetry={load} retrying={loading} />
+        <div className="mt-5">
+          <WorkspaceList workspaces={workspaces} openTasksById={openTasksById} meetingsById={meetingsById} onAdd={() => setModalOpen(true)} />
+        </div>
         <WorkspaceModal open={modalOpen} onClose={() => setModalOpen(false)} />
       </div>
     );
@@ -387,6 +439,16 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 sm:p-6">
+      {(workspacesError || error) && (
+        <div className="mb-5">
+          <LoadError
+            title={workspacesError ? "Couldn't refresh your workspaces" : "Couldn't refresh your dashboard"}
+            message={workspacesError || error}
+            onRetry={workspacesError ? retryWorkspaces : load}
+            retrying={workspacesError ? workspacesLoading : loading}
+          />
+        </div>
+      )}
       <CustomizableDashboard key={user?.id} userId={user?.id} render={renderWidget} isAvailable={isAvailable} />
       <WorkspaceModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </div>

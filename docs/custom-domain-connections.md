@@ -2,6 +2,23 @@
 
 The production client uses `https://app.loft-client.site`. Moving the client to a custom domain also requires updating the origins allowed by S3 and the realtime function.
 
+## Workspace and assistant API access
+
+On 2026-10-08, the browser reported blocked `/api/workspaces` and `/api/assistant/status` requests from `https://app.loft-client.site`: their HTTP 304 responses carried `Access-Control-Allow-Origin: https://www.loft-client.site`. Fresh unauthenticated requests to both endpoints returned the app origin when checked afterward, so the stale responses must also be bypassed when verifying the fix.
+
+In Vercel's **loft-server** project, set **Production** `CLIENT_URL=https://app.loft-client.site` and redeploy the server. Changing local `server/.env` does not update Vercel. To retain additional browser origins, configure the optional comma-separated `CLIENT_ALLOWED_ORIGINS`, for example:
+
+```env
+CLIENT_URL=https://app.loft-client.site
+CLIENT_ALLOWED_ORIGINS=https://www.loft-client.site,https://loft-client.site,https://loft-client.vercel.app
+```
+
+The server now always includes the app origin and matches it, `CLIENT_URL`, and any additional configured origins exactly. An allowed request receives its own origin in the response, with `Vary: Origin`; unrelated domains receive no CORS allow header. See the [Express CORS configuration](https://expressjs.com/en/resources/middleware/cors/).
+
+API responses use `Cache-Control: private, no-store`, disable generated ETags, and ignore GET/HEAD cache validators so a saved response from before the domain change cannot turn into another HTTP 304. See [HTTP caching](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching). Deploy the server changes, then open browser DevTools, enable **Disable cache** in Network, and reload the app. Confirm the authenticated workspace request returns HTTP 200 with `Access-Control-Allow-Origin: https://app.loft-client.site` and the existing workspace list. The client changes show an error and retry action if that request fails.
+
+This repair changes HTTP origin and caching behavior; existing workspace memberships and data need no database migration.
+
 ## S3 preview and download
 
 On 2026-10-06, a fresh signed GET for the PDF reported by the user returned HTTP 200 for both tested origins. S3 returned `Access-Control-Allow-Origin` for `https://loft-client.vercel.app`, but omitted it for `https://www.loft-client.site`. This prevents browser preview and download on the custom domain even though the object and read permission are valid.
