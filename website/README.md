@@ -28,4 +28,8 @@ Every “Try for free” and “Log in” link opens `/login` on the origin conf
 
 ## Product content
 
-Shared feature descriptions, frequently asked questions, and page metadata live in `src/data/product.ts`. The product preview is illustrative and uses sample data; it never reads or writes real workspace data. Copy describes implemented LOFT features. Assistant and speech features are described as conditional on deployment configuration. The pricing page describes current free access, since billing and paid-tier limits have not been implemented.
+Shared feature descriptions, frequently asked questions, and page metadata live in `src/data/product.ts`. The homepage sandbox follows the app's emerald palette, personal navigation rail, contextual workspace menus, and light/dark themes. Its shared sample data supports task creation and editing, drag-and-drop status changes, cross-workspace conflict review, event scheduling, channel and direct messages, document editing, and local file uploads with version history. Task and event changes also update the dashboard and My Plan. Meetings simulate joining, camera/microphone controls, and screen sharing without requesting device access.
+
+Sandbox changes and uploaded files exist only in memory for the current page session. Reset demo restores the sample workspaces. The sandbox never reads or writes real workspace data and needs no backend. Its implementation lives in `src/components/ProductPreview.tsx` and `src/components/sandbox/`.
+
+Copy describes implemented LOFT features. Assistant and speech features are described as conditional on deployment configuration. The pricing page describes current free access, since billing and paid-tier limits have not been implemented.
