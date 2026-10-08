@@ -1,4 +1,4 @@
-import { LOGIN_URL } from "../config";
+import { REGISTER_URL } from "../config";
 import { Brand } from "./Marketing";
 
 export function Footer() {
@@ -19,13 +19,13 @@ export function Footer() {
             <h2>Product</h2>
             <a href="#/features">Explore features</a>
             <a href="#/pricing">Pricing & Beta</a>
-            <a href={LOGIN_URL}>Try open beta</a>
+            <a href={REGISTER_URL}>Try open beta</a>
           </nav>
           <nav aria-label="About links">
             <h2>LOFT</h2>
             <a href="#/about">About LOFT</a>
             <a href="#/features">Workspaces & collaboration</a>
-            <a href={LOGIN_URL}>Log in to your account</a>
+            <a href={REGISTER_URL}>Create your account</a>
           </nav>
         </div>
         <div className="footer-bottom">

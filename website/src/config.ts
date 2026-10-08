@@ -4,3 +4,4 @@ const appUrl =
   import.meta.env.VITE_LOFT_APP_URL?.trim() || "https://app.loft-client.site";
 
 export const LOGIN_URL = `${appUrl.replace(/\/+$/, "")}/login`;
+export const REGISTER_URL = `${appUrl.replace(/\/+$/, "")}/register`;

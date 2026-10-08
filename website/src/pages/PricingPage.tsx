@@ -117,8 +117,8 @@ export function PricingPage() {
               How do I create an account?<span aria-hidden="true">+</span>
             </summary>
             <p>
-              Choose “Try the open beta” to open the LOFT login page, then use the
-              registration link. You can sign in with a password or Google and
+              Choose “Try the open beta” to open the LOFT registration page and
+              create your account. You can sign in with a password or Google and
               complete email verification.
             </p>
           </details>

@@ -250,7 +250,7 @@ export const FAQS = [
   {
     question: "What does “Try for free” open?",
     answer:
-      "It opens the LOFT login page to access the open beta. Sign in with your existing account, or choose the registration link to create a new account. LOFT verifies sign-in with an emailed code.",
+      "It opens the LOFT registration page to create an account and access the open beta. If you already have an account, use Log in in the navigation bar. LOFT verifies sign-in with an emailed code.",
   },
   {
     question: "Do my teams see each other’s work?",

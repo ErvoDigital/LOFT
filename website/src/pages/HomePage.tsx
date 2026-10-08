@@ -227,7 +227,7 @@ export function HomePage() {
             {
               title: "Create your account",
               description:
-                "Open LOFT, register from the login page, and verify your sign-in with the code sent to your email.",
+                "Open LOFT, create your account on the registration page, and verify your sign-in with the code sent to your email.",
             },
             {
               title: "Bring in your people",

@@ -21,7 +21,7 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { LOGIN_URL } from "../config";
+import { REGISTER_URL } from "../config";
 import {
   Dialog,
   AssetDetails,
@@ -484,7 +484,7 @@ export function ProductPreview() {
         <span>
           Explore with sample data. Sign in to bring your own teams together.
         </span>
-        <a href={LOGIN_URL}>Open LOFT</a>
+        <a href={REGISTER_URL}>Open LOFT</a>
       </figcaption>
       <span
         className="ls-sr-only"

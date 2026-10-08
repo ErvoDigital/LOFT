@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
-import { LOGIN_URL } from "../config";
+import { REGISTER_URL } from "../config";
 import type { FEATURES } from "../data/product";
 
 export function Brand() {
@@ -23,7 +23,7 @@ export function GetStartedLink({
   className?: string;
 }) {
   return (
-    <a href={LOGIN_URL} className={`button button-primary ${className}`}>
+    <a href={REGISTER_URL} className={`button button-primary ${className}`}>
       {children}
       <ArrowRight size={16} aria-hidden="true" />
     </a>
