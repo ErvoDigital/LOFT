@@ -35,7 +35,7 @@ export function FeaturesPage() {
   return (
     <>
       <section className="container page-hero">
-        <p className="eyebrow">The LOFT service · Free Beta</p>
+        <p className="eyebrow">The LOFT service · Open Beta</p>
         <h1>
           Everything your teams need.
           <br />
@@ -91,7 +91,7 @@ export function FeaturesPage() {
               "Understand Smart Priority and schedule clashes",
               "Review Lofty's proposals for new tasks and meetings",
               "Prepare a meeting draft for details you’ll add later",
-              "Use text, or push-to-talk voice when speech is configured",
+              "Use text, or tap-to-talk voice when speech is configured",
             ].map((item) => (
               <p key={item}>
                 <CheckCircle2 size={17} aria-hidden="true" />

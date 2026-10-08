@@ -38,9 +38,9 @@ export const PAGES: {
   {
     id: "pricing",
     label: "Pricing",
-    title: "LOFT pricing — Free Beta & Upcoming Freemium Release",
+    title: "LOFT pricing — Open Beta & Upcoming Freemium Release",
     description:
-      "LOFT is currently in free beta with all workspace features unlocked. Experience the platform now ahead of our freemium official release.",
+      "LOFT is currently in open beta with all workspace features unlocked. Experience the platform now ahead of our freemium official release.",
   },
   {
     id: "about",
@@ -245,12 +245,12 @@ export const FAQS = [
   {
     question: "Is LOFT free to use?",
     answer:
-      "Yes. LOFT is currently in free beta with all workspace features unlocked. When officially released, LOFT will feature a freemium model with a generous free tier alongside premium plans for advanced team and organizational needs.",
+      "Yes. LOFT is currently in open beta with all workspace features unlocked. When officially released, LOFT will feature a freemium model with a generous free tier alongside premium plans for advanced team and organizational needs.",
   },
   {
     question: "What does “Try for free” open?",
     answer:
-      "It opens the LOFT login page to access the free beta. Sign in with your existing account, or choose the registration link to create a new account. LOFT verifies sign-in with an emailed code.",
+      "It opens the LOFT login page to access the open beta. Sign in with your existing account, or choose the registration link to create a new account. LOFT verifies sign-in with an emailed code.",
   },
   {
     question: "Do my teams see each other’s work?",

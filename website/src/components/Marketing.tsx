@@ -81,15 +81,15 @@ export function StartSection() {
     <section className="container section">
       <div className="start-panel">
         <div>
-          <p className="eyebrow">Free Beta · Make room for what matters</p>
+          <p className="eyebrow">Open Beta · Make room for what matters</p>
           <h2>Bring your teams into LOFT.</h2>
           <p>
-            Experience the free beta today with all features and Lofty, our AI
+            Experience the open beta today with all features and Lofty, our AI
             assistant. LOFT will feature a freemium model upon official release.
           </p>
         </div>
         <GetStartedLink className="shrink-0">
-          Try the free beta
+          Try the open beta
         </GetStartedLink>
       </div>
     </section>

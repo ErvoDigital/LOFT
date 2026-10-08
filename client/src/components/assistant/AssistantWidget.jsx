@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
 import WorkspaceMark from "../common/WorkspaceMark.jsx";
 import VoiceAssistant from "./VoiceAssistant.jsx";
+import VoiceOrb from "./VoiceOrb.jsx";
 import { createAssistantAudio } from "../../utils/assistantAudio.js";
 import { assistantStatus, sendAssistantMessage, confirmAssistantAction, speakAssistantReply, transcribeAssistantAudio } from "../../api/assistant.js";
 import { apiErrorMessage } from "../../api/client.js";
@@ -25,7 +26,7 @@ const hasBottomControls = (pathname) => /\/(chat|meeting)$/.test(pathname);
 
 let nextId = 0;
 const MAX_RECORDING_MS = 30000;
-const NO_SPEECH = "I didn't catch that. Hold M and try again.";
+const NO_SPEECH = "I didn't catch that. Tap Ask again or hold M to try again.";
 
 // Conversation history stays in memory; tools and confirmations run on the server.
 export default function AssistantWidget() {
@@ -62,7 +63,7 @@ export default function AssistantWidget() {
   const [transcribing, setTranscribing] = useState(false);
   const voiceEnabledRef = useRef(false);
   const voiceSessionRef = useRef(0);
-  // The hold-M voice bubble: { fromId, holding } while it's up. Messages
+  // The voice bubble: { fromId, holding, inputMode } while it's up. Messages
   // with ids above fromId are its current turn.
   const [bubble, setBubble] = useState(null);
   const bubbleHolding = useRef(false);
@@ -180,7 +181,7 @@ export default function AssistantWidget() {
     if (!AudioContext) return;
     try {
       audioContextRef.current ||= new AudioContext();
-      // Called directly by keydown / Play, before asynchronous work starts.
+      // Called directly by a key press or tap, before asynchronous work starts.
       return audioContextRef.current.resume().catch(() => {});
     } catch { /* The audio element still offers Play if Web Audio is unavailable. */ }
   }
@@ -253,11 +254,12 @@ export default function AssistantWidget() {
     void playReply(message.content, contextVersion.current, voiceSessionRef.current, message.id);
   }
 
-  // `hold`: started by the voice bubble's hold-M, which may already have been
-  // released while the microphone was opening.
-  async function beginRecording({ hold = false } = {}) {
+  // A keyboard release or Stop tap can arrive while permission is pending.
+  async function beginRecording() {
     if (!voiceEnabledRef.current || thinking || confirming || transcribing || !configured || recording) return;
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      bubbleHolding.current = false;
+      setBubble((b) => b && { ...b, holding: false });
       setVoiceError("Voice input is not supported in this browser.");
       return;
     }
@@ -269,6 +271,11 @@ export default function AssistantWidget() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (!voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || version !== contextVersion.current) {
         stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      if (!bubbleHolding.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        setVoiceError(NO_SPEECH);
         return;
       }
       mediaStreamRef.current = stream;
@@ -284,6 +291,8 @@ export default function AssistantWidget() {
         clearTimeout(recordingTimeoutRef.current);
         mediaStreamRef.current = null;
         setRecording(false);
+        bubbleHolding.current = false;
+        setBubble((b) => b && { ...b, holding: false });
         if (!voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || !chunks.length || contextVersion.current !== version) return;
         const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
         if (!blob.size) {
@@ -308,12 +317,14 @@ export default function AssistantWidget() {
       recorder.start();
       setRecording(true);
       recordingTimeoutRef.current = setTimeout(() => { if (recorder.state !== "inactive") recorder.stop(); }, MAX_RECORDING_MS);
-      if (hold && !bubbleHolding.current) recorder.stop();
     } catch {
       if (!voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || version !== contextVersion.current) return;
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
       mediaStreamRef.current = null;
+      recorderRef.current = null;
       setRecording(false);
+      bubbleHolding.current = false;
+      setBubble((b) => b && { ...b, holding: false });
       setVoiceError("Couldn't access your microphone. Check your browser permissions and try again.");
     }
   }
@@ -387,20 +398,27 @@ export default function AssistantWidget() {
   }
 
   // Voice capture/playback belongs to the bubble; both features share history.
-  function startBubbleTurn() {
+  function startBubbleTurn({ inputMode = "hold" } = {}) {
     // A question already on its way can't be cut off (send() would drop the
     // new one), but a spoken answer can: recording stops the playback.
     if (thinking || transcribing || confirming || recording || bubbleHolding.current) return false;
     setVoiceError("");
     bubbleHolding.current = true;
-    setBubble({ fromId: nextId, holding: true });
+    setBubble({ fromId: nextId, holding: true, inputMode });
     if (!configured) {
+      bubbleHolding.current = false;
+      setBubble((b) => b && { ...b, holding: false });
       setVoiceError(configured === false ? "Your team needs to finish assistant setup before Lofty can answer." : "Lofty is still starting up. Try again in a moment.");
       return true;
     }
     changeVoiceMode(true);
-    void beginRecording({ hold: true });
+    void beginRecording();
     return true;
+  }
+
+  function startTouchTurn() {
+    prepareVoicePlayback();
+    return startBubbleTurn({ inputMode: "tap" });
   }
 
   function endBubbleHold() {
@@ -408,6 +426,17 @@ export default function AssistantWidget() {
     setBubble((b) => b && { ...b, holding: false });
     stopRecording();
   }
+
+  // A tap recording has no key release. Stop when the page is hidden so it
+  // cannot keep the microphone open after switching apps or locking a phone.
+  useEffect(() => {
+    if (bubble?.inputMode !== "tap" || !bubble.holding) return;
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") endBubbleHold();
+    };
+    document.addEventListener("visibilitychange", onHidden);
+    return () => document.removeEventListener("visibilitychange", onHidden);
+  }, [bubble?.inputMode, bubble?.holding]);
 
   // Closing voice stops its devices and pending speech. The synchronized text
   // conversation remains available, including an answer still on its way.
@@ -444,13 +473,29 @@ export default function AssistantWidget() {
         aria-label="Open Lofty"
         aria-expanded={open}
         aria-controls="loft-assistant"
-        title="Lofty (or hold M to talk)"
-        className={`brand-mark absolute right-3 z-30 flex h-12 w-12 items-center justify-center rounded-full text-white shadow-glow ring-1 ring-white/20 transition-[transform,opacity,filter] duration-200 hover:-translate-y-0.5 hover:brightness-110 active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 sm:right-5 sm:h-14 sm:w-14 ${
+        title="Lofty chat"
+        style={{ "--level": 0, "--turn": 0 }}
+        className={`absolute right-3 z-30 flex h-12 w-12 items-center justify-center rounded-full transition-[transform,opacity,filter] duration-200 hover:-translate-y-0.5 hover:brightness-110 active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 sm:right-5 sm:h-14 sm:w-14 ${
           raised ? "bottom-[4.75rem] sm:bottom-24" : "bottom-3 sm:bottom-5"
         } ${open ? "invisible scale-75 opacity-0" : ""}`}
       >
-        <Sparkles className="h-5 w-5 sm:h-6 sm:w-6" />
+        <VoiceOrb state="done" className="voice-orb-launcher" />
       </button>
+
+      {!open && !bubble && (
+        <button
+          type="button"
+          onClick={startTouchTurn}
+          aria-label="Talk to Lofty"
+          title="Talk to Lofty"
+          disabled={thinking || transcribing || Boolean(confirming)}
+          className={`btn-secondary absolute right-[4.5rem] z-30 flex h-12 w-12 items-center justify-center rounded-full p-0 shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50 sm:right-[5.25rem] sm:h-14 sm:w-14 ${
+            raised ? "bottom-[4.75rem] sm:bottom-24" : "bottom-3 sm:bottom-5"
+          }`}
+        >
+          <Mic className="h-5 w-5" />
+        </button>
+      )}
 
       {open && (
         <>
@@ -478,6 +523,16 @@ export default function AssistantWidget() {
                   {configured === null ? "Checking setup" : configured ? "Ready to ask" : "Setup needed"}
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={startTouchTurn}
+                aria-label="Talk to Lofty"
+                disabled={thinking || transcribing || recording || Boolean(confirming) || Boolean(bubble?.holding)}
+                className="btn-secondary inline-flex min-h-11 shrink-0 items-center gap-1.5 px-3 text-xs disabled:opacity-50"
+              >
+                <Mic className="h-4 w-4" />
+                Talk
+              </button>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -614,7 +669,7 @@ export default function AssistantWidget() {
                 </button>
               </div>
               <p className="mt-2 text-[11px] text-ink-400 dark:text-ink-500">
-                Type for text replies. Hold M outside a text field to talk in the voice bubble.
+                Type for text replies. Tap Talk for voice, then Stop and send when you're done.<span className="hidden sm:inline"> On a keyboard, hold M outside a text field.</span>
               </p>
               <p className="mt-2 text-center text-[11px] text-ink-400 dark:text-ink-500">
                 {configured ? "Check suggestions before confirming. Chat clears when you change workspace or reload." : "Your team needs to finish assistant setup before you can send messages."}
@@ -627,6 +682,8 @@ export default function AssistantWidget() {
       <VoiceAssistant
         raised={raised}
         active={Boolean(bubble)}
+        inputMode={bubble?.inputMode}
+        canTalk={!thinking && !transcribing && !recording && !confirming && !bubble?.holding}
         phase={bubblePhase}
         heard={bubbleQuestion?.content || ""}
         reply={bubbleAnswer?.content || ""}
@@ -648,6 +705,7 @@ export default function AssistantWidget() {
         }}
         onHoldStart={startBubbleTurn}
         onHoldEnd={endBubbleHold}
+        onTalkStart={startTouchTurn}
         onSkip={stopPlayback}
         onClose={closeBubble}
       />

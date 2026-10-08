@@ -23,14 +23,14 @@ export function PricingPage() {
   return (
     <>
       <section className="container page-hero">
-        <p className="eyebrow">Free Beta Access</p>
+        <p className="eyebrow">Open Beta Access</p>
         <h1>
           Make space for your teams.
           <br />
-          <span className="text-brand">Free during public beta.</span>
+          <span className="text-brand">Free during open beta.</span>
         </h1>
         <p className="hero-description">
-          LOFT is currently in free beta, giving you full access to all workspace
+          LOFT is currently in open beta, giving you full access to all workspace
           features, cross-team conflict alerts, and Lofty, our AI assistant.
           Upon official release, LOFT will transition to a freemium model with both
           free and premium tiers.
@@ -44,7 +44,7 @@ export function PricingPage() {
             </span>
             <p className="eyebrow mt-6">Current access</p>
             <h2>LOFT</h2>
-            <p className="price-label">Free Beta</p>
+            <p className="price-label">Open Beta</p>
             <div className="pricing-beta-tag">
               <span>Freemium model at official release</span>
             </div>
@@ -53,13 +53,13 @@ export function PricingPage() {
               released, LOFT will adopt a freemium model with a free tier for everyday
               use alongside premium plans for larger teams and organizations.
             </p>
-            <GetStartedLink>Try the free beta</GetStartedLink>
+            <GetStartedLink>Try the open beta</GetStartedLink>
             <p className="text-sm muted">
               Already have an account? Sign in and pick up where you left off.
             </p>
           </div>
           <div className="pricing-included">
-            <h3>Included during free beta</h3>
+            <h3>Included during open beta</h3>
             <ul>
               {included.map((item) => (
                 <li key={item}>
@@ -86,7 +86,7 @@ export function PricingPage() {
               Is LOFT currently free to use?<span aria-hidden="true">+</span>
             </summary>
             <p>
-              Yes! LOFT is currently in free beta. You can explore all
+              Yes! LOFT is currently in open beta. You can explore all
               features — including multi-workspace collaboration and Lofty,
               our AI assistant — completely free of charge.
             </p>
@@ -108,7 +108,7 @@ export function PricingPage() {
             </summary>
             <p>
               Yes. Your workspaces, members, tasks, documents, and calendar data
-              created during the free beta will seamlessly carry over to the official
+              created during the open beta will seamlessly carry over to the official
               release under the freemium structure.
             </p>
           </details>
@@ -117,7 +117,7 @@ export function PricingPage() {
               How do I create an account?<span aria-hidden="true">+</span>
             </summary>
             <p>
-              Choose “Try the free beta” to open the LOFT login page, then use the
+              Choose “Try the open beta” to open the LOFT login page, then use the
               registration link. You can sign in with a password or Google and
               complete email verification.
             </p>

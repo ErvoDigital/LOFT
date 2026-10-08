@@ -21,7 +21,7 @@ const bundled = await build({
     name: "widget-dependencies",
     setup(builder) {
       builder.onResolve({ filter: /.*/ }, ({ path, kind }) => {
-        if (kind === "entry-point" || path === "react" || path === "react/jsx-runtime" || path.endsWith("/assistantAudio.js")) return;
+        if (kind === "entry-point" || path === "react" || path === "react/jsx-runtime" || path.endsWith("/assistantAudio.js") || path.endsWith("/VoiceOrb.jsx")) return;
         return { path, namespace: "mock" };
       });
       builder.onLoad({ filter: /.*/, namespace: "mock" }, ({ path }) => ({
@@ -45,11 +45,15 @@ async function mount(t, overrides = {}) {
   const audio = [];
   const revoked = [];
   const confirmations = [];
+  const listeners = new Map();
+  const recordingTimers = new Map();
+  const document = { visibilityState: "visible", addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: (name) => listeners.delete(name) };
   let progress;
   let recorder;
   let stoppedTracks = 0;
+  let microphoneRequests = 0;
   const api = {
-    assistantStatus: async () => ({ configured: true }),
+    assistantStatus: async () => ({ configured: overrides.configured ?? true }),
     confirmAssistantAction: async (token) => { confirmations.push(token); return { id: "saved", workspaceId: "workspace" }; },
     sendAssistantMessage: async (body, signal, onProgress) => { messages.push(body); progress = onProgress; return overrides.reply ? overrides.reply.promise : { reply: "Your summary.", actions: [] }; },
     transcribeAssistantAudio: async () => overrides.transcript ? overrides.transcript.promise : { transcript: "What is due today?" },
@@ -76,9 +80,14 @@ async function mount(t, overrides = {}) {
       "../../api/assistant.js": api,
       "../../api/client.js": { apiErrorMessage: (err) => err.message },
     },
-    document: { addEventListener() {}, removeEventListener() {} },
+    document,
     window: overrides.audioContext ? { AudioContext: class { constructor() { return overrides.audioContext; } } } : {},
-    navigator: { mediaDevices: { getUserMedia: async () => ({ getTracks: () => [{ stop: () => stoppedTracks++ }] }) } },
+    navigator: overrides.unsupported ? {} : { mediaDevices: { getUserMedia: async () => {
+      microphoneRequests++;
+      if (overrides.microphoneError) throw overrides.microphoneError;
+      if (overrides.microphone) await overrides.microphone.promise;
+      return { getTracks: () => [{ stop: () => stoppedTracks++ }] };
+    } } },
     MediaRecorder: class {
       static isTypeSupported() { return true; }
       constructor() { recorder = this; this.state = "inactive"; this.mimeType = "audio/webm"; }
@@ -101,8 +110,11 @@ async function mount(t, overrides = {}) {
     URL: { createObjectURL: () => "blob:test-audio", revokeObjectURL: (url) => revoked.push(url) },
     Blob,
     AbortController,
-    setTimeout,
-    clearTimeout,
+    setTimeout: (fn, delay) => {
+      if (overrides.captureRecordingTimer && delay === 30000) { recordingTimers.set("recording", fn); return "recording"; }
+      return setTimeout(fn, delay);
+    },
+    clearTimeout: (id) => { if (id === "recording") recordingTimers.delete(id); else clearTimeout(id); },
   });
   let view;
   await act(async () => { view = create(React.createElement(exported.exports.default)); });
@@ -117,9 +129,123 @@ async function mount(t, overrides = {}) {
   const submit = async () => { await act(async () => view.root.findByType("form").props.onSubmit({ preventDefault() {} })); };
   const startRecording = async () => { await act(async () => { bubble().onPrepareAudio(); return bubble().onHoldStart(); }); };
   const record = async () => { await startRecording(); await act(async () => bubble().onHoldEnd()); };
+  const hide = async () => { document.visibilityState = "hidden"; await act(async () => listeners.get("visibilitychange")?.()); };
   if (!overrides.closed) await click("Open Lofty");
-  return { view, messages, speech, audio, revoked, confirmations, click, type, submit, record, startRecording, get progress() { return progress; }, get bubble() { return bubble(); }, get recorder() { return recorder; }, get stoppedTracks() { return stoppedTracks; } };
+  return { view, messages, speech, audio, revoked, confirmations, recordingTimers, click, type, submit, record, startRecording, hide, get progress() { return progress; }, get bubble() { return bubble(); }, get recorder() { return recorder; }, get stoppedTracks() { return stoppedTracks; }, get microphoneRequests() { return microphoneRequests; } };
 }
+
+test("The touch launcher records with chat closed and Stop sends a voice question", async (t) => {
+  const widget = await mount(t, { closed: true });
+  await widget.click("Talk to Lofty");
+  assert.equal(widget.bubble.inputMode, "tap");
+  assert.equal(widget.bubble.phase, "listening");
+  assert.equal(widget.recorder.state, "recording");
+  assert.equal(widget.messages.length, 0);
+  assert.equal(widget.view.root.findAllByType("input").length, 0);
+  await act(async () => widget.bubble.onHoldEnd());
+  assert.equal(widget.messages[0].interactionMode, "voice");
+  assert.equal(widget.audio[0].played, true);
+  assert.ok(widget.stoppedTracks > 0);
+});
+
+test("The Talk button in chat starts the same independent tap voice session", async (t) => {
+  const widget = await mount(t);
+  await widget.click("Talk to Lofty");
+  assert.equal(widget.bubble.inputMode, "tap");
+  assert.equal(widget.bubble.micReady, true);
+  await widget.click("Close Lofty");
+  assert.equal(widget.recorder.state, "recording");
+  await act(async () => widget.bubble.onHoldEnd());
+  assert.equal(widget.messages[0].interactionMode, "voice");
+});
+
+test("Permission delays do not allow duplicate captures and closing cancels the pending microphone", async (t) => {
+  const microphone = deferred();
+  const widget = await mount(t, { closed: true, microphone });
+  await widget.click("Talk to Lofty");
+  assert.equal(widget.bubble.micReady, false);
+  assert.equal(widget.bubble.onTalkStart(), false);
+  assert.equal(widget.microphoneRequests, 1);
+  await widget.click("Close voice bubble");
+  await act(async () => microphone.resolve());
+  assert.equal(widget.recorder, undefined);
+  assert.equal(widget.stoppedTracks, 1);
+  assert.equal(widget.messages.length, 0);
+});
+
+test("Tap recording stops and submits at the 30-second limit", async (t) => {
+  const widget = await mount(t, { closed: true, captureRecordingTimer: true });
+  await widget.click("Talk to Lofty");
+  await act(async () => widget.recordingTimers.get("recording")());
+  assert.equal(widget.recorder.state, "inactive");
+  assert.equal(widget.bubble.phase, "speaking");
+  assert.equal(widget.bubble.canTalk, true);
+  assert.equal(widget.messages.length, 1);
+  assert.ok(widget.stoppedTracks > 0);
+});
+
+test("Hiding the page ends a tap recording and releases its microphone", async (t) => {
+  const widget = await mount(t, { closed: true });
+  await widget.click("Talk to Lofty");
+  await widget.hide();
+  assert.equal(widget.recorder.state, "inactive");
+  assert.ok(widget.stoppedTracks > 0);
+  assert.equal(widget.messages.length, 1);
+});
+
+test("Hiding the page during permission does not start recording when permission arrives", async (t) => {
+  const microphone = deferred();
+  const widget = await mount(t, { closed: true, microphone });
+  await widget.click("Talk to Lofty");
+  await widget.hide();
+  await act(async () => microphone.resolve());
+  assert.equal(widget.recorder, undefined);
+  assert.equal(widget.stoppedTracks, 1);
+  assert.equal(widget.messages.length, 0);
+  assert.equal(widget.bubble.phase, "error");
+});
+
+test("Tap microphone failures clear Listening and allow another attempt", async (t) => {
+  const widget = await mount(t, { closed: true, microphoneError: new Error("Permission denied") });
+  await widget.click("Talk to Lofty");
+  assert.equal(widget.bubble.phase, "error");
+  assert.match(widget.bubble.error, /permissions/);
+  assert.equal(widget.bubble.canTalk, true);
+  await act(async () => widget.bubble.onTalkStart());
+  assert.equal(widget.microphoneRequests, 2);
+});
+
+test("Closing a tap recording cancels the clip and releases the microphone", async (t) => {
+  const widget = await mount(t, { closed: true });
+  await widget.click("Talk to Lofty");
+  await widget.click("Close voice bubble");
+  assert.equal(widget.recorder.state, "inactive");
+  assert.ok(widget.stoppedTracks > 0);
+  assert.equal(widget.messages.length, 0);
+  assert.equal(widget.bubble.active, false);
+});
+
+test("Releasing M during permission avoids capturing or submitting an empty clip", async (t) => {
+  const microphone = deferred();
+  const widget = await mount(t, { closed: true, microphone });
+  await widget.startRecording();
+  await act(async () => widget.bubble.onHoldEnd());
+  await act(async () => microphone.resolve());
+  assert.equal(widget.recorder, undefined);
+  assert.equal(widget.stoppedTracks, 1);
+  assert.equal(widget.messages.length, 0);
+  assert.equal(widget.bubble.phase, "error");
+});
+
+test("Unsupported browsers and unfinished setup show errors instead of waiting for a key release", async (t) => {
+  for (const overrides of [{ unsupported: true }, { configured: false }]) {
+    const widget = await mount(t, { closed: true, ...overrides });
+    await widget.click("Talk to Lofty");
+    assert.equal(widget.bubble.phase, "error");
+    assert.equal(widget.bubble.canTalk, true);
+    assert.equal(widget.microphoneRequests, 0);
+  }
+});
 
 test("Chat renders streamed text early and replaces tool preambles with one final reply", async (t) => {
   const reply = deferred();

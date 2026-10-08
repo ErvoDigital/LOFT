@@ -31,7 +31,7 @@ export function HomePage() {
       <section className="hero container">
         <p className="hero-pill">
           <span />
-          Free Beta · One home for all your teams
+          Open Beta · One home for all your teams
         </p>
         <h1>
           All your teams.
@@ -39,13 +39,13 @@ export function HomePage() {
           <span className="text-brand">One clear plan.</span>
         </h1>
         <p className="hero-description">
-          School, work, organizations, and community. Currently in free beta,
+          School, work, organizations, and community. Currently in open beta,
           LOFT brings your tasks, calendars, conversations, meetings, documents,
           files, and Lofty, our AI assistant, together so you can see what
           matters across every team.
         </p>
         <div className="hero-actions">
-          <GetStartedLink>Try free beta</GetStartedLink>
+          <GetStartedLink>Try open beta</GetStartedLink>
           <button
             className="button button-secondary"
             onClick={() =>
@@ -65,7 +65,7 @@ export function HomePage() {
         <div className="hero-notes">
           <span>
             <CheckCircle2 size={15} aria-hidden="true" />
-            Free beta (freemium at launch)
+            Open beta (freemium at launch)
           </span>
           <span>
             <CalendarRange size={15} aria-hidden="true" />

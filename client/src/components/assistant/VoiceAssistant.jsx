@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Minus, Volume2, VolumeX, X } from "lucide-react";
+import { Mic, Minus, Square, Volume2, VolumeX, X } from "lucide-react";
 import { spokenReplyAt } from "../../utils/assistantTranscript.js";
+import VoiceOrb from "./VoiceOrb.jsx";
 
 // How long M has to be held before Lofty starts listening, so an accidental
 // tap does nothing.
@@ -26,28 +27,6 @@ function isTypingTarget(el) {
 
 const isTalkKey = (e) => e.key?.toLowerCase() === "m" && !e.ctrlKey && !e.metaKey && !e.altKey;
 
-// The glass bubble. Its layers are styled in index.css (.voice-orb), which
-// reads --level and --turn from an ancestor. A span, so the small one can
-// sit inside a button.
-function VoiceOrb({ state, small }) {
-  return (
-    <span className={`voice-orb ${small ? "voice-orb-sm" : ""}`} data-state={state} aria-hidden="true">
-      <span className="voice-orb-halo" />
-      <span className="voice-orb-ring" />
-      <span className="voice-orb-ring" />
-      <span className="voice-orb-arc" />
-      <span className="voice-orb-pulse">
-        <span className="voice-orb-body">
-          <span className="voice-orb-blob voice-orb-blob-a" />
-          <span className="voice-orb-blob voice-orb-blob-b" />
-          <span className="voice-orb-blob voice-orb-blob-c" />
-          <span className="voice-orb-shine" />
-        </span>
-      </span>
-    </span>
-  );
-}
-
 function Kbd({ children }) {
   return (
     <kbd className="mx-0.5 rounded-md border border-ink-900/15 bg-white/70 px-1.5 py-0.5 font-sans text-[11px] font-semibold text-ink-700 shadow-soft dark:border-white/15 dark:bg-white/[0.08] dark:text-ink-200">
@@ -63,7 +42,7 @@ function CornerButton({ label, onClick, children }) {
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="flex h-10 w-10 items-center justify-center rounded-xl border border-ink-900/10 bg-white/60 text-ink-600 backdrop-blur-md transition-colors hover:bg-white hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:border-white/10 dark:bg-white/[0.06] dark:text-ink-300 dark:hover:bg-white/[0.12] dark:hover:text-ink-50"
+      className="flex h-11 w-11 items-center justify-center rounded-xl border border-ink-900/10 bg-white/60 text-ink-600 backdrop-blur-md transition-colors hover:bg-white hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:border-white/10 dark:bg-white/[0.06] dark:text-ink-300 dark:hover:bg-white/[0.12] dark:hover:text-ink-50"
     >
       {children}
     </button>
@@ -151,7 +130,7 @@ function useMicLevel(stream) {
   return read;
 }
 
-// Push-to-talk for Lofty: holding M anywhere outside a text field brings up
+// Voice for Lofty: tapping Talk or holding M outside a text field brings up
 // the orb in the middle of the screen. The recording, transcription, reply
 // and spoken audio belong to the bubble, with shared chat history; this is the
 // full-screen view of one turn, driven by these props:
@@ -169,6 +148,8 @@ function useMicLevel(stream) {
 export default function VoiceAssistant({
   raised,
   active,
+  inputMode,
+  canTalk,
   phase,
   heard,
   reply,
@@ -185,6 +166,7 @@ export default function VoiceAssistant({
   onPlay,
   onHoldStart,
   onHoldEnd,
+  onTalkStart,
   onSkip,
   onClose,
 }) {
@@ -330,6 +312,10 @@ export default function VoiceAssistant({
     overlayRef.current?.focus({ preventScroll: true });
   }
 
+  function talk() {
+    if (onTalkStart() !== false) setMinimized(false);
+  }
+
   const finished = phase === "done" || phase === "error";
   const closeLabel = heard ? "Close and continue in chat" : "Close";
   const status = audioStatus === "generating" ? "Generating audio…" : STATUS[phase];
@@ -348,7 +334,7 @@ export default function VoiceAssistant({
       aria-modal="true"
       aria-label="Lofty voice"
       tabIndex={-1}
-      className="fixed inset-0 z-[65] flex animate-fade-in flex-col items-center overflow-y-auto overscroll-contain px-4 py-20 focus:outline-none print:hidden"
+      className="fixed inset-0 z-[65] flex animate-fade-in flex-col items-center overflow-y-auto overscroll-contain px-4 py-28 focus:outline-none print:hidden"
     >
       {/* Clicking away tucks the turn into the pill rather than ending it. */}
       <div className="voice-scrim fixed inset-0" onClick={() => setMinimized(true)} aria-hidden="true" />
@@ -406,7 +392,7 @@ export default function VoiceAssistant({
             <div className="pointer-events-auto mt-2 flex w-full flex-col items-center gap-3">
               <div className="flex items-center justify-center gap-2">
                 {canPlay && (
-                  <button type="button" onClick={onPlay} aria-label={playLabel} className="btn-secondary inline-flex items-center gap-1.5 px-2 py-1 text-xs">
+                  <button type="button" onClick={onPlay} aria-label={playLabel} className="btn-secondary inline-flex min-h-11 items-center gap-1.5 px-3 text-xs">
                     <Volume2 className="h-3.5 w-3.5" />
                     {audioStatus === "ready" ? "Play" : "Retry audio"}
                   </button>
@@ -416,7 +402,7 @@ export default function VoiceAssistant({
                     type="button"
                     onClick={skip}
                     title="Stop reading the answer aloud"
-                    className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-ink-500 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-400 dark:hover:bg-white/[0.08] dark:hover:text-ink-50"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-medium text-ink-500 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-400 dark:hover:bg-white/[0.08] dark:hover:text-ink-50"
                   >
                     <VolumeX className="h-3.5 w-3.5" />
                     Skip
@@ -434,18 +420,39 @@ export default function VoiceAssistant({
         </div>
       </div>
 
-      <p className="pointer-events-none fixed inset-x-0 bottom-6 px-4 text-center text-xs text-ink-500 dark:text-ink-400">
+      <div className="fixed inset-x-0 bottom-[max(1.5rem,env(safe-area-inset-bottom))] flex flex-col items-center gap-3 px-4 text-center">
         {phase === "listening" ? (
-          <>
-            Release <Kbd>M</Kbd> when you're done
-          </>
+          <button
+            type="button"
+            onClick={onHoldEnd}
+            aria-label="Stop and send"
+            disabled={!micReady}
+            className="btn-primary inline-flex min-h-12 items-center gap-2 px-6 disabled:opacity-50"
+          >
+            <Square className="h-4 w-4" />
+            Stop and send
+          </button>
         ) : (
-          <>
-            Hold <Kbd>M</Kbd> to ask {finished ? "again" : "something else"} · <Kbd>Esc</Kbd>{" "}
-            {heard ? "to continue in chat" : "to close"}
-          </>
+          <button
+            type="button"
+            onClick={talk}
+            aria-label={finished ? "Ask again" : "Ask something else"}
+            disabled={!canTalk}
+            className="btn-primary inline-flex min-h-12 items-center gap-2 px-6 disabled:opacity-50"
+          >
+            <Mic className="h-4 w-4" />
+            {finished ? "Ask again" : "Ask something else"}
+          </button>
         )}
-      </p>
+        <p className="text-xs text-ink-500 dark:text-ink-400">
+          {phase === "listening" ? (
+            inputMode === "hold" ? <>Release <Kbd>M</Kbd> or tap Stop and send</>
+              : "Tap Stop and send when you're done · Up to 30 seconds"
+          ) : (
+            <>Tap to ask again<span className="hidden sm:inline">, or hold <Kbd>M</Kbd> outside a text field</span></>
+          )}
+        </p>
+      </div>
     </div>,
     document.body
   );
@@ -454,7 +461,7 @@ export default function VoiceAssistant({
   const pill = (
     <div
       ref={pillRef}
-      className={`absolute right-3 z-30 flex animate-slide-fade-in items-center gap-0.5 rounded-full border border-white/60 bg-white/85 p-1 shadow-glass-lg backdrop-blur-xl dark:border-white/[0.08] dark:bg-ink-900/85 sm:right-5 print:hidden ${
+      className={`absolute right-3 z-30 flex max-w-[calc(100%-1.5rem)] animate-slide-fade-in items-center gap-0.5 rounded-full border border-white/60 bg-white/85 p-1 shadow-glass-lg backdrop-blur-xl dark:border-white/[0.08] dark:bg-ink-900/85 sm:right-5 print:hidden ${
         raised ? "bottom-[8.375rem] sm:bottom-[10.25rem]" : "bottom-[4.375rem] sm:bottom-[5.5rem]"
       }`}
     >
@@ -462,13 +469,36 @@ export default function VoiceAssistant({
         type="button"
         onClick={() => setMinimized(false)}
         title="Show Lofty voice"
-        className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-900/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-100 dark:hover:bg-white/[0.06]"
+        className="flex min-w-0 items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-900/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-100 dark:hover:bg-white/[0.06]"
       >
         <VoiceOrb state={phase} small />
-        {audioStatus === "generating" ? "Generating audio…" : PILL_LABEL[phase]}
+        <span className="truncate">{audioStatus === "generating" ? "Generating audio…" : PILL_LABEL[phase]}</span>
       </button>
+      {phase === "listening" ? (
+        <button
+          type="button"
+          onClick={onHoldEnd}
+          disabled={!micReady}
+          aria-label="Stop and send"
+          title="Stop and send"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-500 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50"
+        >
+          <Square className="h-4 w-4" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={talk}
+          disabled={!canTalk}
+          aria-label="Ask again"
+          title="Ask again"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-500 hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50 dark:text-ink-400 dark:hover:text-ink-50"
+        >
+          <Mic className="h-4 w-4" />
+        </button>
+      )}
       {canPlay && (
-        <button type="button" onClick={onPlay} aria-label={playLabel} title={audioStatus === "ready" ? "Play" : "Retry audio"} className="flex h-8 w-8 items-center justify-center rounded-full text-ink-500 hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-400 dark:hover:text-ink-50">
+        <button type="button" onClick={onPlay} aria-label={playLabel} title={audioStatus === "ready" ? "Play" : "Retry audio"} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-500 hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-400 dark:hover:text-ink-50">
           <Volume2 className="h-4 w-4" />
         </button>
       )}
@@ -478,7 +508,7 @@ export default function VoiceAssistant({
           onClick={onSkip}
           aria-label="Stop reading the answer aloud"
           title="Skip"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-400 dark:hover:bg-white/[0.08] dark:hover:text-ink-50"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-400 dark:hover:bg-white/[0.08] dark:hover:text-ink-50"
         >
           <VolumeX className="h-4 w-4" />
         </button>
@@ -488,7 +518,7 @@ export default function VoiceAssistant({
         onClick={onClose}
         aria-label={closeLabel}
         title={closeLabel}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-400 dark:hover:bg-white/[0.08] dark:hover:text-ink-50"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-400 dark:hover:bg-white/[0.08] dark:hover:text-ink-50"
       >
         <X className="h-4 w-4" />
       </button>

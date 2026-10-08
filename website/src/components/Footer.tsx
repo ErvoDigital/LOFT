@@ -19,7 +19,7 @@ export function Footer() {
             <h2>Product</h2>
             <a href="#/features">Explore features</a>
             <a href="#/pricing">Pricing & Beta</a>
-            <a href={LOGIN_URL}>Try free beta</a>
+            <a href={LOGIN_URL}>Try open beta</a>
           </nav>
           <nav aria-label="About links">
             <h2>LOFT</h2>

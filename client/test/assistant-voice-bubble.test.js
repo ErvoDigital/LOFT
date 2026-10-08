@@ -24,11 +24,12 @@ async function mount(t, overrides = {}) {
   const events = [];
   const body = {};
   const props = {
-    active: true, phase: "done", heard: "My question", reply: "My answer", audioStatus: "ready", canPlay: true,
+    active: true, phase: "done", heard: "My question", reply: "My answer", audioStatus: "ready", canPlay: true, canTalk: true,
     onPrepareAudio: () => events.push("prepare"),
     onPlay: () => events.push("play"),
     onHoldStart: () => events.push("start"),
     onHoldEnd: () => events.push("end"),
+    onTalkStart: () => events.push("talk"),
     onClose() {},
     ...overrides,
   };
@@ -37,7 +38,7 @@ async function mount(t, overrides = {}) {
     module: exported, require: createRequire(import.meta.url),
     mocks: {
       "react-dom": { createPortal: (children) => children },
-      "lucide-react": Object.fromEntries(["Minus", "Sparkles", "Volume2", "VolumeX", "X"].map((name) => [name, () => null])),
+      "lucide-react": Object.fromEntries(["Mic", "Minus", "Sparkles", "Square", "Volume2", "VolumeX", "X"].map((name) => [name, () => null])),
     },
     window: { addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: (name) => listeners.delete(name), matchMedia: () => ({ matches: true }) },
     document: { body, addEventListener() {}, removeEventListener() {} },
@@ -73,6 +74,30 @@ test("Typing M in the text chat does not activate voice or prepare audio", async
   bubble.listeners.get("keydown")({ key: "m", target: { tagName: "INPUT", type: "text" } });
   assert.deepEqual(bubble.events, []);
   assert.equal(bubble.timers.size, 0);
+});
+
+test("Tap recording can be sent from both the full bubble and the minimized pill", async (t) => {
+  const bubble = await mount(t, { phase: "listening", inputMode: "tap", micReady: true, canTalk: false, canPlay: false });
+  await bubble.click("Stop and send");
+  await bubble.click("Minimize");
+  await bubble.click("Stop and send");
+  assert.deepEqual(bubble.events, ["end", "end"]);
+  assert.ok(!JSON.stringify(bubble.view.toJSON()).includes("Release"));
+});
+
+test("Stop and send waits for microphone permission and Ask again waits for reasoning", async (t) => {
+  const bubble = await mount(t, { phase: "listening", inputMode: "tap", micReady: false });
+  assert.equal(bubble.view.root.findByProps({ "aria-label": "Stop and send" }).props.disabled, true);
+  await bubble.update({ phase: "thinking", canTalk: false });
+  assert.equal(bubble.view.root.findByProps({ "aria-label": "Ask something else" }).props.disabled, true);
+});
+
+test("Ask again from the minimized pill starts a tap turn and expands the bubble", async (t) => {
+  const bubble = await mount(t);
+  await bubble.click("Minimize");
+  await bubble.click("Ask again");
+  assert.deepEqual(bubble.events, ["talk"]);
+  assert.equal(bubble.view.root.findByProps({ role: "dialog" }).props["aria-label"], "Lofty voice");
 });
 
 test("Play is available in both the full bubble and its minimized pill", async (t) => {

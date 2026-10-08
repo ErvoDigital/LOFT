@@ -539,6 +539,14 @@
 .voice-orb-sm {
   --orb: 1.75rem;
 }
+.voice-orb-launcher {
+  --orb: 3rem;
+}
+@media (min-width: 640px) {
+  .voice-orb-launcher {
+    --orb: 3.5rem;
+  }
+}
 .voice-orb-halo,
 .voice-orb-ring,
 .voice-orb-arc,
