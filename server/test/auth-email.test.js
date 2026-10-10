@@ -103,7 +103,7 @@ describe("Account email and verification over HTTP (in-memory)", () => {
     challenges.length = 0;
     sent = [];
     transportFailure = null;
-    users.push({ id: "u-existing", name: "Ada <Admin>", firstName: "Ada", email: "ada@loft.test", passwordHash });
+    users.push({ id: "u-existing", name: "Ada <Admin>", firstName: "Ada", email: "ada@loft.test", passwordHash, twoFactorEnabled: true });
   });
 
   after(async () => {
@@ -116,9 +116,9 @@ describe("Account email and verification over HTTP (in-memory)", () => {
     }
   });
 
-  async function call(path, body, token) {
+  async function call(path, body, token, method) {
     const response = await fetch(`${baseUrl}${path}`, {
-      method: body ? "POST" : "GET",
+      method: method || (body ? "POST" : "GET"),
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -149,7 +149,31 @@ describe("Account email and verification over HTTP (in-memory)", () => {
     assert.ok(verified.body.token);
   });
 
-  it("requires a correct single-use code for password sign-in", async () => {
+  it("logs in directly without verification email when two-factor authentication is off", async () => {
+    users[0].twoFactorEnabled = false;
+    const res = await login();
+    assert.equal(res.status, 200);
+    assert.equal(res.body.twoFactorRequired, undefined);
+    assert.ok(res.body.token);
+    assert.equal(res.body.user.email, "ada@loft.test");
+    assert.equal(res.body.user.twoFactorEnabled, false);
+    assert.equal(sent.length, 0);
+  });
+
+  it("allows toggling twoFactorEnabled in user settings", async () => {
+    users[0].twoFactorEnabled = false;
+    const res = await call("/users/me", { twoFactorEnabled: true }, authToken, "PATCH");
+    assert.equal(res.status, 200);
+    assert.equal(res.body.user.twoFactorEnabled, true);
+    assert.equal(users[0].twoFactorEnabled, true);
+
+    const off = await call("/users/me", { twoFactorEnabled: false }, authToken, "PATCH");
+    assert.equal(off.status, 200);
+    assert.equal(off.body.user.twoFactorEnabled, false);
+    assert.equal(users[0].twoFactorEnabled, false);
+  });
+
+  it("requires a correct single-use code for password sign-in when 2FA is on", async () => {
     const res = await login();
     assert.equal(res.status, 200);
     assert.equal(res.body.token, undefined);

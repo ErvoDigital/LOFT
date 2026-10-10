@@ -37,6 +37,7 @@ model User {
   // would let a guessed 6-digit code be tried against that endpoint too.
   passwordChangeCode       String?
   passwordChangeCodeExpiry DateTime?
+  twoFactorEnabled         Boolean   @default(false)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

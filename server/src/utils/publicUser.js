@@ -6,5 +6,5 @@
 export function publicUser(user) {
   const { passwordHash, googleId, resetToken, resetTokenExpiry, passwordChangeCode, passwordChangeCodeExpiry, ...rest } =
     user;
-  return { ...rest, hasPassword: !!passwordHash, googleLinked: !!googleId };
+  return { ...rest, hasPassword: !!passwordHash, googleLinked: !!googleId, twoFactorEnabled: Boolean(user.twoFactorEnabled) };
 }

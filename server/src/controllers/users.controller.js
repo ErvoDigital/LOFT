@@ -27,6 +27,7 @@ const updateSchema = z.object({
   nickname: optionalNamePart,
   avatarColor: z.string().min(3).max(20).optional(),
   avatarUrl: imageDataUrlSchema,
+  twoFactorEnabled: z.boolean().optional(),
 });
 
 const verifyPasswordCodeSchema = z.object({ code: z.string().regex(/^\d{6}$/) });

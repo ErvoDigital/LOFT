@@ -92,8 +92,12 @@ export async function login(req, res) {
   const valid = await comparePassword(password, user.passwordHash);
   if (!valid) throw new ApiError(401, "Invalid email or password");
 
-  const challenge = await issueEmailChallenge(user, "LOGIN");
-  res.json(challengeResponse(challenge, user.email));
+  if (user.twoFactorEnabled) {
+    const challenge = await issueEmailChallenge(user, "LOGIN");
+    return res.json(challengeResponse(challenge, user.email));
+  }
+
+  res.json({ token: signToken({ sub: user.id }), user: publicUser(user) });
 }
 
 export async function googleAuth(req, res) {
@@ -101,7 +105,6 @@ export async function googleAuth(req, res) {
   const payload = await verifyGoogleCredential(credential);
   if (!payload.email_verified) throw new ApiError(400, "Please verify your Google account email before signing in.");
   const email = payload.email.toLowerCase();
-  requireMail();
   let created = false;
 
   let user = await prisma.user.findUnique({ where: { googleId: payload.sub } });
@@ -134,9 +137,14 @@ export async function googleAuth(req, res) {
     created = true;
   }
 
-  const challenge = await issueEmailChallenge(user, "LOGIN");
-  const welcome = created ? await welcomeEmail(user) : {};
-  res.json({ ...challengeResponse(challenge, user.email), ...welcome });
+  if (created || user.twoFactorEnabled) {
+    requireMail();
+    const challenge = await issueEmailChallenge(user, "LOGIN");
+    const welcome = created ? await welcomeEmail(user) : {};
+    return res.json({ ...challengeResponse(challenge, user.email), ...welcome });
+  }
+
+  res.json({ token: signToken({ sub: user.id }), user: publicUser(user) });
 }
 
 export async function verifyTwoFactor(req, res) {

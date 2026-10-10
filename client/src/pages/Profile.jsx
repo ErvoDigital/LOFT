@@ -44,6 +44,26 @@ export default function Profile() {
   const [googleError, setGoogleError] = useState("");
   const [unlinking, setUnlinking] = useState(false);
 
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+  const [twoFactorMsg, setTwoFactorMsg] = useState("");
+  const [twoFactorError, setTwoFactorError] = useState("");
+
+  async function toggleTwoFactor() {
+    setTwoFactorMsg("");
+    setTwoFactorError("");
+    setTwoFactorLoading(true);
+    const nextState = !user?.twoFactorEnabled;
+    try {
+      const updated = await usersApi.updateProfile({ twoFactorEnabled: nextState });
+      setUser(updated);
+      setTwoFactorMsg(nextState ? "Two-factor authentication enabled." : "Two-factor authentication disabled.");
+    } catch (err) {
+      setTwoFactorError(apiErrorMessage(err));
+    } finally {
+      setTwoFactorLoading(false);
+    }
+  }
+
   async function saveProfile(e) {
     e.preventDefault();
     setProfileMsg("");
@@ -213,6 +233,31 @@ export default function Profile() {
         </div>
         {googleMsg && <p className="mb-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">{googleMsg}</p>}
         {googleError && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{googleError}</p>}
+
+        <div className="mb-5 flex flex-col gap-3 rounded-lg border border-ink-100 px-4 py-3 dark:border-ink-700 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-ink-700 dark:text-ink-200">Two-factor authentication (2FA)</p>
+            <p className="text-xs text-ink-400">
+              {user?.twoFactorEnabled
+                ? "Enabled — a 6-digit verification code is emailed to you when signing in."
+                : "Disabled — you sign in directly without a verification code."}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={toggleTwoFactor}
+            disabled={twoFactorLoading}
+            className={`text-sm font-medium ${
+              user?.twoFactorEnabled
+                ? "text-red-600 hover:underline dark:text-red-400"
+                : "text-brand-600 hover:underline dark:text-brand-400"
+            } disabled:opacity-60`}
+          >
+            {twoFactorLoading ? "Updating…" : user?.twoFactorEnabled ? "Turn off" : "Turn on"}
+          </button>
+        </div>
+        {twoFactorMsg && <p className="mb-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">{twoFactorMsg}</p>}
+        {twoFactorError && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{twoFactorError}</p>}
 
         <div className="max-w-sm space-y-3">
           <p className="text-sm font-medium text-ink-700 dark:text-ink-200">{user?.hasPassword ? "Password" : "Set a password"}</p>
