@@ -81,7 +81,7 @@ export function StartSection() {
     <section className="container section">
       <div className="start-panel">
         <div>
-          <p className="eyebrow">Open Beta · Make room for what matters</p>
+          <p className="eyebrow">Make room for what matters</p>
           <h2>Bring your teams into LOFT.</h2>
           <p>
             Experience the open beta today with all features and Lofty, our AI

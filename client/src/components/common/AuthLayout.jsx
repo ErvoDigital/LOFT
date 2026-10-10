@@ -10,6 +10,9 @@ export default function AuthLayout({ title, subtitle, children }) {
           {subtitle && <p className="mt-1 text-center text-sm text-ink-500">{subtitle}</p>}
         </div>
         <div className="card p-5 shadow-glass-lg sm:p-6">{children}</div>
+        <p className="mt-6 text-center text-xs leading-relaxed text-ink-400 dark:text-ink-500">
+          LOFT is a student-developed academic project currently in beta testing. The business concept is being developed for educational purposes.
+        </p>
       </div>
     </div>
   );

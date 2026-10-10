@@ -23,17 +23,16 @@ export function PricingPage() {
   return (
     <>
       <section className="container page-hero">
-        <p className="eyebrow">Open Beta Access</p>
+        <p className="eyebrow">Open Beta Pricing</p>
         <h1>
           Make space for your teams.
           <br />
           <span className="text-brand">Free during open beta.</span>
         </h1>
         <p className="hero-description">
-          LOFT is currently in open beta, giving you full access to all workspace
-          features, cross-team conflict alerts, and Lofty, our AI assistant.
-          Upon official release, LOFT will transition to a freemium model with both
-          free and premium tiers.
+          LOFT is currently in open beta with all workspace features, conflict
+          detection, and Lofty, our AI assistant, available at no cost. Official
+          release will feature a freemium model.
         </p>
       </section>
       <section className="container pricing-section">
@@ -81,6 +80,16 @@ export function PricingPage() {
           title="Clear, transparent access today and tomorrow."
         />
         <div className="faq-list">
+          <details>
+            <summary>
+              What is LOFT’s current project status?<span aria-hidden="true">+</span>
+            </summary>
+            <p>
+              LOFT is a student-developed academic project currently in beta
+              testing. The business concept is being developed for educational
+              purposes.
+            </p>
+          </details>
           <details>
             <summary>
               Is LOFT currently free to use?<span aria-hidden="true">+</span>

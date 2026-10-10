@@ -243,6 +243,11 @@ export const FAQS = [
       "LOFT is for people who belong to more than one team: students, professionals, project groups, organizations, and community groups. Each team gets its own workspace, while you get a personal view across your memberships.",
   },
   {
+    question: "What is LOFT’s current project status?",
+    answer:
+      "LOFT is a student-developed academic project currently in beta testing. The business concept is being developed for educational purposes.",
+  },
+  {
     question: "Is LOFT free to use?",
     answer:
       "Yes. LOFT is currently in open beta with all workspace features unlocked. When officially released, LOFT will feature a freemium model with a generous free tier alongside premium plans for advanced team and organizational needs.",
