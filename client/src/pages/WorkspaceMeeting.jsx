@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   Video,
@@ -15,6 +15,9 @@ import {
   MessageSquare,
   Settings,
   CalendarPlus,
+  Users,
+  LayoutGrid,
+  UserRound,
   X,
 } from "lucide-react";
 import { useSocket } from "../context/SocketContext.jsx";
@@ -23,11 +26,18 @@ import { useMeeting } from "../context/MeetingContext.jsx";
 import { useWorkspaces } from "../context/WorkspaceContext.jsx";
 import * as conversationsApi from "../api/conversations.js";
 import * as eventsApi from "../api/events.js";
+import * as workspacesApi from "../api/workspaces.js";
+import { apiErrorMessage } from "../api/client.js";
+import { can } from "../lib/access.js";
+import { elapsedMeetingTime, isWorkspaceMeeting } from "../lib/meetings.js";
+import { useConfirm } from "../context/ConfirmContext.jsx";
 import VideoTile from "../components/meeting/VideoTile.jsx";
 import ChatThread from "../components/chat/ChatThread.jsx";
 import Modal from "../components/common/Modal.jsx";
 import MeetingSettingsModal from "../components/meeting/MeetingSettingsModal.jsx";
 import ScheduleMeetingModal from "../components/meeting/ScheduleMeetingModal.jsx";
+import MeetingOverview from "../components/meeting/MeetingOverview.jsx";
+import MeetingParticipants from "../components/meeting/MeetingParticipants.jsx";
 
 const GRID_GAP = 16; // px — must match the camera grid's gap-4
 const TILE_ASPECT_RATIO = 16 / 9;
@@ -110,7 +120,7 @@ function useElementSize() {
 // appears where it can work.
 const CAN_SHARE_SCREEN = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
 
-function ControlButton({ onClick, variant = "default", wide, title, children }) {
+function ControlButton({ onClick, variant = "default", wide, title, disabled, pressed, children }) {
   const variants = {
     default: "bg-white/10 text-white hover:bg-white/20",
     off: "bg-white text-ink-900 hover:bg-white/90",
@@ -122,7 +132,9 @@ function ControlButton({ onClick, variant = "default", wide, title, children }) 
       onClick={onClick}
       title={title}
       aria-label={title}
-      className={`flex h-11 shrink-0 items-center justify-center rounded-full transition-colors sm:h-12 ${wide ? "px-5 sm:px-6" : "w-11 sm:w-12"} ${variants[variant]}`}
+      disabled={disabled}
+      aria-pressed={pressed}
+      className={`flex h-11 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 sm:h-12 ${wide ? "px-5 sm:px-6" : "w-11 sm:w-12"} ${variants[variant]}`}
     >
       {children}
     </button>
@@ -165,6 +177,8 @@ export default function WorkspaceMeeting() {
     activeWorkspaceId,
     joined,
     joining,
+    joinedAt,
+    deviceBusy,
     error,
     lobbyOpen,
     pendingWorkspaceId,
@@ -209,49 +223,80 @@ export default function WorkspaceMeeting() {
   const [chatConversation, setChatConversation] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [participantsOpen, setParticipantsOpen] = useState(false);
+  const [focusedId, setFocusedId] = useState(null);
+  const [layout, setLayout] = useState("grid");
+  const [events, setEvents] = useState([]);
+  const [access, setAccess] = useState(null);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsError, setEventsError] = useState("");
+  const [chatError, setChatError] = useState("");
+  const [chatAttempt, setChatAttempt] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const requestVersion = useRef(0);
+  const workspaceScope = useRef(0);
+  const controlsRef = useRef(null);
+  const confirm = useConfirm();
+  const workspaceName = workspaces.find((workspace) => workspace.id === workspaceId)?.name || "Workspace";
 
-  // The only "meet link" concept LOFT has — this workspace's own meeting
-  // room, shareable as a plain URL rather than a separate per-meeting id.
+  // Every scheduled session in this workspace uses the same meeting room.
   const meetLink = `${window.location.origin}/workspaces/${workspaceId}/meeting`;
-  // The nearest upcoming/ongoing calendar event that was scheduled as a
-  // meeting (its location is this workspace's meet link) — used purely to
-  // decide whether there's anything worth sharing yet; see meetLinkAvailable.
-  const [scheduledMeeting, setScheduledMeeting] = useState(null);
 
   const inThisWorkspacesCall = joined && activeWorkspaceId === workspaceId;
   const inAnotherWorkspacesCall = joined && activeWorkspaceId !== workspaceId;
   const lobbyForThisWorkspace = lobbyOpen && pendingWorkspaceId === workspaceId;
   const confirmForThisWorkspace = confirmWorkspaceId === workspaceId;
-  // The meeting link only means anything once there's actually a meeting to
-  // join — either it's live right now, or a future one has been scheduled
-  // (which is what stamps the link into an Event's location in the first
-  // place, via ScheduleMeetingModal). Otherwise Settings hides it entirely.
-  const meetingIsLive = inThisWorkspacesCall || preJoinCount > 0;
-  const meetLinkAvailable = meetingIsLive || !!scheduledMeeting;
-
-  const loadScheduledMeeting = useCallback(() => {
-    eventsApi.listWorkspaceEvents(workspaceId).then((events) => {
-      const now = new Date();
-      const upcoming = events
-        .filter((e) => e.location === meetLink && new Date(e.endTime) >= now)
-        .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
-      setScheduledMeeting(upcoming[0] || null);
-    });
-  }, [workspaceId, meetLink]);
+  const preparation = useRef(null);
+  preparation.current = { joined, pendingWorkspaceId, confirmWorkspaceId, cancelPrepare, cancelConfirm };
+  useEffect(() => () => {
+    const current = preparation.current;
+    if (!current.joined && current.pendingWorkspaceId === workspaceId) current.cancelPrepare();
+    if (current.confirmWorkspaceId === workspaceId) current.cancelConfirm();
+  }, [workspaceId]);
+  const loadScheduledMeeting = useCallback(async () => {
+    const version = ++requestVersion.current;
+    try {
+      const [loaded, workspace] = await Promise.all([eventsApi.listWorkspaceEvents(workspaceId), workspacesApi.getWorkspace(workspaceId)]);
+      if (requestVersion.current !== version) return;
+      setEvents(loaded.filter((event) => isWorkspaceMeeting(event, workspaceId)).sort((a, b) => new Date(a.startTime) - new Date(b.startTime)));
+      setAccess(workspace); setEventsError("");
+    } catch (err) { if (requestVersion.current === version) setEventsError(apiErrorMessage(err)); }
+    finally { if (requestVersion.current === version) setEventsLoading(false); }
+  }, [workspaceId]);
 
   useEffect(() => {
+    workspaceScope.current++;
+    setEvents([]); setAccess(null); setEventsLoading(true); setEventsError(""); setPreJoinCount(0);
+    setSettingsOpen(false); setScheduleOpen(false); setEditingEvent(null); setParticipantsOpen(false); setFocusedId(null);
     loadScheduledMeeting();
+    return () => { requestVersion.current++; workspaceScope.current++; };
   }, [loadScheduledMeeting]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), inThisWorkspacesCall ? 1000 : 30000);
+    return () => clearInterval(timer);
+  }, [inThisWorkspacesCall]);
+
+  useEffect(() => {
+    if (!inThisWorkspacesCall) return;
+    const controls = controlsRef.current, shell = controls?.closest(".app-content");
+    if (!shell) return;
+    const measure = () => shell.style.setProperty("--meeting-controls-clearance", `${controls.getBoundingClientRect().height + 24}px`);
+    measure();
+    const observer = new ResizeObserver(measure); observer.observe(controls);
+    return () => { observer.disconnect(); shell.style.removeProperty("--meeting-controls-clearance"); };
+  }, [inThisWorkspacesCall]);
 
   // Picks up a meeting scheduled (or cancelled) just now, from this tab or
   // any other member's, without waiting for a page reload.
   useEffect(() => {
     if (!socket) return;
-    const handler = () => loadScheduledMeeting();
-    const socketEvents = ["event:created", "event:updated", "event:cancelled"];
+    const handler = (payload) => { if (!payload?.workspaceId || payload.workspaceId === workspaceId) loadScheduledMeeting(); };
+    const socketEvents = ["event:created", "event:updated", "event:cancelled", "connect"];
     socketEvents.forEach((e) => socket.on(e, handler));
     return () => socketEvents.forEach((e) => socket.off(e, handler));
-  }, [socket, loadScheduledMeeting]);
+  }, [socket, workspaceId, loadScheduledMeeting]);
 
   // A dedicated "Meeting Chat" channel, separate from General, so meeting
   // chatter doesn't mix into regular workspace chat history — created (and/or
@@ -260,27 +305,32 @@ export default function WorkspaceMeeting() {
   // added to a channel they never look at.
   useEffect(() => {
     if (!chatOpen || chatConversation) return;
-    conversationsApi.getOrCreateMeetingChat(workspaceId).then(setChatConversation);
-  }, [chatOpen, chatConversation, workspaceId]);
+    let current = true;
+    setChatError("");
+    conversationsApi.getOrCreateMeetingChat(workspaceId).then((conversation) => { if (current) setChatConversation(conversation); }).catch((err) => { if (current) setChatError(apiErrorMessage(err)); });
+    return () => { current = false; };
+  }, [chatOpen, chatConversation, workspaceId, chatAttempt]);
 
   // A different workspace's meeting page — drop the stale reference so it
   // doesn't flash the previous workspace's chat before the new one loads.
   useEffect(() => {
     setChatConversation(null);
     setChatOpen(false);
-  }, [workspaceId]);
+    setChatError(""); setParticipantsOpen(false); setFocusedId(null);
+  }, [workspaceId, inThisWorkspacesCall]);
 
   // "How many are already here" for the pre-join screen — page-scoped to
   // whichever workspace is currently being viewed, independent of whatever
   // call (if any) is actually active elsewhere.
   useEffect(() => {
     if (!socket || !connected || inThisWorkspacesCall) return;
-    socket.emit("meeting:status", workspaceId, (res) => Number.isFinite(res?.count) && setPreJoinCount(res.count));
+    let current = true;
+    socket.emit("meeting:status", workspaceId, (res) => current && Number.isFinite(res?.count) && setPreJoinCount(res.count));
     const onActivity = (payload) => {
       if (payload.workspaceId === workspaceId) setPreJoinCount(payload.count);
     };
     socket.on("meeting:activity", onActivity);
-    return () => socket.off("meeting:activity", onActivity);
+    return () => { current = false; socket.off("meeting:activity", onActivity); };
   }, [socket, connected, workspaceId, inThisWorkspacesCall]);
 
   const cameraCount = 1 + Object.keys(participants).length;
@@ -289,6 +339,21 @@ export default function WorkspaceMeeting() {
     () => computeGridLayout(cameraCount, gridSize.width, gridSize.height),
     [cameraCount, gridSize.width, gridSize.height]
   );
+
+  const schedule = (event = null) => { setEditingEvent(event); setScheduleOpen(true); };
+  const handleSaved = (saved) => {
+    setEvents((previous) => [...previous.filter((event) => event.id !== saved.id), saved].sort((a, b) => new Date(a.startTime) - new Date(b.startTime)));
+  };
+  async function cancelScheduledMeeting(event) {
+    if (!can(access, "events.manage")) return;
+    const version = workspaceScope.current;
+    if (!await confirm({ title: "Cancel this meeting?", subject: event.title, message: "This removes it from the calendar for everyone invited.", confirmLabel: "Cancel meeting", cancelLabel: "Keep meeting" })) return;
+    if (workspaceScope.current !== version) return;
+    try {
+      await eventsApi.cancelEvent(workspaceId, event.id);
+      if (workspaceScope.current === version) setEvents((previous) => previous.filter((item) => item.id !== event.id));
+    } catch (err) { if (workspaceScope.current === version) setEventsError(apiErrorMessage(err)); }
+  }
 
   if (inAnotherWorkspacesCall) {
     const otherName = workspaces.find((w) => w.id === activeWorkspaceId)?.name || "another workspace";
@@ -312,22 +377,24 @@ export default function WorkspaceMeeting() {
     return (
       <div className="flex h-full items-center justify-center bg-ink-900 p-4 sm:p-6">
         <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-5 text-center sm:p-6">
-          <h2 className="text-lg font-semibold text-white">Check your camera and mic</h2>
-          <p className="mt-1 text-sm text-white/50">Make sure you look and sound right before you join.</p>
+          <p className="mb-1 text-xs text-white/50">{workspaceName}</p>
+          <h2 className="text-lg font-semibold text-white">Ready to join?</h2>
+          <p className="mt-1 text-sm text-white/50">Check your camera and microphone before entering.</p>
 
           <div className="mx-auto mt-4 w-full">
-            <VideoTile stream={localStream} name={user.name} avatarColor={user.avatarColor} isLocal camOn={camOn} />
+            <VideoTile stream={localStream} name={user.name} avatarColor={user.avatarColor} isLocal camOn={camOn} micOn={micOn} showStatus />
           </div>
 
           <div className="mt-4 flex items-center justify-center gap-3">
             <ControlButton
               onClick={micAvailable ? toggleMic : promptEnableMic}
+              disabled={deviceBusy}
               variant={!micAvailable ? "off" : micOn ? "default" : "off"}
               title={!micAvailable ? "Turn on your microphone" : micOn ? "Mute" : "Unmute"}
             >
               {!micAvailable || !micOn ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </ControlButton>
-            <ControlButton onClick={toggleCam} variant={camOn ? "default" : "off"} title={camOn ? "Turn off camera" : "Turn on camera"}>
+            <ControlButton onClick={toggleCam} disabled={deviceBusy} variant={camOn ? "default" : "off"} title={camOn ? "Turn off camera" : "Turn on camera"}>
               {camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
             </ControlButton>
           </div>
@@ -339,7 +406,7 @@ export default function WorkspaceMeeting() {
             <button onClick={cancelPrepare} disabled={joining} className="btn-secondary flex-1">
               Cancel
             </button>
-            <button onClick={confirmJoin} disabled={joining || !connected} className="btn-primary flex-1">
+            <button onClick={confirmJoin} disabled={joining || deviceBusy || !connected} className="btn-primary flex-1">
               {joining ? "Joining…" : "Join now"}
             </button>
           </div>
@@ -351,68 +418,19 @@ export default function WorkspaceMeeting() {
   }
 
   if (!inThisWorkspacesCall) {
-    return (
-      <div className="flex h-full items-center justify-center bg-ink-900 p-4 sm:p-6">
-        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-6 text-center sm:p-8">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/15 text-brand-400">
-            <Video className="h-6 w-6" />
-          </div>
-          <h2 className="text-lg font-semibold text-white">
-            {preJoinCount > 0 ? "A meeting is live" : "Start a meeting"}
-          </h2>
-          <p className="mt-1 text-sm text-white/50">
-            {preJoinCount > 0
-              ? `${preJoinCount} ${preJoinCount === 1 ? "person is" : "people are"} already here.`
-              : "Nobody's here yet — start one and workspace members will be notified."}
-          </p>
-          {error && <p className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>}
-          {!connected && <p role="status" className="mt-3 text-sm text-amber-300">Live connection unavailable. Reconnecting…</p>}
-          <button onClick={() => promptJoin(workspaceId)} disabled={joining || !connected} className="btn-primary mt-5 w-full">
-            {joining ? "Requesting access…" : preJoinCount > 0 ? "Join meeting" : "Start meeting"}
-          </button>
-          <div className="mt-2 flex items-center gap-2">
-            <button onClick={() => setScheduleOpen(true)} className="btn-secondary w-full justify-center !bg-white/10 !border-white/10 !text-white hover:!bg-white/20">
-              <CalendarPlus className="h-4 w-4" /> Schedule a meeting
-            </button>
-            <button
-              onClick={() => setSettingsOpen(true)}
-              title="Meeting settings"
-              aria-label="Meeting settings"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white hover:bg-white/20"
-            >
-              <Settings className="h-4 w-4" />
-            </button>
-          </div>
+    return <MeetingOverview key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} events={events} loading={eventsLoading} loadError={eventsError} onRetry={loadScheduledMeeting} now={now} liveCount={preJoinCount} connected={connected} joining={joining} error={error} meetLink={meetLink} onJoin={() => promptJoin(workspaceId)} onSchedule={() => schedule()} onSettings={() => setSettingsOpen(true)} canManage={can(access, "events.manage")} onEdit={schedule} onCancel={cancelScheduledMeeting}>
+      <MeetingSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} meetLink={meetLink} />
+      <ScheduleMeetingModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} workspaceId={workspaceId} meetLink={meetLink} event={editingEvent} onSaved={handleSaved} />
+      <Modal open={confirmForThisWorkspace} onClose={cancelConfirm} title="Choose how to join" width="max-w-sm">
+        <p className="mb-4 text-sm text-ink-500 dark:text-ink-400">Choose your camera and microphone settings. You can change them during the meeting.</p>
+        <div className="space-y-2">
+          <button onClick={() => confirmDevices({ video: true, audio: true })} className="btn-primary w-full justify-center"><Video className="h-4 w-4" /> Camera and microphone</button>
+          <button onClick={() => confirmDevices({ video: false, audio: true })} className="btn-secondary w-full justify-center"><Mic className="h-4 w-4" /> Microphone only</button>
+          <button onClick={() => confirmDevices({ video: true, audio: false })} className="btn-secondary w-full justify-center"><Video className="h-4 w-4" /> Camera only</button>
+          <button onClick={() => confirmDevices({ video: false, audio: false })} className="w-full rounded-lg py-2.5 text-sm font-medium text-ink-500 hover:bg-ink-100 dark:text-ink-400 dark:hover:bg-ink-700">Join with camera and mic off</button>
         </div>
-
-        <MeetingSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} meetLink={meetLinkAvailable ? meetLink : null} />
-        <ScheduleMeetingModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} workspaceId={workspaceId} meetLink={meetLink} />
-
-        <Modal open={confirmForThisWorkspace} onClose={cancelConfirm} title="" width="max-w-sm">
-          <div className="text-center">
-            <div className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-ink-100 dark:bg-ink-700">
-              <Video className="h-9 w-9 text-ink-400" />
-              <span className="absolute -right-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full brand-mark text-white shadow-soft">
-                <Video className="h-4 w-4" />
-              </span>
-              <span className="absolute -left-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full bg-accent-500 text-white shadow-soft">
-                <Mic className="h-4 w-4" />
-              </span>
-            </div>
-            <h2 className="text-lg font-semibold text-ink-900 dark:text-ink-50">Do you want people to see you in the meeting?</h2>
-            <p className="mt-1 text-sm text-ink-400">You can still turn off your camera anytime in the meeting.</p>
-            <div className="mt-5 flex flex-col gap-2">
-              <button onClick={() => confirmDevices(false)} className="btn-primary w-full justify-center">
-                <Video className="h-4 w-4" /> Use camera
-              </button>
-              <button onClick={() => confirmDevices(true)} className="btn-secondary w-full justify-center">
-                <Mic className="h-4 w-4" /> Use microphone and camera
-              </button>
-            </div>
-          </div>
-        </Modal>
-      </div>
-    );
+      </Modal>
+    </MeetingOverview>;
   }
 
   const remoteIds = Object.keys(participants);
@@ -424,9 +442,17 @@ export default function WorkspaceMeeting() {
     ? { stream: remoteScreenStreams[remoteScreenIds[0]], label: `${participants[remoteScreenIds[0]]?.name || "Guest"} · Presenting` }
     : null;
 
+  const people = [{ id: user.id, name: user.name, avatarColor: user.avatarColor, stream: localStream, isLocal: true, camOn, micOn, speaking: speakingIds.has(user.id) }, ...remoteIds.map((id) => ({ id, ...participants[id], stream: remoteStreams[id], camOn: remoteMediaState[id]?.camOn ?? true, micOn: remoteMediaState[id]?.micOn ?? true, speaking: speakingIds.has(id), connecting: !remoteStreams[id] && (remoteMediaState[id]?.micOn !== false || remoteMediaState[id]?.camOn !== false) }))];
+  const focused = people.find((person) => person.id === focusedId) || people.find((person) => person.speaking && !person.isLocal) || people.find((person) => !person.isLocal) || people[0];
+
   return (
-    <div className="relative flex h-full">
+    <div className="relative flex h-full min-h-0 overflow-hidden">
       <div className="flex h-full min-w-0 flex-1 flex-col bg-ink-900 p-2 sm:p-4">
+        <header className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2 text-white">
+          <div className="min-w-0"><h1 className="truncate text-sm font-semibold">{workspaceName} · Meeting</h1><p className="mt-0.5 flex items-center gap-1.5 text-xs text-white/50"><span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-brand-400" : "bg-amber-400"}`} />{connected ? "Connected" : "Reconnecting…"}{joinedAt && <span className="tabular-nums">· {elapsedMeetingTime(joinedAt, now)}</span>} · {cameraCount} in call</p></div>
+          <div role="group" aria-label="Meeting layout" className="flex rounded-lg bg-white/5 p-1">{[["grid", "Grid", LayoutGrid], ["speaker", "Speaker", UserRound]].map(([value, label, Icon]) => <button key={value} onClick={() => { setLayout(value); if (value === "grid") setFocusedId(null); }} aria-pressed={layout === value} className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs ${layout === value ? "bg-white/15 text-white" : "text-white/50 hover:text-white"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}</div>
+        </header>
+        {error && <p role="alert" className="mb-2 shrink-0 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p>}
         {primaryScreen ? (
           <div
             className={`flex min-h-0 flex-1 gap-3 ${
@@ -502,11 +528,16 @@ export default function WorkspaceMeeting() {
                     micOn={remoteMediaState[id]?.micOn ?? true}
                     showStatus
                     speaking={speakingIds.has(id)}
-                    connecting={!remoteStreams[id]}
+                    connecting={people.find((person) => person.id === id)?.connecting}
                   />
                 </div>
               ))}
             </div>
+          </div>
+        ) : layout === "speaker" ? (
+          <div className="flex min-h-0 flex-1 flex-col gap-3">
+            <div className="min-h-0 flex-1"><VideoTile {...focused} large showStatus /></div>
+            <div className="flex shrink-0 gap-2 overflow-x-auto pb-1">{people.filter((person) => person.id !== focused.id).map((person) => <button key={person.id} onClick={() => setFocusedId(person.id)} aria-label={`Focus ${person.name}`} className="w-28 shrink-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-brand-400"><VideoTile {...person} showStatus /></button>)}</div>
           </div>
         ) : cameraCount === 1 ? (
           <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -548,7 +579,7 @@ export default function WorkspaceMeeting() {
                   micOn={remoteMediaState[id]?.micOn ?? true}
                   showStatus
                   speaking={speakingIds.has(id)}
-                  connecting={!remoteStreams[id]}
+                  connecting={people.find((person) => person.id === id)?.connecting}
                   large
                 />
               </div>
@@ -556,15 +587,17 @@ export default function WorkspaceMeeting() {
           </div>
         )}
 
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-2 sm:mt-4 sm:gap-3">
+        <div ref={controlsRef} className="mt-2 flex shrink-0 flex-wrap items-center justify-center gap-2 sm:mt-4 sm:gap-3">
           <ControlButton
             onClick={micAvailable ? toggleMic : promptEnableMic}
+            disabled={deviceBusy}
+            pressed={micOn}
             variant={!micAvailable ? "off" : micOn ? "default" : "off"}
             title={!micAvailable ? "Turn on your microphone" : micOn ? "Mute" : "Unmute"}
           >
             {!micAvailable || !micOn ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
           </ControlButton>
-          <ControlButton onClick={toggleCam} variant={camOn ? "default" : "off"} title={camOn ? "Turn off camera" : "Turn on camera"}>
+          <ControlButton onClick={toggleCam} disabled={deviceBusy} pressed={camOn} variant={camOn ? "default" : "off"} title={camOn ? "Turn off camera" : "Turn on camera"}>
             {camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
           </ControlButton>
           {(CAN_SHARE_SCREEN || sharingScreen) && (
@@ -577,13 +610,14 @@ export default function WorkspaceMeeting() {
             </ControlButton>
           )}
           <ControlButton
-            onClick={() => setChatOpen((o) => !o)}
+            onClick={() => { setChatOpen((o) => !o); setParticipantsOpen(false); }}
             variant={chatOpen ? "active" : "default"}
             title={chatOpen ? "Hide chat" : "Show chat"}
           >
             <MessageSquare className="h-5 w-5" />
           </ControlButton>
-          <ControlButton onClick={() => setScheduleOpen(true)} title="Schedule a meeting">
+          <ControlButton onClick={() => { setParticipantsOpen((value) => !value); setChatOpen(false); }} variant={participantsOpen ? "active" : "default"} title={participantsOpen ? "Hide participants" : "Show participants"} pressed={participantsOpen}><Users className="h-5 w-5" /></ControlButton>
+          <ControlButton onClick={() => schedule()} title="Schedule a meeting">
             <CalendarPlus className="h-5 w-5" />
           </ControlButton>
           <ControlButton onClick={() => setSettingsOpen(true)} title="Meeting settings">
@@ -595,10 +629,11 @@ export default function WorkspaceMeeting() {
         </div>
 
         <MicRequestModal open={micRequestOpen} onCancel={cancelMicRequest} onConfirm={confirmEnableMic} />
-        <MeetingSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} meetLink={meetLinkAvailable ? meetLink : null} />
-        <ScheduleMeetingModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} workspaceId={workspaceId} meetLink={meetLink} />
+        <MeetingSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} meetLink={meetLink} />
+        <ScheduleMeetingModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} workspaceId={workspaceId} meetLink={meetLink} event={editingEvent} onSaved={handleSaved} />
       </div>
 
+      {participantsOpen && <MeetingParticipants people={people} focusedId={focusedId} onFocus={(id) => { setFocusedId(id); setLayout(id ? "speaker" : "grid"); }} onClose={() => setParticipantsOpen(false)} />}
       {/* Phones: the chat covers the call rather than squeezing it into a sliver. */}
       {chatOpen && (
         <div className="absolute inset-0 z-30 flex h-full min-h-0 w-full flex-col bg-white dark:bg-ink-800 md:static md:z-auto md:w-80 md:shrink-0 md:border-l md:border-ink-200 md:dark:border-ink-700">
@@ -627,7 +662,7 @@ export default function WorkspaceMeeting() {
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="flex flex-1 items-center justify-center text-sm text-ink-400">Loading chat…</div>
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-4 text-sm text-ink-400">{chatError ? <><p role="alert" className="text-red-500">{chatError}</p><button onClick={() => setChatAttempt((value) => value + 1)} className="btn-secondary">Retry</button></> : "Loading chat…"}</div>
             </>
           )}
         </div>

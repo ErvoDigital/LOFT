@@ -19,7 +19,8 @@ function serialize(conversation, lastMessage) {
     createdById: conversation.createdById,
     participants: conversation.participants?.map((p) => p.user),
     lastMessage: lastMessage
-      ? { id: lastMessage.id, content: lastMessage.content, createdAt: lastMessage.createdAt, sender: lastMessage.sender }
+      ? { id: lastMessage.id, content: lastMessage.content, createdAt: lastMessage.createdAt, sender: lastMessage.sender,
+          attachment: lastMessage.attachment ? { name: lastMessage.attachment.name } : null }
       : null,
   };
 }
@@ -33,21 +34,15 @@ function serialize(conversation, lastMessage) {
 export async function listWorkspaceConversations(req, res) {
   const conversations = await prisma.conversation.findMany({
     where: { workspaceId: req.params.workspaceId, isMeetingChat: false, participants: { some: { userId: req.userId } } },
-    include: { participants: { include: { user: participantSelect } } },
+    include: {
+      participants: { include: { user: participantSelect } },
+      messages: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1,
+        include: { sender: { select: { id: true, name: true } }, attachment: { select: { name: true } } } },
+    },
     orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
   });
 
-  const lastMessages = await prisma.message.findMany({
-    where: { conversationId: { in: conversations.map((c) => c.id) } },
-    orderBy: { createdAt: "desc" },
-    include: { sender: { select: { id: true, name: true } } },
-  });
-  const lastByConv = new Map();
-  for (const m of lastMessages) {
-    if (!lastByConv.has(m.conversationId)) lastByConv.set(m.conversationId, m);
-  }
-
-  res.json({ conversations: conversations.map((c) => serialize(c, lastByConv.get(c.id))) });
+  res.json({ conversations: conversations.map((c) => serialize(c, c.messages[0])) });
 }
 
 const createSchema = z.object({

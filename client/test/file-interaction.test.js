@@ -8,6 +8,7 @@ import { act, create } from "react-test-renderer";
 import { build } from "esbuild";
 import { previewMimeType } from "../src/lib/filePreview.js";
 import { fileFailure } from "../src/lib/fileFeedback.js";
+import * as taskViewHelpers from "../src/lib/taskViews.js";
 
 const noop = () => null;
 const icons = Object.fromEntries(["File", "AlertCircle", "Download", "Eye", "FolderInput", "Trash2", "Loader2", "X", "Pencil", "Maximize2", "Minimize2", "Pin", "Moon", "Calendar", "Clock3", "Paperclip", "Image", "Film", "Music", "FileText"].map((name) => [name, noop]));
@@ -64,6 +65,7 @@ async function mount(t, component = "preview", overrides = {}, apiOverrides = {}
       "../../lib/filePreview.js": { previewMimeType, readOfficePreview: async () => { throw new Error("PRIVATE parser failure"); } },
       "../../lib/colors.js": { displayColor: () => "" },
       "../../lib/uploads.js": { ACCEPTED_UPLOAD_TYPES: "" },
+      "../../lib/taskViews.js": taskViewHelpers,
       "./OfficeContentPreview.jsx": noop,
       "./dragTypes.js": { ASSET_DRAG_TYPE: "asset" },
       "../../lib/fileIcons.jsx": { FileIcon: noop, formatSize: () => "12 B", timeAgo: () => "Just now" },

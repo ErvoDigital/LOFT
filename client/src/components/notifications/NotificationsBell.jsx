@@ -14,7 +14,7 @@ function timeAgo(date) {
 }
 
 export default function NotificationsBell() {
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
+  const { notifications, unreadCount, markRead, markAllRead, error, refresh } = useNotifications();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const navigate = useNavigate();
@@ -31,6 +31,8 @@ export default function NotificationsBell() {
     <div className="relative max-sm:static" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
+        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+        aria-expanded={open}
         className="relative flex h-10 w-10 items-center justify-center rounded-xl lg:h-9 lg:w-9 lg:rounded-lg text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700"
       >
         <Bell className="h-[18px] w-[18px]" />
@@ -51,6 +53,7 @@ export default function NotificationsBell() {
               </button>
             )}
           </div>
+          {error && <div role="alert" className="m-2 rounded-lg bg-red-500/10 p-2 text-xs text-red-600 dark:text-red-300"><p>{error}</p><button onClick={refresh} className="mt-1 font-semibold underline">Retry</button></div>}
           <div className="max-h-96 overflow-y-auto overscroll-contain max-sm:max-h-[70vh]">
             {notifications.length === 0 && <p className="px-2 py-6 text-center text-sm text-ink-400">You're all caught up.</p>}
             {notifications.map((n) => (

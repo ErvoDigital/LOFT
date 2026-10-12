@@ -1,6 +1,7 @@
 import { Pin, Moon, Pencil } from "lucide-react";
 import Avatar from "../common/Avatar.jsx";
 import { TierBadge } from "../common/Badges.jsx";
+import { formatTaskDue, isTaskOverdue } from "../../lib/taskViews.js";
 
 function formatDuration(minutes) {
   const m = Number(minutes) || 0;
@@ -12,7 +13,7 @@ function formatDuration(minutes) {
 }
 
 export default function TaskCard({ task, onClick, onEdit, dragHandlers, dragging, isDoneColumn, draggable = true }) {
-  const overdue = task.dueDate && new Date(task.dueDate) < new Date() && !isDoneColumn;
+  const overdue = isTaskOverdue(task, [{ id: task.status, isDone: isDoneColumn }]);
 
   return (
     <div
@@ -64,7 +65,7 @@ export default function TaskCard({ task, onClick, onEdit, dragHandlers, dragging
           {task.dueDate ? (
             <span className={`shrink-0 text-xs font-medium ${overdue ? "text-red-500" : "text-ink-400"}`}>
               {overdue ? "Overdue · " : "Due "}
-              {new Date(task.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}
+              {formatTaskDue(task.dueDate)}
             </span>
           ) : (
             <span className="shrink-0 text-xs text-ink-300">No due date</span>

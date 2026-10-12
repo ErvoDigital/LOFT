@@ -170,6 +170,7 @@ async function handleMessageSend(conn, data) {
   const conversationId = data?.conversationId;
   const attachmentAssetId = data?.attachmentAssetId || null;
   if ((!content && !attachmentAssetId) || !conversationId) return { error: "Invalid message" };
+  if (content.length > 4000) return { error: "Messages can contain up to 4,000 characters" };
 
   const convRes = await pool.query(`SELECT id, "workspaceId", "isMeetingChat" FROM "Conversation" WHERE id=$1`, [
     conversationId,

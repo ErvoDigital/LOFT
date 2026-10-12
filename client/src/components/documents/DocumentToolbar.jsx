@@ -8,9 +8,6 @@ import {
   Underline,
   Strikethrough,
   Code,
-  Heading1,
-  Heading2,
-  Heading3,
   Palette,
   Highlighter,
   AlignLeft,
@@ -26,6 +23,10 @@ import {
   Link2,
   Subscript,
   Superscript,
+  FilePlus2,
+  Rows3,
+  Columns3,
+  Trash2,
 } from "lucide-react";
 import { promptForLink } from "../../lib/tiptapLink.js";
 import useFloatingPanel from "../common/useFloatingPanel.js";
@@ -125,6 +126,12 @@ export default function DocumentToolbar({ editor }) {
 
       <Divider />
 
+      <select aria-label="Text style" value={editor.isActive("heading") ? String(editor.getAttributes("heading").level) : "paragraph"} onChange={(e) => e.target.value === "paragraph" ? editor.chain().focus().setParagraph().run() : editor.chain().focus().setHeading({ level: Number(e.target.value) }).run()} className="h-8 w-28 shrink-0 rounded-md border border-ink-200 bg-transparent px-2 text-xs text-ink-600 dark:border-ink-700 dark:text-ink-200"><option value="paragraph">Normal text</option>{[1, 2, 3].map((level) => <option key={level} value={level}>Heading {level}</option>)}</select>
+      <select aria-label="Font family" value={editor.getAttributes("textStyle").fontFamily || "Arial"} onChange={(e) => editor.chain().focus().setFontFamily(e.target.value).run()} className="ml-1 h-8 w-28 shrink-0 rounded-md border border-ink-200 bg-transparent px-2 text-xs text-ink-600 dark:border-ink-700 dark:text-ink-200">{["Arial", "Georgia", "Times New Roman", "Verdana", "Courier New"].map((font) => <option key={font} value={font}>{font}</option>)}</select>
+      <select aria-label="Font size" value={editor.getAttributes("textStyle").fontSize || "11pt"} onChange={(e) => editor.chain().focus().setFontSize(e.target.value).run()} className="ml-1 h-8 w-16 shrink-0 rounded-md border border-ink-200 bg-transparent px-2 text-xs text-ink-600 dark:border-ink-700 dark:text-ink-200">{[8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72].map((size) => <option key={size} value={`${size}pt`}>{size}</option>)}</select>
+
+      <Divider />
+
       <ToolButton Icon={Bold} title="Bold" active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} />
       <ToolButton Icon={Italic} title="Italic" active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} />
       <ToolButton
@@ -151,27 +158,6 @@ export default function DocumentToolbar({ editor }) {
         title="Superscript"
         active={editor.isActive("superscript")}
         onClick={() => editor.chain().focus().toggleSuperscript().run()}
-      />
-
-      <Divider />
-
-      <ToolButton
-        Icon={Heading1}
-        title="Heading 1"
-        active={editor.isActive("heading", { level: 1 })}
-        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-      />
-      <ToolButton
-        Icon={Heading2}
-        title="Heading 2"
-        active={editor.isActive("heading", { level: 2 })}
-        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-      />
-      <ToolButton
-        Icon={Heading3}
-        title="Heading 3"
-        active={editor.isActive("heading", { level: 3 })}
-        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
       />
 
       <Divider />
@@ -237,6 +223,8 @@ export default function DocumentToolbar({ editor }) {
       <ToolButton Icon={Code2} title="Code block" active={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()} />
       <ToolButton Icon={Minus} title="Horizontal rule" onClick={() => editor.chain().focus().setHorizontalRule().run()} />
       <ToolButton Icon={Link2} title="Link" active={editor.isActive("link")} onClick={() => promptForLink(editor)} />
+      <ToolButton Icon={FilePlus2} title="Insert page break (Ctrl+Enter)" disabled={!editor.can().insertPageBreak()} onClick={() => editor.chain().focus().insertPageBreak().run()} />
+      {editor.isActive("table") && <><Divider /><ToolButton Icon={Rows3} title="Add row below" onClick={() => editor.chain().focus().addRowAfter().run()} /><ToolButton Icon={Columns3} title="Add column right" onClick={() => editor.chain().focus().addColumnAfter().run()} /><ToolButton Icon={Trash2} title="Delete row" onClick={() => editor.chain().focus().deleteRow().run()} /><ToolButton Icon={Trash2} title="Delete column" onClick={() => editor.chain().focus().deleteColumn().run()} /><ToolButton Icon={Trash2} title="Delete table" onClick={() => editor.chain().focus().deleteTable().run()} /></>}
     </div>
   );
 }

@@ -97,8 +97,7 @@ export default {
       },
       animation: {
         "toast-in": "toast-in 0.2s ease-out",
-        // Duration must match TOAST_SECONDS in MentionToasts.jsx — this bar
-        // is the visual half of the countdown, the numeral is the other half.
+        // NotificationToasts overrides the duration to match its dismiss timer.
         "toast-shrink": "toast-shrink 6s linear forwards",
         // Durations are mirrored by the timers that clear the trigger state in
         // WorkspaceStorage.jsx — keep them in sync.

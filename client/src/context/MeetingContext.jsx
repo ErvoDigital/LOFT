@@ -36,6 +36,8 @@ export function MeetingProvider({ children }) {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
   const [joined, setJoined] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [joinedAt, setJoinedAt] = useState(null);
+  const [deviceBusy, setDeviceBusy] = useState(false);
   const [error, setError] = useState("");
   // True once the camera/mic stream has been acquired and previewed but
   // before the socket join actually happens — the "check your camera and
@@ -78,6 +80,11 @@ export function MeetingProvider({ children }) {
   const sharingScreenRef = useRef(false); // mirrors `sharingScreen` state, same reason
   const micOnRef = useRef(true); // mirrors `micOn`, read inside the peer-joined handler to answer a new joiner's implicit "what's everyone's state" question
   const camOnRef = useRef(true); // mirrors `camOn`, same reason
+  const mediaSessionRef = useRef(0);
+  const joinPendingRef = useRef(false);
+  const deviceBusyRef = useRef(false);
+  const peerScreenStreamIdRef = useRef(new Map());
+  const screenRequestRef = useRef(false);
 
   useEffect(() => {
     annotationsRef.current = annotations;
@@ -95,7 +102,14 @@ export function MeetingProvider({ children }) {
   // Local + every peer's camera stream, fed to the speaking-highlight
   // detector — only while actually in a call, so no AudioContext/analysers
   // exist during the lobby or when idle.
-  const speakingIds = useSpeakingDetection(joined ? { [user.id]: localStream, ...remoteStreams } : {});
+  const speakingIds = useSpeakingDetection(joined ? { [user?.id]: localStream, ...remoteStreams } : {});
+
+  useEffect(() => () => {
+    mediaSessionRef.current++;
+    peersRef.current.forEach((pc) => pc.close()); peersRef.current.clear();
+    localStreamRef.current?.getTracks().forEach((track) => track.stop()); localStreamRef.current = null;
+    localScreenStreamRef.current?.getTracks().forEach((track) => track.stop()); localScreenStreamRef.current = null;
+  }, []);
 
   const createPeerConnection = useCallback(
     (peerId, isInitiator) => {
@@ -103,6 +117,12 @@ export function MeetingProvider({ children }) {
 
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       localStreamRef.current?.getTracks().forEach((track) => pc.addTrack(track, localStreamRef.current));
+      // A listener with no outgoing tracks still needs media sections in the
+      // initial offer so the other participant can send their camera and voice.
+      if (isInitiator) {
+        if (!localStreamRef.current?.getAudioTracks().length) pc.addTransceiver("audio", { direction: "recvonly" });
+        if (!localStreamRef.current?.getVideoTracks().length) pc.addTransceiver("video", { direction: "recvonly" });
+      }
       if (localScreenStreamRef.current) {
         // One sender per track (video, plus audio when the share included
         // it) — stored as an array so stopScreenShare can remove all of
@@ -127,6 +147,11 @@ export function MeetingProvider({ children }) {
         // also holds for a peer who joins mid-share, since camera tracks are always added
         // before the screen track in createPeerConnection.
         const incoming = e.streams[0];
+        if (!incoming) return;
+        if (incoming.id === peerScreenStreamIdRef.current.get(peerId)) {
+          setRemoteScreenStreams((prev) => ({ ...prev, [peerId]: incoming }));
+          return;
+        }
         const knownCameraId = peerCameraStreamIdRef.current.get(peerId);
         if (!knownCameraId || incoming.id === knownCameraId) {
           peerCameraStreamIdRef.current.set(peerId, incoming.id);
@@ -147,7 +172,7 @@ export function MeetingProvider({ children }) {
         pc.createOffer()
           .then((offer) => pc.setLocalDescription(offer))
           .then(() => {
-            socket.emit("meeting:signal", { toUserId: peerId, data: { type: "offer", sdp: pc.localDescription } });
+            socket.emit("meeting:signal", { toUserId: peerId, data: { type: "offer", sdp: pc.localDescription, cameraStreamId: localStreamRef.current?.id, screenStreamId: localScreenStreamRef.current?.id } });
           })
           .catch((err) => console.error("createOffer failed", err));
       }
@@ -185,6 +210,7 @@ export function MeetingProvider({ children }) {
       peersRef.current.delete(userId);
       screenSendersRef.current.delete(userId);
       peerCameraStreamIdRef.current.delete(userId);
+      peerScreenStreamIdRef.current.delete(userId);
       setParticipants((prev) => {
         const next = { ...prev };
         delete next[userId];
@@ -208,6 +234,8 @@ export function MeetingProvider({ children }) {
     };
 
     const onSignal = async ({ fromUserId, data }) => {
+      if (data.cameraStreamId) peerCameraStreamIdRef.current.set(fromUserId, data.cameraStreamId);
+      if (data.screenStreamId) peerScreenStreamIdRef.current.set(fromUserId, data.screenStreamId);
       const pc = createPeerConnection(fromUserId, false);
       try {
         if (data.type === "offer") {
@@ -215,7 +243,7 @@ export function MeetingProvider({ children }) {
           flushQueued(fromUserId, pc);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
-          socket.emit("meeting:signal", { toUserId: fromUserId, data: { type: "answer", sdp: pc.localDescription } });
+          socket.emit("meeting:signal", { toUserId: fromUserId, data: { type: "answer", sdp: pc.localDescription, cameraStreamId: localStreamRef.current?.id, screenStreamId: localScreenStreamRef.current?.id } });
 
           // An answer can only fill the m-lines the offer already has, so if I'm
           // currently sharing my screen, the sender createPeerConnection already
@@ -224,7 +252,7 @@ export function MeetingProvider({ children }) {
           if (localScreenStreamRef.current) {
             const followUpOffer = await pc.createOffer();
             await pc.setLocalDescription(followUpOffer);
-            socket.emit("meeting:signal", { toUserId: fromUserId, data: { type: "offer", sdp: pc.localDescription } });
+            socket.emit("meeting:signal", { toUserId: fromUserId, data: { type: "offer", sdp: pc.localDescription, cameraStreamId: localStreamRef.current?.id, screenStreamId: localScreenStreamRef.current?.id } });
           }
         } else if (data.type === "answer") {
           await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
@@ -245,6 +273,7 @@ export function MeetingProvider({ children }) {
 
     const onScreenShare = ({ userId, sharing }) => {
       if (sharing) return; // the stream itself arrives via ontrack; nothing to do here
+      peerScreenStreamIdRef.current.delete(userId);
       setRemoteScreenStreams((prev) => {
         const next = { ...prev };
         delete next[userId];
@@ -286,38 +315,37 @@ export function MeetingProvider({ children }) {
     };
   }, [socket, joined, createPeerConnection, flushQueued]);
 
-  // Acquires the camera (and, if requested, mic) stream and opens the
-  // pre-join lobby (a preview + mic/cam check) rather than joining the call
-  // outright — the actual socket join only happens once the user confirms
-  // via confirmJoin(). No guard against an already-active call here, since
-  // this is also used directly by switchMeeting() right after it tears the
-  // old call down, so it can't be blocked by `joined` still reading true
-  // from this render's stale closure (leaveMeeting()'s setJoined(false)
-  // hasn't been applied yet at that point).
-  async function acquireDevices(workspaceId, withAudio = true) {
+  // Acquire only the chosen devices. An empty stream lets someone listen
+  // without requesting camera or microphone access.
+  async function acquireDevices(workspaceId, options = { video: true, audio: true }) {
+    if (joinPendingRef.current) return;
+    const devices = typeof options === "boolean" ? { video: true, audio: options } : options;
+    const session = ++mediaSessionRef.current;
+    joinPendingRef.current = true;
+    setPendingWorkspaceId(workspaceId);
     setError("");
     setJoining(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: withAudio });
+      const stream = devices.video || devices.audio ? await navigator.mediaDevices.getUserMedia(devices) : new MediaStream();
+      if (session !== mediaSessionRef.current) { stream.getTracks().forEach((track) => track.stop()); return; }
       localStreamRef.current = stream;
       setLocalStream(stream);
-      setMicAvailable(withAudio);
-      setMicOn(withAudio);
+      setMicAvailable(!!devices.audio);
+      setMicOn(!!devices.audio); micOnRef.current = !!devices.audio;
+      setCamOn(!!devices.video); camOnRef.current = !!devices.video;
       setPendingWorkspaceId(workspaceId);
       setLobbyOpen(true);
     } catch (err) {
-      setError("Couldn't access your camera or microphone. Check your browser permissions and try again.");
+      if (session === mediaSessionRef.current) { setPendingWorkspaceId(null); setError("Couldn't access the selected devices. Check browser permissions, or join with your camera and mic off."); }
     } finally {
-      setJoining(false);
+      if (session === mediaSessionRef.current) { joinPendingRef.current = false; setJoining(false); }
     }
   }
 
-  // Opens the "do you want people to see/hear you" confirmation — shown
-  // before any permission is requested, so the browser's own camera/mic
-  // prompt only fires once the user picks camera-only vs. camera+mic below.
+  // Ask which devices to use before triggering browser permission prompts.
   function promptJoin(workspaceId) {
-    if (joined || joining || lobbyOpen || confirmWorkspaceId) return;
-    setConfirmWorkspaceId(workspaceId);
+    if (joined || joining || joinPendingRef.current || lobbyOpen || confirmWorkspaceId) return;
+    setError(""); setConfirmWorkspaceId(workspaceId);
   }
 
   function cancelConfirm() {
@@ -327,16 +355,18 @@ export function MeetingProvider({ children }) {
   // Called once the user picks a device combination from the confirmation —
   // this is what actually triggers getUserMedia (and the browser's native
   // permission prompt).
-  function confirmDevices(withAudio) {
+  function confirmDevices(options) {
     const workspaceId = confirmWorkspaceId;
     setConfirmWorkspaceId(null);
     if (!workspaceId) return;
-    return acquireDevices(workspaceId, withAudio);
+    return acquireDevices(workspaceId, options);
   }
 
   // Backs out of the lobby without ever having joined the call — releases
   // the camera/mic and restores the mic/cam toggle defaults for next time.
   function cancelPrepare() {
+    mediaSessionRef.current++; joinPendingRef.current = false; deviceBusyRef.current = false;
+    setJoining(false); setDeviceBusy(false);
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
     setLocalStream(null);
@@ -353,14 +383,18 @@ export function MeetingProvider({ children }) {
   // getUserMedia a second time.
   function confirmJoin() {
     const workspaceId = pendingWorkspaceId;
-    if (!workspaceId || !localStreamRef.current || joining) return;
+    if (!workspaceId || !localStreamRef.current || joining || joinPendingRef.current || deviceBusyRef.current) return;
     if (!socket?.connected) {
       setError("Live connection unavailable. Wait for it to reconnect, then join again.");
       return;
     }
     setError("");
+    const session = mediaSessionRef.current;
+    joinPendingRef.current = true;
     setJoining(true);
     socket.emit("meeting:join", workspaceId, (res) => {
+      if (session !== mediaSessionRef.current) return;
+      joinPendingRef.current = false;
       if (res?.error || !Array.isArray(res?.peers)) {
         setError(res?.error || "Couldn't confirm the meeting connection. Please try again.");
         setJoining(false);
@@ -374,14 +408,17 @@ export function MeetingProvider({ children }) {
       setParticipants(meta);
       setActiveWorkspaceId(workspaceId);
       setJoined(true);
+      setJoinedAt(Date.now());
       setJoining(false);
       setLobbyOpen(false);
       setPendingWorkspaceId(null);
+      socket.emit("meeting:media-state", { micOn: micOnRef.current, camOn: camOnRef.current });
       (res.peers || []).forEach((p) => createPeerConnection(p.userId, true));
     });
   }
 
   function stopLocalScreenShare() {
+    screenRequestRef.current = false;
     const screenStream = localScreenStreamRef.current;
     if (!screenStream) return;
     screenStream.getTracks().forEach((t) => t.stop());
@@ -392,6 +429,8 @@ export function MeetingProvider({ children }) {
 
   function leaveMeeting() {
     if (!joined) return;
+    mediaSessionRef.current++; joinPendingRef.current = false; deviceBusyRef.current = false;
+    setJoining(false); setDeviceBusy(false); setJoinedAt(null);
     socket?.emit("meeting:leave");
     peersRef.current.forEach((pc) => pc.close());
     peersRef.current.clear();
@@ -401,6 +440,7 @@ export function MeetingProvider({ children }) {
     setLocalStream(null);
     pendingCandidatesRef.current.clear();
     peerCameraStreamIdRef.current.clear();
+    peerScreenStreamIdRef.current.clear();
     setParticipants({});
     setRemoteStreams({});
     setRemoteScreenStreams({});
@@ -438,16 +478,10 @@ export function MeetingProvider({ children }) {
     setLeaveConfirmOpen(false);
   }
 
-  // Leaves whatever call is currently active and immediately opens the
-  // lobby for a different workspace's — used by the "leave & join here"
-  // cross-workspace prompt. Skips the confirmation dialog (defaults to
-  // camera+mic) and goes through acquireDevices directly (not promptJoin)
-  // since leaveMeeting()'s setJoined(false) hasn't taken effect yet at this
-  // point in the same synchronous call — promptJoin's `if (joined) return`
-  // guard would still see the pre-leave value and no-op.
+  // Switching workspaces starts with the same device choices as a fresh call.
   function switchMeeting(workspaceId) {
     leaveMeeting();
-    return acquireDevices(workspaceId);
+    setError(""); setConfirmWorkspaceId(workspaceId);
   }
 
   // Hard stop on logout: the socket is already disconnecting by the time this
@@ -456,7 +490,9 @@ export function MeetingProvider({ children }) {
   // connections directly — otherwise the browser's camera indicator would
   // stay on with no UI left to turn it off.
   useEffect(() => {
-    if (user || (!joined && !lobbyOpen && !confirmWorkspaceId)) return;
+    if (user) return;
+    mediaSessionRef.current++; joinPendingRef.current = false; deviceBusyRef.current = false;
+    setJoining(false); setDeviceBusy(false); setJoinedAt(null); setLeaveConfirmOpen(false);
     setConfirmWorkspaceId(null);
     peersRef.current.forEach((pc) => pc.close());
     peersRef.current.clear();
@@ -467,6 +503,7 @@ export function MeetingProvider({ children }) {
     setLocalStream(null);
     pendingCandidatesRef.current.clear();
     peerCameraStreamIdRef.current.clear();
+    peerScreenStreamIdRef.current.clear();
     screenSendersRef.current.clear();
     setParticipants({});
     setRemoteStreams({});
@@ -484,16 +521,22 @@ export function MeetingProvider({ children }) {
   }, [user]);
 
   function toggleMic() {
-    const next = !micOn;
+    if (deviceBusyRef.current || !localStreamRef.current) return;
+    if (!localStreamRef.current.getAudioTracks().some((track) => track.readyState !== "ended")) return enableDevice("audio");
+    const next = !micOnRef.current;
     localStreamRef.current?.getAudioTracks().forEach((t) => (t.enabled = next));
     setMicOn(next);
+    micOnRef.current = next;
     if (joined) socket.emit("meeting:media-state", { micOn: next, camOn: camOnRef.current });
   }
 
-  function toggleCam() {
-    const next = !camOn;
+  async function toggleCam() {
+    if (deviceBusyRef.current || !localStreamRef.current) return;
+    if (!localStreamRef.current.getVideoTracks().some((track) => track.readyState !== "ended")) return enableDevice("video");
+    const next = !camOnRef.current;
     localStreamRef.current?.getVideoTracks().forEach((t) => (t.enabled = next));
     setCamOn(next);
+    camOnRef.current = next;
     if (joined) socket.emit("meeting:media-state", { micOn: micOnRef.current, camOn: next });
   }
 
@@ -515,33 +558,41 @@ export function MeetingProvider({ children }) {
   // (same offer/renegotiate pattern as startScreenShare).
   async function confirmEnableMic() {
     setMicRequestOpen(false);
+    return enableDevice("audio");
+  }
+
+  async function enableDevice(kind) {
+    if (deviceBusyRef.current || !localStreamRef.current) return;
+    const session = mediaSessionRef.current, stream = localStreamRef.current;
+    deviceBusyRef.current = true; setDeviceBusy(true); setError("");
     try {
-      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const audioTrack = audioStream.getAudioTracks()[0];
-      if (!localStreamRef.current) {
-        localStreamRef.current = audioStream;
-        setLocalStream(audioStream);
-      } else {
-        localStreamRef.current.addTrack(audioTrack);
-      }
+      const acquired = await navigator.mediaDevices.getUserMedia({ [kind]: true });
+      if (session !== mediaSessionRef.current || stream !== localStreamRef.current) { acquired.getTracks().forEach((track) => track.stop()); return; }
+      const track = acquired.getTracks().find((item) => item.kind === kind);
+      if (!track) { acquired.getTracks().forEach((item) => item.stop()); throw new Error("No media track"); }
+      stream.addTrack(track);
+      if (kind === "audio") { setMicAvailable(true); setMicOn(true); micOnRef.current = true; }
+      else { setCamOn(true); camOnRef.current = true; }
+      // Keep the stream id stable for peers; changing the object refreshes
+      // the local preview and speaking detection after adding a track.
+      setLocalStream(new MediaStream(stream.getTracks()));
 
       for (const [peerId, pc] of peersRef.current) {
-        pc.addTrack(audioTrack, localStreamRef.current);
+        if (session !== mediaSessionRef.current) break;
+        pc.addTrack(track, stream);
         try {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
-          socket.emit("meeting:signal", { toUserId: peerId, data: { type: "offer", sdp: pc.localDescription } });
+          if (session === mediaSessionRef.current) socket.emit("meeting:signal", { toUserId: peerId, data: { type: "offer", sdp: pc.localDescription, cameraStreamId: stream.id, screenStreamId: localScreenStreamRef.current?.id } });
         } catch (err) {
-          console.error("add-mic renegotiation failed", err);
+          console.error("device renegotiation failed", err);
         }
       }
 
-      setMicAvailable(true);
-      setMicOn(true);
-      socket.emit("meeting:media-state", { micOn: true, camOn: camOnRef.current });
+      if (session === mediaSessionRef.current && joined) socket.emit("meeting:media-state", { micOn: micOnRef.current, camOn: camOnRef.current });
     } catch (err) {
-      setError("Couldn't access your microphone. Check your browser permissions and try again.");
-    }
+      if (session === mediaSessionRef.current) setError(`Couldn't access your ${kind === "audio" ? "microphone" : "camera"}. Check your browser permissions and try again.`);
+    } finally { if (session === mediaSessionRef.current) { deviceBusyRef.current = false; setDeviceBusy(false); } }
   }
 
   // Local update + broadcast so every participant's canvas matches. Used both
@@ -572,7 +623,9 @@ export function MeetingProvider({ children }) {
   }
 
   async function startScreenShare() {
-    if (sharingScreen) return;
+    if (sharingScreen || screenRequestRef.current || !joined) return;
+    const session = mediaSessionRef.current;
+    screenRequestRef.current = true;
     try {
       // `audio: true` only makes the browser's own share picker offer a
       // "share audio" checkbox — most browsers only honor it for a tab/
@@ -580,32 +633,36 @@ export function MeetingProvider({ children }) {
       // user leaves it unchecked. Either way the resulting stream just has
       // no audio track, so nothing else here needs to special-case it.
       const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      if (session !== mediaSessionRef.current) { displayStream.getTracks().forEach((track) => track.stop()); return; }
       const screenStream = new MediaStream(displayStream.getTracks());
       localScreenStreamRef.current = screenStream;
       clearAnnotations();
 
       for (const [peerId, pc] of peersRef.current) {
+        if (session !== mediaSessionRef.current) break;
         const senders = screenStream.getTracks().map((track) => pc.addTrack(track, screenStream));
         screenSendersRef.current.set(peerId, senders);
         try {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
-          socket.emit("meeting:signal", { toUserId: peerId, data: { type: "offer", sdp: pc.localDescription } });
+          if (session === mediaSessionRef.current) socket.emit("meeting:signal", { toUserId: peerId, data: { type: "offer", sdp: pc.localDescription, cameraStreamId: localStreamRef.current?.id, screenStreamId: localScreenStreamRef.current?.id } });
         } catch (err) {
           console.error("screen-share offer failed", err);
         }
       }
 
-      screenStream.getVideoTracks()[0].onended = () => stopScreenShare();
+      if (session !== mediaSessionRef.current) return;
+      screenStream.getVideoTracks()[0].onended = () => { if (localScreenStreamRef.current === screenStream) stopScreenShare(); };
       socket.emit("meeting:screen-share", { sharing: true });
       setSharingScreen(true);
     } catch (err) {
       // User cancelled the share picker or denied permission — nothing to do.
-    }
+    } finally { if (session === mediaSessionRef.current) screenRequestRef.current = false; }
   }
 
   async function stopScreenShare() {
     if (!localScreenStreamRef.current) return;
+    const session = mediaSessionRef.current;
 
     for (const [peerId, pc] of peersRef.current) {
       const senders = screenSendersRef.current.get(peerId);
@@ -614,12 +671,13 @@ export function MeetingProvider({ children }) {
       try {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        socket.emit("meeting:signal", { toUserId: peerId, data: { type: "offer", sdp: pc.localDescription } });
+        socket.emit("meeting:signal", { toUserId: peerId, data: { type: "offer", sdp: pc.localDescription, cameraStreamId: localStreamRef.current?.id, screenStreamId: localScreenStreamRef.current?.id } });
       } catch (err) {
         console.error("stop-share renegotiation failed", err);
       }
     }
 
+    if (session !== mediaSessionRef.current) return;
     stopLocalScreenShare();
     socket.emit("meeting:screen-share", { sharing: false });
     clearAnnotations();
@@ -629,6 +687,8 @@ export function MeetingProvider({ children }) {
     activeWorkspaceId,
     joined,
     joining,
+    joinedAt,
+    deviceBusy,
     error,
     lobbyOpen,
     pendingWorkspaceId,
@@ -682,14 +742,14 @@ export function MeetingProvider({ children }) {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-500/15 text-red-600">
             <PhoneOff className="h-6 w-6" />
           </div>
-          <h2 className="text-base font-semibold text-ink-900 dark:text-ink-50">End the call?</h2>
+          <h2 className="text-base font-semibold text-ink-900 dark:text-ink-50">Leave this meeting?</h2>
           <p className="mt-1 text-sm text-ink-400">You'll be disconnected from this meeting.</p>
           <div className="mt-4 flex items-center gap-2">
             <button onClick={cancelLeave} className="btn-secondary flex-1">
               Cancel
             </button>
             <button onClick={confirmLeave} className="btn-danger flex-1">
-              End call
+              Leave meeting
             </button>
           </div>
         </div>

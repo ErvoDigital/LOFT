@@ -62,35 +62,40 @@ export default function NewDmModal({ open, onClose, onStarted }) {
       .catch(() => setFollowing([]));
   }, [open]);
 
-  async function handleSearch(q) {
-    setQuery(q);
-    if (q.trim().length < 2) return setResults([]);
+  useEffect(() => {
+    let cancelled = false;
+    const q = query.trim();
+    setResults([]);
+    if (!open || q.length < 2) { setSearching(false); return; }
     setSearching(true);
-    try {
-      setResults(await usersApi.searchUsers(q));
-    } catch (err) {
-      setError(apiErrorMessage(err));
-    } finally {
-      setSearching(false);
-    }
-  }
+    const timer = setTimeout(async () => {
+      try {
+        const people = await usersApi.searchUsers(q);
+        if (!cancelled) { setResults(people); setError(""); }
+      } catch (err) {
+        if (!cancelled) setError(apiErrorMessage(err));
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [open, query]);
 
-  async function pickWorkspace(workspace) {
-    setOpenWorkspace(workspace);
+  useEffect(() => {
+    if (!open || !openWorkspace) return;
+    let cancelled = false;
     setLoadingMembers(true);
+    setMembers([]);
     setError("");
-    try {
-      const full = await workspacesApi.getWorkspace(workspace.id);
-      setMembers(full.members.map((m) => m.user).filter((u) => u.id !== me?.id));
-    } catch (err) {
-      setError(apiErrorMessage(err));
-      setMembers([]);
-    } finally {
-      setLoadingMembers(false);
-    }
-  }
+    workspacesApi.getWorkspace(openWorkspace.id).then((full) => {
+      if (!cancelled) setMembers(full.members.map((m) => m.user).filter((u) => u.id !== me?.id));
+    }).catch((err) => { if (!cancelled) setError(apiErrorMessage(err)); })
+      .finally(() => { if (!cancelled) setLoadingMembers(false); });
+    return () => { cancelled = true; };
+  }, [open, openWorkspace, me?.id]);
 
   async function selectUser(userId) {
+    if (starting) return;
     setStarting(true);
     setError("");
     try {
@@ -132,8 +137,9 @@ export default function NewDmModal({ open, onClose, onStarted }) {
             <input
               className="input !pl-9"
               placeholder="Search people by name or email…"
+              aria-label="Search people"
               value={query}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => setQuery(e.target.value)}
               autoFocus
             />
           </div>
@@ -165,7 +171,7 @@ export default function NewDmModal({ open, onClose, onStarted }) {
                   workspaces.map((workspace) => (
                     <button
                       key={workspace.id}
-                      onClick={() => pickWorkspace(workspace)}
+                      onClick={() => setOpenWorkspace(workspace)}
                       className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left hover:bg-ink-900/[0.04] dark:hover:bg-white/[0.06]"
                     >
                       <WorkspaceMark

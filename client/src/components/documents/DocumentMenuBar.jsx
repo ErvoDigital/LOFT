@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useEditorState } from "@tiptap/react";
 import {
   FilePlus,
   Copy,
@@ -40,6 +41,8 @@ import {
   Columns2,
   Columns3,
   Lock,
+  FilePlus2,
+  Settings2,
 } from "lucide-react";
 import { promptForLink } from "../../lib/tiptapLink.js";
 import TableGridPicker from "./TableGridPicker.jsx";
@@ -50,6 +53,8 @@ function MenuButton({ label, isOpen, onToggle }) {
   return (
     <button
       onClick={onToggle}
+      aria-haspopup="menu"
+      aria-expanded={isOpen}
       className={`rounded px-2 py-1.5 text-sm transition-colors sm:px-2.5 sm:py-1 ${isOpen ? "bg-ink-100 text-ink-900 dark:bg-ink-700 dark:text-ink-50" : "text-ink-600 hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-700"}`}
     >
       {label}
@@ -62,6 +67,7 @@ function Item({ Icon, label, shortcut, onClick, disabled, active }) {
     <button
       onClick={onClick}
       disabled={disabled}
+      role="menuitem"
       className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm touch:py-2.5 disabled:opacity-40 disabled:pointer-events-none ${
         active ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "text-ink-600 hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-700"
       }`}
@@ -99,7 +105,13 @@ export default function DocumentMenuBar({
   onSetPageSize,
   columns,
   onSetColumns,
+  onPageSetup,
+  onAddPage,
+  editable = true,
+  canManage = true,
+  busy = false,
 }) {
+  useEditorState({ editor, selector: ({ transactionNumber }) => transactionNumber });
   const [openMenu, setOpenMenu] = useState(null);
   const [tableFlyoutOpen, setTableFlyoutOpen] = useState(false);
   const ref = useRef(null);
@@ -122,6 +134,7 @@ export default function DocumentMenuBar({
 
   useEffect(() => {
     if (openMenu !== "Insert") setTableFlyoutOpen(false);
+    if (openMenu) ref.current?.querySelector('[role="menu"] button:not(:disabled)')?.focus();
   }, [openMenu]);
 
   function run(fn) {
@@ -133,7 +146,7 @@ export default function DocumentMenuBar({
 
   function cmd(fn) {
     return () => {
-      if (editor) fn(editor.chain().focus()).run();
+      if (editor && editable) fn(editor.chain().focus()).run();
       setOpenMenu(null);
     };
   }
@@ -151,17 +164,18 @@ export default function DocumentMenuBar({
   const menus = {
     File: (
       <>
-        <Item Icon={FilePlus} label="New document" onClick={run(onNew)} />
-        <Item Icon={Copy} label="Make a copy" onClick={run(onMakeCopy)} />
-        <Item Icon={Pencil} label="Rename" onClick={run(onRename)} />
-        <Item Icon={Lock} label="Access" onClick={run(onAccess)} />
+        <Item Icon={FilePlus} label="New document" disabled={busy} onClick={run(onNew)} />
+        <Item Icon={Copy} label="Make a copy" disabled={busy} onClick={run(onMakeCopy)} />
+        <Item Icon={Pencil} label="Rename" disabled={!editable} onClick={run(onRename)} />
+        <Item Icon={Settings2} label="Page setup" disabled={!editable} onClick={run(onPageSetup)} />
+        <Item Icon={Lock} label="Access" disabled={!canManage} onClick={run(onAccess)} />
         <Sep />
-        <Item Icon={FileDown} label="Download as PDF" onClick={run(() => onDownload("pdf"))} />
+        <Item Icon={FileDown} label="Save as PDF…" onClick={run(() => onDownload("pdf"))} />
         <Item Icon={FileText} label="Download as Markdown" onClick={run(() => onDownload("markdown"))} />
         <Item Icon={FileCode} label="Download as HTML" onClick={run(() => onDownload("html"))} />
         <Item Icon={Printer} label="Print" shortcut={`${MOD}+P`} onClick={run(onPrint)} />
         <Sep />
-        <Item Icon={Trash2} label="Move to trash" onClick={run(onDelete)} />
+        <Item Icon={Trash2} label="Delete document" disabled={!canManage || busy} onClick={run(onDelete)} />
       </>
     ),
     Edit: (
@@ -180,12 +194,15 @@ export default function DocumentMenuBar({
         <Item Icon={fullscreen ? Minimize2 : Maximize2} label={fullscreen ? "Exit full screen" : "Full screen"} onClick={run(onToggleFullscreen)} />
         <Sep />
         <Item Icon={LayoutGrid} label="Pageless format" active={pageless} onClick={run(onTogglePageless)} />
-        <Item label="Page view — Letter" active={!pageless && pageSize === "letter"} onClick={run(() => onSetPageSize("letter"))} />
-        <Item label="Page view — A4" active={!pageless && pageSize === "a4"} onClick={run(() => onSetPageSize("a4"))} />
+        <Item label="Page view — Letter" disabled={!editable} active={!pageless && pageSize === "letter"} onClick={run(() => onSetPageSize("letter"))} />
+        <Item label="Page view — A4" disabled={!editable} active={!pageless && pageSize === "a4"} onClick={run(() => onSetPageSize("a4"))} />
       </>
     ),
     Insert: (
       <>
+        <Item Icon={FilePlus2} label="Add page at end" onClick={run(() => { editor?.chain().focus().addPage().run(); onAddPage?.(); })} />
+        <Item Icon={FilePlus2} label="Page break" shortcut={`${MOD}+Enter`} disabled={!editor?.can().insertPageBreak()} onClick={cmd((c) => c.insertPageBreak())} />
+        <Sep />
         <Item Icon={ImageIcon} label="Image" onClick={run(onInsertImage)} />
         <div
           className="relative"
@@ -248,9 +265,9 @@ export default function DocumentMenuBar({
         <Item Icon={ListOrdered} label="Numbered list" active={editor?.isActive("orderedList")} onClick={cmd((c) => c.toggleOrderedList())} />
         <Item Icon={ListChecks} label="Task list" active={editor?.isActive("taskList")} onClick={cmd((c) => c.toggleTaskList())} />
         <Sep />
-        <Item label="1 column" active={columns === 1} onClick={run(() => onSetColumns(1))} />
-        <Item Icon={Columns2} label="2 columns" active={columns === 2} onClick={run(() => onSetColumns(2))} />
-        <Item Icon={Columns3} label="3 columns" active={columns === 3} onClick={run(() => onSetColumns(3))} />
+        <Item label="1 column" disabled={!pageless} active={columns === 1} onClick={run(() => onSetColumns(1))} />
+        <Item Icon={Columns2} label="2 columns (pageless)" disabled={!pageless} active={columns === 2} onClick={run(() => onSetColumns(2))} />
+        <Item Icon={Columns3} label="3 columns (pageless)" disabled={!pageless} active={columns === 3} onClick={run(() => onSetColumns(3))} />
         <Sep />
         <Item Icon={RemoveFormatting} label="Clear formatting" shortcut={`${MOD}+\\`} onClick={cmd((c) => c.unsetAllMarks().clearNodes())} />
       </>
@@ -270,11 +287,21 @@ export default function DocumentMenuBar({
           <MenuButton label={label} isOpen={openMenu === label} onToggle={() => setOpenMenu((m) => (m === label ? null : label))} />
           {openMenu === label && (
             <div
+              role="menu"
+              aria-label={label}
+              onKeyDown={(e) => {
+                if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+                e.preventDefault();
+                const buttons = Array.from(e.currentTarget.querySelectorAll("button:not(:disabled)"));
+                const index = buttons.indexOf(document.activeElement);
+                const next = e.key === "Home" ? 0 : e.key === "End" ? buttons.length - 1 : (index + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+                buttons[next]?.focus();
+              }}
               className={`absolute inset-x-2 top-full z-30 mt-1 card p-1.5 shadow-panel sm:inset-x-auto sm:left-0 sm:w-64 ${
                 label === "Insert" ? "overflow-visible" : "max-h-[70vh] overflow-y-auto"
               }`}
             >
-              {content}
+              <fieldset disabled={!editable && ["Edit", "Insert", "Format"].includes(label)}>{content}</fieldset>
             </div>
           )}
         </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { SlidersHorizontal } from "lucide-react";
 import * as tasksApi from "../api/tasks.js";
@@ -10,7 +10,14 @@ import TaskCard from "../components/tasks/TaskCard.jsx";
 import TaskModal from "../components/tasks/TaskModal.jsx";
 import TaskDetailsPanel from "../components/tasks/TaskDetailsPanel.jsx";
 import TaskStatusManagerModal from "../components/tasks/TaskStatusManagerModal.jsx";
+import TaskViewToolbar from "../components/tasks/TaskViewToolbar.jsx";
+import TaskListView from "../components/tasks/TaskListView.jsx";
+import TaskTableView, { TASK_TABLE_COLUMNS } from "../components/tasks/TaskTableView.jsx";
+import TaskCalendarView from "../components/tasks/TaskCalendarView.jsx";
 import Spinner from "../components/common/Spinner.jsx";
+import EmptyState from "../components/common/EmptyState.jsx";
+import { apiErrorMessage } from "../api/client.js";
+import { DEFAULT_TASK_FILTERS, readTaskView, saveTaskView, filterTasks, sortTasks, taskDropOrder, localDateKey } from "../lib/taskViews.js";
 import { displayColor } from "../lib/colors.js";
 import { can } from "../lib/access.js";
 
@@ -30,34 +37,83 @@ export default function WorkspaceTasks() {
   const [detailsTaskId, setDetailsTaskId] = useState(null);
   const [draggedId, setDraggedId] = useState(null);
   const [dropIndicator, setDropIndicator] = useState(null); // { status, index }
-  const suppressReload = useRef(false);
+  const [view, setView] = useState(() => readTaskView(user.id, workspaceId));
+  const [filters, setFilters] = useState({ ...DEFAULT_TASK_FILTERS });
+  const [sort, setSort] = useState({ key: "order", direction: "asc" });
+  const [groupBy, setGroupBy] = useState("status");
+  const [tableColumns, setTableColumns] = useState(TASK_TABLE_COLUMNS.map((column) => column.key));
+  const [savingIds, setSavingIds] = useState(new Set());
+  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const loadRequest = useRef(0);
+  const pendingWrites = useRef(new Set());
+  const needsReload = useRef(false);
+  const workspaceRef = useRef(workspaceId);
+  const scopeVersion = useRef(0);
+  const [today, setToday] = useState(() => localDateKey());
+  workspaceRef.current = workspaceId;
 
-  const load = useCallback(() => {
-    Promise.all([
-      tasksApi.listWorkspaceTasks(workspaceId),
-      workspacesApi.getWorkspace(workspaceId),
-      taskStatusesApi.listTaskStatuses(workspaceId),
-    ]).then(([t, workspace, statuses]) => {
+  useEffect(() => {
+    const timer = setInterval(() => setToday(localDateKey()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const load = useCallback(async () => {
+    const request = ++loadRequest.current;
+    try {
+      const [t, workspace, statuses] = await Promise.all([
+        tasksApi.listWorkspaceTasks(workspaceId),
+        workspacesApi.getWorkspace(workspaceId),
+        taskStatusesApi.listTaskStatuses(workspaceId),
+      ]);
+      if (request !== loadRequest.current) return;
       setTasks(t);
       setMembers(workspace.members);
       setAccess(workspace);
       setColumns(statuses);
-      setLoading(false);
-    });
+      setLoadError("");
+    } catch (err) {
+      if (request === loadRequest.current) setLoadError(apiErrorMessage(err));
+    } finally {
+      if (request === loadRequest.current) setLoading(false);
+    }
   }, [workspaceId]);
 
   useEffect(() => {
+    scopeVersion.current++;
     setLoading(true);
+    setTasks([]);
+    setColumns([]);
+    setMembers([]);
+    setAccess(null);
+    setFilters({ ...DEFAULT_TASK_FILTERS });
+    setView(readTaskView(user.id, workspaceId));
+    setSort({ key: "order", direction: "asc" });
+    setTableColumns(TASK_TABLE_COLUMNS.map((column) => column.key));
+    setError("");
+    setLoadError("");
+    setDetailsOpen(false);
+    setDetailsTaskId(null);
+    setModalOpen(false);
+    setStatusModalOpen(false);
+    setDraggedId(null);
+    setDropIndicator(null);
+    pendingWrites.current.clear();
+    needsReload.current = false;
+    setSavingIds(new Set());
     load();
-  }, [load]);
+    return () => { loadRequest.current++; scopeVersion.current++; };
+  }, [load, user.id, workspaceId]);
 
   useEffect(() => {
     if (!socket) return;
-    const handler = () => {
-      if (suppressReload.current) return;
+    const handler = (event) => {
+      if (event?.workspaceId && event.workspaceId !== workspaceId) return;
+      if (pendingWrites.current.size) { needsReload.current = true; return; }
       load();
     };
     const events = [
+      "connect",
       "task:created",
       "task:updated",
       "task:deleted",
@@ -67,11 +123,70 @@ export default function WorkspaceTasks() {
     ];
     events.forEach((e) => socket.on(e, handler));
     return () => events.forEach((e) => socket.off(e, handler));
-  }, [socket, load]);
+  }, [socket, load, workspaceId]);
 
   const detailsTask = detailsTaskId ? tasks.find((t) => t.id === detailsTaskId) : null;
 
   const canEditStatuses = can(access, "statuses.manage");
+  const visibleTasks = useMemo(() => filterTasks(tasks, filters, columns, user.id), [tasks, filters, columns, user.id, today]);
+  const sortedTasks = useMemo(() => sortTasks(visibleTasks, sort, columns), [visibleTasks, sort, columns]);
+  const filtered = Object.entries(filters).some(([key, value]) => value !== DEFAULT_TASK_FILTERS[key]);
+
+  useEffect(() => {
+    if (columns.length && filters.status !== "all" && !columns.some((column) => column.id === filters.status)) {
+      setFilters((prev) => ({ ...prev, status: "all" }));
+    }
+  }, [columns, filters.status]);
+
+  function changeView(next) {
+    setView(next);
+    setDraggedId(null);
+    setDropIndicator(null);
+    saveTaskView(user.id, workspaceId, next);
+  }
+
+  function openTask(task) {
+    setDetailsTaskId(task.id);
+    setDetailsOpen(true);
+  }
+
+  function editTask(task) {
+    setEditingTask(task);
+    setModalOpen(true);
+  }
+
+  async function saveTaskChange(task, data, optimistic = false) {
+    if (pendingWrites.current.has(task.id)) return;
+    const targetWorkspace = workspaceId;
+    const version = scopeVersion.current;
+    const isCurrent = () => workspaceRef.current === targetWorkspace && version === scopeVersion.current;
+    loadRequest.current++; // Ignore history fetched before this write.
+    pendingWrites.current.add(task.id);
+    setSavingIds(new Set(pendingWrites.current));
+    setError("");
+    if (optimistic) setTasks((prev) => prev.map((item) => item.id === task.id ? { ...item, ...data } : item));
+    try {
+      const saved = await tasksApi.updateTask(targetWorkspace, task.id, data);
+      if (!isCurrent()) return;
+      setTasks((prev) => prev.map((item) => item.id === task.id ? { ...item, ...saved } : item));
+    } catch (err) {
+      if (!isCurrent()) return;
+      if (optimistic) setTasks((prev) => prev.map((item) => item.id === task.id ? { ...item, ...Object.fromEntries(Object.keys(data).map((key) => [key, task[key]])) } : item));
+      setError(apiErrorMessage(err));
+    } finally {
+      if (isCurrent()) {
+        pendingWrites.current.delete(task.id);
+        setSavingIds(new Set(pendingWrites.current));
+        if (!pendingWrites.current.size && needsReload.current) { needsReload.current = false; load(); }
+      }
+    }
+  }
+
+  function changeTaskStatus(task, status) {
+    if (status === task.status || !canMoveTask(task) || !columns.some((column) => column.id === status)) return;
+    const order = Math.max(0, ...tasks.filter((item) => item.status === status).map((item) => item.order || 0)) + 1;
+    return saveTaskChange(task, { status, order });
+  }
 
   // A member moves only their own tasks between columns; tasks.status (every
   // admin has it) moves anyone's. The server enforces the same rule. Anyone
@@ -86,7 +201,7 @@ export default function WorkspaceTasks() {
   }
 
   function columnTasks(status) {
-    return tasks.filter((t) => t.status === status).sort((a, b) => a.order - b.order);
+    return visibleTasks.filter((t) => t.status === status).sort((a, b) => a.order - b.order);
   }
 
   function handleDragStart(e, task) {
@@ -125,26 +240,13 @@ export default function WorkspaceTasks() {
     const indicator = dropIndicator;
     setDraggedId(null);
     setDropIndicator(null);
-    if (!taskId || !indicator) return;
+    if (!taskId || !indicator || indicator.status !== status) return;
 
     const dragged = tasks.find((t) => t.id === taskId);
     if (!dragged || (dragged.status !== status && !canMoveTask(dragged))) return;
 
-    const targetList = columnTasks(status).filter((t) => t.id !== taskId);
-    const insertAt = Math.min(indicator.index, targetList.length);
-    const before = targetList[insertAt - 1];
-    const after = targetList[insertAt];
-    const newOrder = before && after ? (before.order + after.order) / 2 : before ? before.order + 1 : after ? after.order - 1 : 1;
-
-    suppressReload.current = true;
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status, order: newOrder } : t)));
-    try {
-      await tasksApi.updateTask(workspaceId, taskId, { status, order: newOrder });
-    } catch {
-      load(); // put the card back where the server still has it
-    } finally {
-      setTimeout(() => (suppressReload.current = false), 300);
-    }
+    const order = taskDropOrder(tasks, visibleTasks, taskId, status, indicator.index);
+    await saveTaskChange(dragged, { status, order }, true);
   }
 
   if (loading) {
@@ -157,7 +259,7 @@ export default function WorkspaceTasks() {
 
   return (
     <>
-      <div className="flex h-full flex-col gap-3 p-4 sm:gap-4 sm:p-6">
+      <div className="flex h-full min-h-0 min-w-0 flex-col gap-3 p-4 sm:gap-4 sm:p-6">
         <div className="flex shrink-0 items-center justify-between gap-3">
           <h2 className="text-xl font-semibold tracking-tight text-ink-900 dark:text-ink-50 sm:text-2xl">Tasks</h2>
           <div className="flex items-center gap-2">
@@ -184,9 +286,23 @@ export default function WorkspaceTasks() {
           </div>
         </div>
 
-        {/* Phones get one column per swipe, snapping into place, with the
-            next column peeking in so it's clear the board carries on. */}
+        {(error || loadError) && <div role="alert" className="flex shrink-0 items-center gap-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">
+          <span className="flex-1">{error || loadError}</span>
+          {loadError && <button type="button" onClick={load} className="font-semibold underline">Retry</button>}
+          {error && <button type="button" onClick={() => setError("")} className="font-semibold underline">Dismiss</button>}
+        </div>}
+        <TaskViewToolbar view={view} onViewChange={changeView} filters={filters} onFiltersChange={setFilters} statuses={columns} members={members} total={tasks.length} visible={visibleTasks.length} sort={sort} onSortChange={setSort} groupBy={groupBy} onGroupChange={setGroupBy} />
+
+        {!visibleTasks.length && (filtered || view !== "board" || !columns.length) ? <div className="flex min-h-0 flex-1 items-center justify-center">
+          <div className="text-center"><EmptyState title={filtered ? "No matching tasks" : loadError ? "Couldn't load tasks" : "No tasks yet"} description={filtered ? "Try another search or change your filters." : "Create a task to get started."} />
+            {filtered && <button type="button" onClick={() => setFilters({ ...DEFAULT_TASK_FILTERS })} className="btn-secondary mt-3 text-xs">Clear filters</button>}
+          </div>
+        </div> : view === "list" ? <TaskListView tasks={sortedTasks} statuses={columns} groupBy={groupBy} onOpen={openTask} onEdit={editTask} canMoveTask={canMoveTask} onStatusChange={changeTaskStatus} savingIds={savingIds} />
+          : view === "table" ? <TaskTableView tasks={sortedTasks} statuses={columns} sort={sort} onSortChange={setSort} visibleColumns={tableColumns} onColumnsChange={setTableColumns} onOpen={openTask} onEdit={editTask} canMoveTask={canMoveTask} onStatusChange={changeTaskStatus} savingIds={savingIds} />
+          : view === "calendar" ? <TaskCalendarView tasks={visibleTasks} statuses={columns} onOpen={openTask} /> : (
+
         <div className="-mx-4 flex min-h-0 flex-1 snap-x snap-mandatory scroll-px-4 items-start gap-3 overflow-x-auto overscroll-x-contain px-4 pb-2 sm:mx-0 sm:snap-none sm:gap-4 sm:px-0">
+          {/* Phones get one column per swipe, with the next column peeking in. */}
           {columns.map((col) => {
             const colTasks = columnTasks(col.id);
             const showIndicator = dropIndicator?.status === col.id;
@@ -208,21 +324,16 @@ export default function WorkspaceTasks() {
                 {/* Bleeds into the column's padding so the scroll box doesn't clip the cards' hover glow. */}
                 <div className="-mx-3 -mb-3 min-h-0 space-y-2 overflow-y-auto px-3 pb-3 pt-1">
                   {colTasks.map((t, i) => (
-                    <div key={t.id}>
+                    <div key={t.id} data-task-id={t.id}>
                       {showIndicator && dropIndicator.index === i && <DropLine />}
                       <div onDragOver={(e) => handleCardDragOver(e, col.id, i)}>
                         <TaskCard
                           task={t}
                           dragging={draggedId === t.id}
                           isDoneColumn={col.isDone}
-                          onClick={() => {
-                            setDetailsTaskId(t.id);
-                            setDetailsOpen(true);
-                          }}
-                          onEdit={() => {
-                            setEditingTask(t);
-                            setModalOpen(true);
-                          }}
+                          draggable={!savingIds.has(t.id)}
+                          onClick={() => openTask(t)}
+                          onEdit={() => editTask(t)}
                           dragHandlers={{
                             onDragStart: (e) => handleDragStart(e, t),
                             onDragEnd: handleDragEnd,
@@ -242,6 +353,7 @@ export default function WorkspaceTasks() {
             );
           })}
         </div>
+        )}
       </div>
 
       <TaskModal

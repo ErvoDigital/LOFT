@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MessageSquare, MessagesSquare, PanelLeftClose, PanelLeftOpen, Plus, Trash2 } from "lucide-react";
 import * as messagesApi from "../api/messages.js";
@@ -11,6 +11,9 @@ import EmptyState from "../components/common/EmptyState.jsx";
 import Spinner from "../components/common/Spinner.jsx";
 import NewDmModal from "../components/chat/NewDmModal.jsx";
 import ChatThread from "../components/chat/ChatThread.jsx";
+import ConversationSearch from "../components/chat/ConversationSearch.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
+import { activityLabel, conversationMatches, conversationPreview } from "../lib/chat.js";
 import { displayColor, textOn } from "../lib/colors.js";
 import useMediaQuery, { TWO_PANE } from "../hooks/useMediaQuery.js";
 import { can } from "../lib/access.js";
@@ -18,6 +21,7 @@ import { can } from "../lib/access.js";
 const COLLAPSE_KEY = "loft:messages-list-collapsed";
 
 export default function Chat() {
+  const { user } = useAuth();
   const { socket } = useSocket();
   const confirm = useConfirm();
   const { workspaces } = useWorkspaces();
@@ -28,6 +32,10 @@ export default function Chat() {
   const [activeId, setActiveId] = useState(() => location.state?.conversationId ?? null);
   const [loadingConvos, setLoadingConvos] = useState(true);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const loadRequest = useRef(0);
   const [dmModalOpen, setDmModalOpen] = useState(false);
   // Phones show the list or one open conversation, never both. The list
   // comes first unless a profile's "Message" button sent us to a chat.
@@ -49,16 +57,24 @@ export default function Chat() {
     }
   }, [collapsed]);
 
-  const loadConversations = useCallback(() => {
-    messagesApi.listConversations().then((convos) => {
+  const loadConversations = useCallback(async () => {
+    const request = ++loadRequest.current;
+    try {
+      const convos = await messagesApi.listConversations();
+      if (request !== loadRequest.current) return;
       setConversations(convos);
-      setLoadingConvos(false);
+      setLoadError("");
       setActiveId((prev) => (prev && convos.some((c) => c.id === prev) ? prev : convos[0]?.id ?? null));
-    });
+    } catch (err) {
+      if (request === loadRequest.current) setLoadError(apiErrorMessage(err));
+    } finally {
+      if (request === loadRequest.current) setLoadingConvos(false);
+    }
   }, []);
 
   useEffect(() => {
     loadConversations();
+    return () => { loadRequest.current++; };
   }, [loadConversations]);
 
   // Already on this page when a profile's "Message" button is used: the route
@@ -75,13 +91,10 @@ export default function Chat() {
 
   useEffect(() => {
     if (!socket) return;
-    socket.on("message:preview", loadConversations);
-    socket.on("message:deleted", loadConversations);
-    socket.on("conversation:deleted", loadConversations);
+    const events = ["connect", "message:preview", "message:deleted", "conversation:created", "conversation:deleted"];
+    events.forEach((event) => socket.on(event, loadConversations));
     return () => {
-      socket.off("message:preview", loadConversations);
-      socket.off("message:deleted", loadConversations);
-      socket.off("conversation:deleted", loadConversations);
+      events.forEach((event) => socket.off(event, loadConversations));
     };
   }, [socket, loadConversations]);
 
@@ -127,12 +140,20 @@ export default function Chat() {
   // The icon-only rail is a desktop space saver; phones always get names.
   const railOnly = collapsed && twoPane;
   const listHidden = !twoPane && showThread && !!active;
+  const visible = conversations.filter((c) => conversationMatches(c, query) &&
+    (filter === "all" || (filter === "channels" ? c.isGroup : !c.isGroup)));
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full min-h-0 min-w-0 flex-col">
+      {(error || loadError) && <div role="alert" className="flex items-center gap-3 border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
+        <span className="flex-1">{error || loadError}</span>
+        {loadError && <button type="button" onClick={loadConversations} className="font-semibold underline">Retry</button>}
+        {error && <button type="button" onClick={() => setError("")} className="font-semibold underline">Dismiss</button>}
+      </div>}
+      <div className="flex min-h-0 min-w-0 flex-1">
       <div
         className={`flex shrink-0 flex-col border-ink-200 bg-white transition-[width] duration-150 dark:border-ink-700 dark:bg-ink-800 md:border-r ${
-          railOnly ? "w-16 items-center" : "w-full md:w-72"
+          railOnly ? "w-16 items-center" : "w-full md:w-80"
         } ${listHidden ? "hidden" : ""}`}
       >
         <div className={`flex items-center border-b border-ink-200 p-4 dark:border-ink-700 ${railOnly ? "flex-col gap-2" : "justify-between"}`}>
@@ -154,20 +175,26 @@ export default function Chat() {
             </button>
           </div>
         </div>
-        {error && !railOnly && (
-          <p className="mx-3 mt-2 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>
-        )}
+        {!railOnly && <div className="space-y-3 border-b border-ink-200 px-3 py-3 dark:border-ink-700">
+          <ConversationSearch value={query} onChange={setQuery} />
+          <div className="flex gap-1" aria-label="Conversation filters">
+            {[["all", "All"], ["direct", "Direct"], ["channels", "Channels"]].map(([value, label]) => (
+              <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}
+                className={`rounded-md px-3 py-1 text-xs font-medium ${filter === value ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "text-ink-500 hover:bg-ink-50 dark:text-ink-400 dark:hover:bg-ink-700"}`}>{label}</button>
+            ))}
+          </div>
+        </div>}
         <div className={`flex-1 overflow-y-auto ${railOnly ? "flex w-full flex-col items-center gap-1 py-2" : ""}`}>
           {loadingConvos ? (
             <Spinner className="py-8" />
-          ) : conversations.length === 0 ? (
+          ) : (railOnly ? conversations : visible).length === 0 ? (
             !railOnly && (
               <div className="p-4">
-                <EmptyState icon={<MessageSquare className="h-5 w-5" />} title="No conversations yet" description="Join a workspace to get a group chat, or start a DM." />
+                <EmptyState icon={<MessageSquare className="h-5 w-5" />} title={conversations.length ? "No matching conversations" : loadError ? "Couldn't load conversations" : "No conversations yet"} description={conversations.length ? "Try a different name or filter." : "Start a direct message or join a workspace."} />
               </div>
             )
           ) : (
-            conversations.map((c) => {
+            (railOnly ? conversations : visible).map((c) => {
               const avatar = c.isGroup ? (
                 <div style={{ backgroundColor: displayColor(c.color), color: textOn(c.color) }} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-semibold">
                   {c.title.slice(0, 2).toUpperCase()}
@@ -183,6 +210,7 @@ export default function Chat() {
                     setShowThread(true);
                   }}
                   title={railOnly ? c.title : undefined}
+                  aria-current={activeId === c.id && twoPane ? "true" : undefined}
                   className={`flex items-center hover:bg-ink-50 dark:hover:bg-ink-700 ${
                     railOnly ? "h-11 w-11 justify-center rounded-lg" : "w-full gap-3 px-4 py-3 text-left md:gap-2.5"
                   } ${activeId === c.id && twoPane ? "bg-brand-50 dark:bg-brand-500/15" : ""}`}
@@ -190,13 +218,12 @@ export default function Chat() {
                   {avatar}
                   {!railOnly && (
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-ink-800 dark:text-ink-100">{c.title}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="min-w-0 flex-1 truncate text-sm font-medium text-ink-800 dark:text-ink-100">{c.title}</p>
+                        <time className="shrink-0 text-[10px] text-ink-400" dateTime={c.lastMessage?.createdAt}>{activityLabel(c.lastMessage?.createdAt)}</time>
+                      </div>
                       <p className="truncate text-xs text-ink-400">
-                        {c.lastMessage
-                          ? c.lastMessage.content || (c.lastMessage.attachment ? `📎 ${c.lastMessage.attachment.name}` : "")
-                          : c.isGroup
-                          ? "Group chat"
-                          : "Say hello"}
+                        {conversationPreview(c, user.id)}
                       </p>
                     </div>
                   )}
@@ -235,6 +262,7 @@ export default function Chat() {
           }
         />
       )}
+      </div>
 
       <NewDmModal
         open={dmModalOpen}

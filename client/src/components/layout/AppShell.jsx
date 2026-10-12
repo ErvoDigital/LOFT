@@ -5,6 +5,7 @@ import MobileNav from "./MobileNav.jsx";
 import Topbar from "./Topbar.jsx";
 import MiniCallPlayer from "../meeting/MiniCallPlayer.jsx";
 import AssistantWidget from "../assistant/AssistantWidget.jsx";
+import NotificationToasts from "../notifications/NotificationToasts.jsx";
 import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
 
 // The page name, plus the workspace it belongs to when there is one. The
@@ -57,7 +58,7 @@ export default function AppShell() {
   // hidden, which pushes the bottom of the app under them. Browsers without
   // dvh drop that declaration and keep h-screen.
   return (
-    <div className="relative flex h-screen h-dvh overflow-hidden">
+    <div className="app-shell relative flex h-screen h-dvh overflow-hidden">
       {/* The colour the frosted panels blur against — without it the glass
           surfaces read as flat translucent grey. */}
       <div className="app-backdrop pointer-events-none fixed inset-0 -z-10 print:hidden" aria-hidden="true" />
@@ -67,13 +68,14 @@ export default function AppShell() {
           workspace panel share. No background of its own, so the page keeps
           blurring against the backdrop rather than stacking another layer.
           Phones and tablets get it edge to edge, with no frame. */}
-      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden lg:my-2 lg:mr-2 lg:rounded-2xl lg:border lg:border-white/60 lg:shadow-glass lg:dark:border-white/[0.07] print:m-0 print:rounded-none print:border-0">
+      <div className="app-content relative flex min-w-0 flex-1 flex-col overflow-hidden lg:my-2 lg:mr-2 lg:rounded-2xl lg:border lg:border-white/60 lg:shadow-glass lg:dark:border-white/[0.07] print:m-0 print:rounded-none print:border-0">
         <Topbar title={title} context={context} navOpen={navOpen} onOpenNav={() => setNavOpen(true)} />
         <main className="relative flex-1 overflow-y-auto overscroll-contain print:overflow-visible">
           <Outlet />
         </main>
         <MiniCallPlayer />
         <AssistantWidget />
+        <NotificationToasts />
       </div>
     </div>
   );

@@ -103,6 +103,7 @@ export function initSockets(httpServer, corsOrigin) {
       try {
         const trimmed = String(content || "").trim();
         if ((!trimmed && !attachmentAssetId) || !conversationId) return ack?.({ error: "Invalid message" });
+        if (trimmed.length > 4000) return ack?.({ error: "Messages can contain up to 4,000 characters" });
 
         const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
         if (!conversation) return ack?.({ error: "Conversation not found" });

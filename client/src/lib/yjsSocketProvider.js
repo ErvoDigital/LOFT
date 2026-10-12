@@ -3,7 +3,7 @@ import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate, removeAwareness
 
 // Yjs updates are binary; the realtime service's wire protocol is JSON text,
 // so binary payloads travel as base64 in both directions.
-function toBase64(bytes) {
+export function toBase64(bytes) {
   let binary = "";
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
@@ -32,6 +32,9 @@ export class SocketYjsProvider {
     this.ydoc = ydoc;
     this.awareness = new Awareness(ydoc);
     this.awareness.setLocalStateField("user", { id: user.id, name: user.name, color: user.avatarColor });
+    this.destroyed = false;
+    this.synced = false;
+    this._pendingConnects = new Set();
 
     // Tag every locally-applied update with `this` as its origin so applying
     // a remote update (which we also tag with `this`) doesn't get echoed
@@ -62,7 +65,12 @@ export class SocketYjsProvider {
     // room membership doesn't survive that — without an explicit resync,
     // sync would silently stop for the rest of the session. Yjs updates are
     // CRDT-mergeable, so a full resync on reconnect is always safe.
-    this._onSocketReconnect = () => this.connect().catch(() => {});
+    this._onSocketReconnect = () => {
+      if (!this.synced) return; // The initial connect() waits for this event.
+      this.connect().then(() => {
+        if (!this.destroyed) this.socket.emit("document:update", { documentId: this.documentId, update: toBase64(Y.encodeStateAsUpdate(this.ydoc)) });
+      }).catch(() => {});
+    };
 
     ydoc.on("update", this._onLocalUpdate);
     this.awareness.on("update", this._onLocalAwareness);
@@ -74,15 +82,40 @@ export class SocketYjsProvider {
 
   connect() {
     return new Promise((resolve, reject) => {
-      this.socket.emit("document:join", this.documentId, (res) => {
-        if (res?.error) return reject(new Error(res.error));
-        Y.applyUpdate(this.ydoc, fromBase64(res.update), this);
-        resolve(res);
-      });
+      let timer;
+      const cleanup = () => {
+        clearTimeout(timer);
+        this.socket.off("connect", join);
+        this._pendingConnects.delete(cancel);
+      };
+      const cancel = () => { cleanup(); reject(new Error("Document closed")); };
+      const join = () => {
+        cleanup();
+        if (this.destroyed) return reject(new Error("Document closed"));
+        this.socket.emit("document:join", this.documentId, (res) => {
+          if (this.destroyed) return reject(new Error("Document closed"));
+          if (res?.error) return reject(new Error(res.error));
+          try {
+            Y.applyUpdate(this.ydoc, fromBase64(res.update), this);
+            this.synced = true;
+            resolve(res);
+          } catch {
+            reject(new Error("Couldn't sync this document. Please reopen it."));
+          }
+        });
+      };
+      if (this.socket.connected) join();
+      else {
+        this._pendingConnects.add(cancel);
+        this.socket.on("connect", join);
+        timer = setTimeout(() => { cleanup(); reject(new Error("Live connection unavailable. Please reopen the document when you're connected.")); }, 15000);
+      }
     });
   }
 
   destroy() {
+    this.destroyed = true;
+    this._pendingConnects.forEach((cancel) => cancel());
     removeAwarenessStates(this.awareness, [this.ydoc.clientID], "provider destroyed");
     this.ydoc.off("update", this._onLocalUpdate);
     this.awareness.off("update", this._onLocalAwareness);
@@ -91,5 +124,6 @@ export class SocketYjsProvider {
     this.socket.off("document:awareness-request", this._onAwarenessRequest);
     this.socket.off("connect", this._onSocketReconnect);
     this.socket.emit("document:leave", this.documentId);
+    this.awareness.destroy();
   }
 }

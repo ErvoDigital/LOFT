@@ -19,7 +19,7 @@ export function useSpeakingDetection(streamsById) {
   const analysersRef = useRef(new Map()); // id -> { analyser, source, stream, lastLoud }
 
   const streamKey = Object.entries(streamsById)
-    .map(([id, s]) => `${id}:${s?.id || ""}`)
+    .map(([id, s]) => `${id}:${s?.id || ""}:${s?.getAudioTracks().map((track) => track.id).join(",") || ""}`)
     .sort()
     .join("|");
 
@@ -38,7 +38,8 @@ export function useSpeakingDetection(streamsById) {
 
     for (const [id, stream] of Object.entries(streamsById)) {
       const existing = analysersRef.current.get(id);
-      if (existing?.stream === stream) continue;
+      const audioKey = stream?.getAudioTracks().map((track) => track.id).join(",");
+      if (existing?.stream === stream && existing.audioKey === audioKey) continue;
       if (existing) existing.source.disconnect();
 
       if (!stream || stream.getAudioTracks().length === 0) {
@@ -50,7 +51,7 @@ export function useSpeakingDetection(streamsById) {
       analyser.fftSize = 512;
       const source = ctx.createMediaStreamSource(stream);
       source.connect(analyser);
-      analysersRef.current.set(id, { analyser, source, stream, lastLoud: 0 });
+      analysersRef.current.set(id, { analyser, source, stream, audioKey, lastLoud: 0 });
     }
 
     for (const id of Array.from(analysersRef.current.keys())) {

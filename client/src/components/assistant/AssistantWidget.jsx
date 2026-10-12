@@ -20,9 +20,9 @@ const SUGGESTIONS = [
 
 const PRIORITY_NAMES = { TIER_1: "Critical", TIER_2: "Time-sensitive", TIER_3: "Flexible", TIER_4: "Backlog" };
 
-// Chat composers and the meeting controls run along the bottom edge and put
+// Chat composers, document controls and meetings run along the bottom edge and put
 // a button in the right corner, so on those pages the launcher sits higher.
-const hasBottomControls = (pathname) => /\/(chat|meeting)$/.test(pathname);
+const hasBottomControls = (pathname) => /\/(chat|meeting)$|\/docs\/[^/]+$/.test(pathname);
 
 let nextId = 0;
 const MAX_RECORDING_MS = 30000;
@@ -476,7 +476,7 @@ export default function AssistantWidget() {
         title="Lofty chat"
         style={{ "--level": 0, "--turn": 0 }}
         className={`absolute right-3 z-30 flex h-12 w-12 items-center justify-center rounded-full transition-[transform,opacity,filter] duration-200 hover:-translate-y-0.5 hover:brightness-110 active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 sm:right-5 sm:h-14 sm:w-14 ${
-          raised ? "bottom-[4.75rem] sm:bottom-24" : "bottom-3 sm:bottom-5"
+          raised ? "bottom-[max(4.75rem,var(--chat-composer-clearance,0px),var(--meeting-controls-clearance,0px))] sm:bottom-[max(6rem,var(--chat-composer-clearance,0px),var(--meeting-controls-clearance,0px))]" : "bottom-3 sm:bottom-5"
         } ${open ? "invisible scale-75 opacity-0" : ""}`}
       >
         <VoiceOrb state="done" className="voice-orb-launcher" />
@@ -490,7 +490,7 @@ export default function AssistantWidget() {
           title="Talk to Lofty"
           disabled={thinking || transcribing || Boolean(confirming)}
           className={`btn-secondary absolute right-[4.5rem] z-30 flex h-12 w-12 items-center justify-center rounded-full p-0 shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50 sm:right-[5.25rem] sm:h-14 sm:w-14 ${
-            raised ? "bottom-[4.75rem] sm:bottom-24" : "bottom-3 sm:bottom-5"
+            raised ? "bottom-[max(4.75rem,var(--chat-composer-clearance,0px),var(--meeting-controls-clearance,0px))] sm:bottom-[max(6rem,var(--chat-composer-clearance,0px),var(--meeting-controls-clearance,0px))]" : "bottom-3 sm:bottom-5"
           }`}
         >
           <Mic className="h-5 w-5" />

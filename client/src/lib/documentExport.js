@@ -5,6 +5,7 @@
 // text color, highlight) degrade gracefully to plain text — Markdown is
 // understood here as a portable export, not a lossless one; PDF/HTML exports
 // preserve full fidelity for that.
+import { normalizePageLayout, pageDimensions } from "./documentLayout.js";
 function serializeMarks(text, marks = []) {
   let result = text;
   for (const mark of marks) {
@@ -62,6 +63,17 @@ function serializeNode(node, depth = 0) {
     }
     case "horizontalRule":
       return "---\n\n";
+    case "pageBreak":
+      return '<div style="break-after: page;"></div>\n\n';
+    case "image":
+      return `![${node.attrs?.alt || ""}](${node.attrs?.src || ""})\n\n`;
+    case "table": {
+      const rows = (node.content || []).map((row) => (row.content || []).map((cell) => (cell.content || []).map((child) => serializeNode(child).trim()).join("<br>").replace(/\|/g, "\\|").replace(/\n/g, "<br>")));
+      if (!rows.length) return "";
+      const columns = Math.max(...rows.map((row) => row.length));
+      const rowText = (cells) => `| ${Array.from({ length: columns }, (_, i) => cells[i] || "").join(" | ")} |\n`;
+      return rowText(rows[0]) + rowText(Array(columns).fill("---")) + rows.slice(1).map(rowText).join("") + "\n";
+    }
     default:
       return node.content ? node.content.map((n) => serializeNode(n, depth)).join("") : "";
   }
@@ -76,14 +88,17 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 
-export function toHtmlDocument(editor, title) {
+export function toHtmlDocument(editor, title, pageLayout) {
+  const layout = normalizePageLayout(pageLayout);
+  const dims = pageDimensions(layout);
   return `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <title>${escapeHtml(title)}</title>
 <style>
-  body { font-family: -apple-system, "Segoe UI", Arial, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; line-height: 1.65; }
+  @page { size: ${layout.size === "a4" ? "A4" : "letter"} ${layout.orientation}; margin: ${dims.margin / 96}in; }
+  body { font-family: Arial, sans-serif; font-size: 11pt; max-width: ${dims.width - dims.margin * 2}px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; line-height: 1.65; overflow-wrap: break-word; }
   h1, h2, h3 { margin-top: 1.4em; margin-bottom: 0.4em; }
   blockquote { border-left: 3px solid #cbd5e1; padding-left: 1em; color: #64748b; margin-left: 0; font-style: italic; }
   pre { background: #0f172a; color: #f8fafc; padding: 1em; border-radius: 8px; overflow-x: auto; }
@@ -91,6 +106,13 @@ export function toHtmlDocument(editor, title) {
   ul[data-type="taskList"] { list-style: none; padding-left: 0.25em; }
   ul[data-type="taskList"] li { display: flex; align-items: baseline; gap: 0.5em; }
   mark { background: #fef08a; }
+  img { max-width: 100%; height: auto; }
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  td, th { border: 1px solid #cbd5e1; padding: 0.4em 0.6em; vertical-align: top; }
+  th { background: #f8fafc; text-align: left; }
+  [data-page-break] { break-after: page; height: 0; }
+  @media screen { [data-page-break] { margin: 2rem 0; border-top: 1px dashed #cbd5e1; } }
+  @media print { body { max-width: none; margin: 0; padding: 0; } h1, h2, h3 { break-after: avoid; } tr, img { break-inside: avoid; } }
 </style>
 </head>
 <body>
@@ -116,9 +138,9 @@ function slugFilename(title) {
   return (title || "Untitled document").trim().replace(/[^\w\- ]+/g, "").replace(/\s+/g, "-").slice(0, 80) || "document";
 }
 
-export function exportDocument(editor, title, format) {
+export function exportDocument(editor, title, format, layout) {
   const base = slugFilename(title);
   if (format === "markdown") downloadFile(`${base}.md`, toMarkdown(editor), "text/markdown");
-  else if (format === "html") downloadFile(`${base}.html`, toHtmlDocument(editor, title), "text/html");
+  else if (format === "html") downloadFile(`${base}.html`, toHtmlDocument(editor, title, layout), "text/html");
   else if (format === "pdf") window.print();
 }

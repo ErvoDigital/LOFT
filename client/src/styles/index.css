@@ -255,9 +255,35 @@
    markers at all. */
 .doc-content {
   color: rgb(var(--ink-800));
-  font-size: 0.9375rem;
+  font-family: Arial, sans-serif;
+  font-size: 11pt;
   line-height: 1.65;
+  padding: var(--doc-margin, 48px);
+  min-height: inherit;
+  overflow-wrap: break-word;
 }
+.doc-canvas { display: flex; justify-content: center; min-width: min-content; padding: 24px 16px; }
+.doc-paper-stack { position: relative; flex-shrink: 0; }
+.doc-sheets { position: absolute; inset: 0; pointer-events: none; }
+.doc-sheet { position: absolute; left: 0; width: 100%; background: white; box-shadow: 0 1px 4px #0f172a18; border: 1px solid rgb(var(--ink-200)); }
+.dark .doc-sheet { background: rgb(var(--ink-800)); border-color: rgb(var(--ink-700)); }
+.doc-sheet-number { position: absolute; bottom: 28px; left: 0; right: 0; text-align: center; font: 11px Arial, sans-serif; color: rgb(var(--ink-400)); }
+.doc-editor-content { position: relative; min-height: inherit; }
+.doc-editor-content > div { min-height: inherit; }
+.doc-pageless { width: 100%; max-width: 1100px; }
+.doc-canvas-pageless { min-width: 0; padding: 0; }
+.doc-pageless .doc-content { padding: 32px clamp(20px, 5vw, 64px); min-height: 400px; }
+.doc-pagination-gap { display: block; width: 100%; margin: 0 !important; padding: 0 !important; pointer-events: none; user-select: none; }
+.doc-content .doc-pagination-gap-row { display: table-row; }
+.doc-content .doc-pagination-gap-row td { height: inherit; border: 0; padding: 0; background: transparent; }
+.doc-page-break { position: relative; height: 24px; margin: 0 !important; break-after: page; user-select: none; }
+.doc-page-break::after { content: "Page break"; position: absolute; top: 8px; left: 0; right: 0; border-top: 1px dashed rgb(var(--ink-300)); color: rgb(var(--ink-400)); font: 10px Arial, sans-serif; padding-top: 4px; text-align: center; }
+.doc-page-break.ProseMirror-selectednode::after { border-color: rgb(var(--brand-400)); color: rgb(var(--brand-500)); }
+.doc-content.ProseMirror:focus { outline: none; }
+.doc-content > :first-child { margin-top: 0; }
+.doc-content h3 { font-size: 1.1rem; font-weight: 600; margin: 1em 0 0.4em; }
+.doc-content .tableWrapper { overflow-x: auto; }
+.doc-content img { max-height: 600px; object-fit: contain; }
 .doc-content p {
   margin: 0.5em 0;
 }
@@ -393,13 +419,21 @@
    theme.boxShadow key and print:shadow-none isn't guaranteed to resolve the
    way class order in the JSX would suggest). */
 @media print {
-  .doc-page {
-    box-shadow: none !important;
-    margin: 0 !important;
-    max-width: none !important;
-    min-height: 0 !important;
-    border-radius: 0 !important;
-  }
+  body:has(.document-editor), body:has(.document-editor) #root, body:has(.document-editor) .app-shell, body:has(.document-editor) .app-content, body:has(.document-editor) main { height: auto !important; overflow: visible !important; display: block !important; background: white !important; }
+  body:has(.document-editor) .app-shell > :not(.app-content), body:has(.document-editor) .app-content > :not(main) { display: none !important; }
+  .document-editor { display: block !important; position: static !important; height: auto !important; color: #1e293b !important; background: white !important; }
+  .doc-scroll { overflow: visible !important; background: white !important; }
+  .doc-canvas { display: block; padding: 0; min-width: 0; }
+  .doc-paper-stack { width: 100% !important; min-height: 0 !important; zoom: 1 !important; }
+  .doc-sheets { display: none; }
+  .doc-editor-content, .doc-editor-content > div { min-height: 0 !important; }
+  .doc-content { padding: 0 !important; min-height: 0 !important; color: #1e293b !important; }
+  .doc-content h1, .doc-content h2, .doc-content h3 { color: #0f172a !important; break-after: avoid; }
+  .doc-content p { orphans: 2; widows: 2; }
+  .doc-content tr, .doc-content img { break-inside: avoid; }
+  .doc-pagination-gap, .doc-page-break { height: 0 !important; break-after: page; }
+  .doc-pagination-gap-row { display: none !important; }
+  .doc-page-break::after { display: none; }
 }
 
 /* Tiptap's CollaborationCaret extension (class names are its own default

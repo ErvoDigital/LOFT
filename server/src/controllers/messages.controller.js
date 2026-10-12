@@ -101,18 +101,11 @@ export async function listConversations(req, res) {
     include: {
       workspace: { select: { id: true, name: true, color: true } },
       participants: { include: { user: { select: { id: true, name: true, avatarColor: true, avatarUrl: true } } } },
+      messages: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1, include: messageInclude },
     },
   });
 
-  const lastMessages = await prisma.message.findMany({
-    where: { conversationId: { in: conversations.map((c) => c.id) } },
-    orderBy: { createdAt: "desc" },
-    include: { sender: { select: { id: true, name: true } }, attachment: { include: { versions: { orderBy: { version: "desc" }, take: 1 } } } },
-  });
-  const lastByConv = new Map();
-  for (const m of lastMessages) {
-    if (!lastByConv.has(m.conversationId)) lastByConv.set(m.conversationId, m);
-  }
+  const lastByConv = new Map(conversations.map((c) => [c.id, c.messages[0]]));
 
   // A chat the caller deleted from their list stays hidden until it has
   // something new to show: once a message lands after hiddenAt, it comes back
@@ -168,13 +161,43 @@ async function assertParticipant(conversationId, userId) {
 export async function getMessages(req, res) {
   await assertParticipant(req.params.conversationId, req.userId);
 
-  const messages = await prisma.message.findMany({
-    where: { conversationId: req.params.conversationId },
+  const { before, q, limit } = z.object({
+    before: z.string().max(512).optional(),
+    q: z.string().trim().max(200).default(""),
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  }).parse(req.query || {});
+  const where = { conversationId: req.params.conversationId, AND: [] };
+  if (before) {
+    let cursor;
+    try {
+      cursor = z.object({ id: z.string().min(1).max(128), createdAt: z.string().datetime() })
+        .parse(JSON.parse(Buffer.from(before, "base64url").toString("utf8")));
+    } catch {
+      throw new ApiError(400, "Invalid message cursor");
+    }
+    const createdAt = new Date(cursor.createdAt);
+    where.AND.push({ OR: [{ createdAt: { lt: createdAt } }, { createdAt, id: { lt: cursor.id } }] });
+  }
+  if (q) {
+    where.AND.push({ OR: [
+      { content: { contains: q, mode: "insensitive" } },
+      { attachment: { name: { contains: q, mode: "insensitive" } } },
+    ] });
+  }
+  const rows = await prisma.message.findMany({
+    where,
     include: messageInclude,
-    orderBy: { createdAt: "asc" },
-    take: 200,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: limit + 1,
   });
-  res.json({ messages: messages.map(serializeMessage) });
+  const hasMore = rows.length > limit;
+  const page = rows.slice(0, limit);
+  const oldest = page[page.length - 1];
+  res.json({
+    messages: page.reverse().map(serializeMessage),
+    hasMore,
+    nextCursor: hasMore && oldest ? Buffer.from(JSON.stringify({ id: oldest.id, createdAt: oldest.createdAt.toISOString() })).toString("base64url") : null,
+  });
 }
 
 export async function sendMessageRest(req, res) {

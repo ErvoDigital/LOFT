@@ -9,6 +9,7 @@ import { displayColor } from "../../lib/colors.js";
 import { ACCEPTED_UPLOAD_TYPES } from "../../lib/uploads.js";
 import { fileFailure } from "../../lib/fileFeedback.js";
 import FileFailureNotice from "../storage/FileFailureNotice.jsx";
+import { formatTaskDue, isTaskOverdue } from "../../lib/taskViews.js";
 
 function formatDuration(minutes) {
   const m = Number(minutes) || 0;
@@ -104,7 +105,7 @@ export default function TaskDetailsPanel({ open, task, workspaceId, statuses, on
 
   if (!mounted || !task) return null;
 
-  const overdue = task.dueDate && new Date(task.dueDate) < new Date();
+  const overdue = isTaskOverdue(task, statuses || []);
   const statusMeta = statuses?.find((s) => s.id === task.status);
 
   async function handleFilesSelected(e) {
@@ -232,7 +233,7 @@ export default function TaskDetailsPanel({ open, task, workspaceId, statuses, on
                   <span className={`inline-flex items-center gap-1.5 text-sm font-medium ${overdue ? "text-red-500" : "text-ink-700 dark:text-ink-200"}`}>
                     <Calendar className="h-3.5 w-3.5" />
                     {overdue ? "Overdue · " : ""}
-                    {new Date(task.dueDate).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+                    {formatTaskDue(task.dueDate)}
                   </span>
                 ) : (
                   <span className="text-sm text-ink-300">No due date</span>

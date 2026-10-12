@@ -14,7 +14,7 @@ export default function MiniCallPlayer() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { workspaces } = useWorkspaces();
-  const { activeWorkspaceId, joined, participants, localStream, micOn, camOn, toggleMic, toggleCam, requestLeave } = useMeeting();
+  const { activeWorkspaceId, joined, participants, localStream, micOn, camOn, micAvailable, deviceBusy, toggleMic, toggleCam, confirmEnableMic, requestLeave } = useMeeting();
 
   if (!joined || !activeWorkspaceId) return null;
 
@@ -46,8 +46,9 @@ export default function MiniCallPlayer() {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              toggleMic();
+              if (micAvailable) toggleMic(); else confirmEnableMic();
             }}
+            disabled={deviceBusy}
             title={micOn ? "Mute" : "Unmute"}
             aria-label={micOn ? "Mute" : "Unmute"}
             className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
@@ -60,6 +61,7 @@ export default function MiniCallPlayer() {
               toggleCam();
             }}
             title={camOn ? "Turn off camera" : "Turn on camera"}
+            disabled={deviceBusy}
             aria-label={camOn ? "Turn off camera" : "Turn on camera"}
             className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
           >
