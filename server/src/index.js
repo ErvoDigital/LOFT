@@ -17,6 +17,6 @@ startReminderJob();
 httpServer.listen(PORT, () => {
   console.log(`LOFT API listening on http://localhost:${PORT}`);
   verifyMailConnection()
-    .then(() => console.log("SMTP connection verified"))
+    .then(() => console.log("Email provider and credentials verified"))
     .catch((error) => console.error(error.message));
 });

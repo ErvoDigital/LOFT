@@ -1,7 +1,7 @@
 import "../src/config/env.js";
 import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { clientUrl } from "../src/services/mail.service.js";
+import { clientUrl, senderIdentity } from "../src/services/mail.service.js";
 import { buildWelcomeEmail, buildPasswordResetEmail, buildVerificationEmail } from "../src/utils/emailTemplates.js";
 import { buildInviteEmail } from "../src/utils/inviteEmail.js";
 import { escapeHtml } from "../src/utils/emailLayout.js";
@@ -26,6 +26,6 @@ await writeFile(new URL("../.mail-previews/index.html", import.meta.url), `<!doc
 <body><header><h1>Loft email previews</h1><p>Sample content only. No emails are sent and codes/links do not authorize account actions.</p>
 <nav>${emails.map(([key, email]) => `<a href="${key}.html" target="preview">${escapeHtml(email.subject)}</a>`).join("")}</nav>
 <button onclick="document.querySelector('iframe').style.width='760px'">Desktop</button> <button onclick="document.querySelector('iframe').style.width='375px'">Mobile</button>
-<p>For inbox display, messages use the sender name Loft. The current SMTP sender address remains ervodigital@gmail.com.</p></header>
+<p>Sender: Loft &lt;${escapeHtml(senderIdentity().from.address || "configure MAIL_FROM")}&gt;</p></header>
 <main><iframe name="preview" title="Email template preview" src="welcome.html"></iframe></main></body></html>`);
 console.log(`Email previews generated: ${directory}index.html`);

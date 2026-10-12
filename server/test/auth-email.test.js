@@ -64,11 +64,12 @@ describe("Account email and verification over HTTP (in-memory)", () => {
   let server, baseUrl, users, challenges, sent, passwordHash, setTransport, authToken, googleVerify;
   let transportFailure;
   const savedEnv = {};
-  const keys = ["JWT_SECRET", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "MAIL_FROM", "CLIENT_URL", "GOOGLE_CLIENT_ID", "NODE_ENV"];
+  const keys = ["JWT_SECRET", "MAIL_PROVIDER", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "MAIL_FROM", "CLIENT_URL", "GOOGLE_CLIENT_ID", "NODE_ENV"];
 
   before(async () => {
     for (const key of keys) savedEnv[key] = process.env[key];
     Object.assign(process.env, {
+      MAIL_PROVIDER: "smtp",
       JWT_SECRET: "auth-email-test-secret", SMTP_HOST: "smtp.test", SMTP_PORT: "587",
       SMTP_USER: "sender@loft.test", SMTP_PASS: "test-password", MAIL_FROM: "LOFT <sender@loft.test>",
       CLIENT_URL: "https://loft.test/", GOOGLE_CLIENT_ID: "test-google-client", NODE_ENV: "development",
@@ -251,6 +252,47 @@ describe("Account email and verification over HTTP (in-memory)", () => {
     transportFailure = null;
     assert.equal((await login()).status, 200);
     assert.equal(sent.length, 1);
+  });
+
+  it("Brevo failures grant no session and a successful retry delivers the sign-in code", async () => {
+    const originalFetch = globalThis.fetch;
+    const previousKey = process.env.BREVO_API_KEY;
+    let fail = true;
+    const deliveries = [];
+    process.env.MAIL_PROVIDER = "brevo";
+    process.env.BREVO_API_KEY = "brevo-http-test-secret";
+    globalThis.fetch = async (url, options) => {
+      if (String(url) !== "https://api.brevo.com/v3/smtp/email") return originalFetch(url, options);
+      deliveries.push(JSON.parse(options.body));
+      assert.equal(options.headers["api-key"], "brevo-http-test-secret");
+      return new Response(JSON.stringify(fail ? { code: "unauthorized" } : { messageId: "<login@brevo.test>" }), {
+        status: fail ? 401 : 201, headers: { "content-type": "application/json" },
+      });
+    };
+    try {
+      const failed = await login();
+      assert.equal(failed.status, 503);
+      assert.equal(failed.body.token, undefined);
+      assert.equal(failed.body.code, undefined);
+      fail = false;
+      const retried = await login();
+      assert.equal(retried.status, 200);
+      assert.equal(retried.body.twoFactorRequired, true);
+      assert.equal(retried.body.token, undefined);
+      const delivery = deliveries.at(-1);
+      assert.deepEqual(delivery.sender, { name: "Loft", email: "sender@loft.test" });
+      assert.deepEqual(delivery.to, [{ email: "ada@loft.test" }]);
+      const code = delivery.textContent.match(/^\d{6}$/m)?.[0];
+      assert.ok(code);
+      const verified = await verify(retried, code);
+      assert.equal(verified.status, 200);
+      assert.ok(verified.body.token);
+    } finally {
+      globalThis.fetch = originalFetch;
+      process.env.MAIL_PROVIDER = "smtp";
+      if (previousKey === undefined) delete process.env.BREVO_API_KEY;
+      else process.env.BREVO_API_KEY = previousKey;
+    }
   });
 
   it("restores a prior code if resending fails, preserving attempt limits", async () => {

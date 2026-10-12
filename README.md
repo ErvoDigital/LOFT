@@ -48,7 +48,7 @@ No application code changes needed — the schema deliberately avoids SQLite-inc
 
 ### Email and sign-in verification
 
-Configure SMTP for welcome emails, password recovery, workspace invitations, password-change codes and email verification before account access. Password and Google sign-in both require an emailed code before a session token is issued. See [email setup and delivery checks](docs/email.md). Recovery tokens and verification codes are never returned through the API or in-app notifications.
+Configure Brevo for welcome emails, password recovery, workspace invitations, password-change codes and sign-in verification. Accounts with two-factor authentication enabled require an emailed code before a session token is issued. See [email setup and delivery checks](docs/email.md). Recovery tokens and verification codes are never returned through the API or in-app notifications.
 
 ## Feature status
 

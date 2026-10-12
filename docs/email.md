@@ -1,61 +1,81 @@
 # Email setup
 
-LOFT uses the same SMTP transport for welcome emails (including new Google accounts), password resets, workspace invitations, sign-in verification and password-change verification.
+LOFT uses Brevo's transactional email API for welcome emails (including new Google accounts), password resets, workspace invitations, sign-in verification and password-change verification. All five email types share the backend mail service and the existing HTML/plain-text templates.
 
-Local API entry points load `server/.env` using its absolute location. Hosting platforms need these variables in the **backend deployment's environment**; a local `.env` file does not configure a deployed API.
+## Configure Brevo
 
-```dotenv
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-sender@gmail.com
-SMTP_PASS=your-google-app-password
-MAIL_FROM="Loft <your-sender@gmail.com>"
-CLIENT_URL=http://localhost:5173
-```
-
-For Gmail, use an [app password](https://support.google.com/accounts/answer/185833) with Google 2-Step Verification enabled. Spaces in Google's displayed app password are normalized by the transport. Use port 587 for STARTTLS or 465 for TLS. TLS certificates are checked. Set `CLIENT_URL` to the actual web application URL on your deployment, so reset and invitation links reach the right site. Restart the API after changing `.env` and redeploy after changing hosted environment variables.
-
-## Sender name and custom-domain address
-
-All outgoing messages explicitly use the display name **Loft**. `MAIL_FROM` selects the sender email address; an old display name embedded in it does not override the Loft name. The five email types share one responsive, table-based HTML layout, with a wordmark, inbox preview text, readable content, relevant action buttons or verification-code blocks, expiry/security notes, a help footer, and a matching plain-text alternative.
-
-The current Gmail setup uses `MAIL_FROM="Loft <ervodigital@gmail.com>"`. Gmail can [rewrite an unverified From address](https://nodemailer.com/guides/using-gmail), so setting `MAIL_FROM="Loft <support@loft-client.site>"` alone does not reliably hide the Gmail address. [Verified Gmail/Workspace aliases](https://support.google.com/mail/answer/22370?hl=en) or a mail provider verified for your domain can send using the custom address. Some mail clients may still show the original Gmail account for aliases. Google also documents that third-party Gmail Send As support ends in January 2027; Workspace aliases are unaffected.
-
-To use `support@loft-client.site` as the actual sender, verify `loft-client.site` with the selected email provider, add its required SPF/DKIM records (and configure DMARC), then use that provider's SMTP credentials with:
+1. Add and verify **ervodigital@gmail.com** as a sender in [Brevo's sender settings](https://app.brevo.com/senders). Messages use the display name **Loft**.
+2. Create an **API key** in [Brevo's SMTP & API settings](https://app.brevo.com/settings/keys/api). An SMTP key does not authenticate API requests.
+3. Set these variables in `server/.env` for local use, or in the **loft-server backend deployment's environment** for production:
 
 ```dotenv
-MAIL_FROM="Loft <support@loft-client.site>"
-MAIL_REPLY_TO=support@loft-client.site
+MAIL_PROVIDER=brevo
+BREVO_API_KEY=your-brevo-api-key
+MAIL_FROM="Loft <ervodigital@gmail.com>"
+MAIL_TEST_TO=ervodigital@gmail.com
+CLIENT_URL=https://app.loft-client.site
 ```
 
-Keep `SMTP_USER` as the provider's authentication username, which may differ from `MAIL_FROM`. Custom-domain receiving is separate: configure a support mailbox or forwarding rule so replies are delivered. DNS currently points this domain to Namecheap forwarding servers; forwarding alone does not authorize Gmail to send from the domain. Preserve website DNS and existing forwarding/MX records when adding provider verification records unless the chosen receiving provider explicitly requires changes.
+Local development can use `CLIENT_URL=http://localhost:5173`. `server/.env.example` contains the email configuration template. The API resolves `server/.env` regardless of its working directory, and hosting environment variables take precedence over the file. Keep the API key in backend secrets; do not put it in frontend/Vite variables or commit it.
 
-`MAIL_REPLY_TO` is optional. It changes the reply destination without changing the sender displayed in the inbox; only set it after that destination receives mail. Leaving it unset sends replies to the current sender.
+On Vercel, configure the variables for the **loft-server** project's Production environment and redeploy the server. Preview deployments need their own settings if they should send email. Changing a local file does not configure the deployed API. `CLIENT_URL` controls the destination of reset and invitation links.
 
-## Verify delivery
+Messages are sent over HTTPS to Brevo's [`POST /v3/smtp/email`](https://developers.brevo.com/docs/send-a-transactional-email) using the `api-key` header. Delivery calls have a 15-second timeout. The service requires a message ID before reporting provider acceptance. It does not retry or fall back to another provider after a failed or timed-out Brevo request.
 
-Generate an HTML gallery and plain-text previews for all five email formats:
+`MAIL_PROVIDER=brevo` explicitly selects Brevo. When this variable is unset, a configured `BREVO_API_KEY` selects Brevo; otherwise the existing SMTP transport remains available. Unsupported provider names, a missing Brevo key or a missing/invalid `MAIL_FROM` make email unavailable rather than reporting successful sends.
 
-```bash
-npm run mail:preview -w server
-```
+## Sender and replies
 
-Open `server/.mail-previews/index.html` and select Desktop or Mobile. These files contain sample data, are ignored by Git, and do not send emails.
+All outgoing messages explicitly use the display name **Loft**. `MAIL_FROM` selects the sender address; an embedded display name does not override Loft. `MAIL_REPLY_TO` optionally selects a different reply address. Leave it unset to receive replies at the sender mailbox.
+
+To switch to `support@loft-client.site`, add the sender in Brevo and [authenticate the domain](https://help.brevo.com/hc/en-us/articles/12163873383186-Authenticate-your-domain-with-Brevo-Brevo-code-DKIM-DMARC) using the DNS records Brevo provides, then update `MAIL_FROM`. Configure a mailbox or forwarding rule separately to receive replies. Preserve website and existing receiving/MX records when adding authentication records.
+
+## Verify configuration and delivery
 
 From the repository root:
 
 ```bash
 npm run mail:check -w server
-npm run mail:check -w server -- --send
 ```
 
-The first command checks the SMTP connection, TLS and credentials without sending anything. The second sends five clearly labeled test messages to `SMTP_USER`: welcome, reset, invite, sign-in code and password-change code. Their links/codes cannot modify an account or join a workspace. The command succeeds only when SMTP accepts every recipient. SMTP acceptance is separate from inbox placement; check the receiving inbox and spam folder.
+This is read-only. For Brevo, it authenticates against the account API, checks whether transactional email is disabled, and confirms `MAIL_FROM` matches an active sender. It does not send email or prove inbox delivery.
 
-The local server also checks SMTP on startup. Send failures produce a `mail.delivery_failed` log with a provider error code, command and status code; credentials and message bodies are omitted. Authentication/recovery endpoints report an error if sending fails. Registration reports a welcome-email warning if that message fails after verification mail succeeds. Invitation results distinguish `emailed: true` from failed sends, so admins can retry them.
+To deliberately send five labeled delivery tests to a mailbox you control:
+
+```bash
+npm run mail:check -w server -- --send --to ervodigital@gmail.com
+```
+
+Alternatively, set `MAIL_TEST_TO` and use `--send`. An explicit recipient is required: SMTP authentication usernames are not necessarily receiving mailboxes. Test messages cover welcome, reset, invite, sign-in code and password-change code. Their links/codes cannot modify an account or join a workspace. Provider acceptance is separate from inbox delivery; check the recipient's inbox/spam folder and [Brevo's transactional logs](https://app.brevo.com/transactional/logs).
+
+Generate HTML and plain-text previews without sending email:
+
+```bash
+npm run mail:preview -w server
+```
+
+Open `server/.mail-previews/index.html` and select Desktop or Mobile. Generated previews contain sample data and are ignored by Git.
+
+The local server checks email configuration on startup. Provider failures produce a `mail.delivery_failed` log containing the provider, error code and status code. Credentials, provider error messages, recipients and message bodies are omitted. Authentication/recovery endpoints report an error if sending fails. Registration reports a welcome-email warning if that message fails after verification mail succeeds. Invitation results distinguish successful sends from failures so admins can retry them.
+
+## Existing SMTP deployments
+
+The SMTP transport remains available when explicitly selected:
+
+```dotenv
+MAIL_PROVIDER=smtp
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USER=your-brevo-smtp-login
+SMTP_PASS=your-brevo-smtp-key
+MAIL_FROM="Loft <ervodigital@gmail.com>"
+```
+
+Brevo [SMTP authentication](https://developers.brevo.com/docs/smtp-integration) requires the SMTP login and SMTP key from its dashboard, rather than the API key. Port 587 uses STARTTLS; port 465 uses TLS. TLS certificates are checked. `mail:check` verifies the SMTP connection and authentication for this provider.
 
 ## Account verification
 
-Apply the `20261006160000_add_email_challenges` migration and regenerate the Prisma client before running the updated backend:
+Apply the email challenge migrations and regenerate the Prisma client before running a backend that has not yet received them:
 
 ```bash
 npm exec -w server -- prisma migrate deploy
@@ -64,6 +84,6 @@ npm run prisma:generate
 
 The workspace command runs Prisma from `server`, where it loads `server/.env`.
 
-Registration, password sign-in and Google sign-in return a challenge, without a session token. The client asks for the emailed six-digit code and calls `/api/auth/2fa/verify`; only successful verification creates a session. `/api/auth/2fa/resend` sends a replacement after a 60-second cooldown. Codes expire in 10 minutes, allow five incorrect attempts, are consumed once, and are stored as keyed hashes in the database. Resending or repeating sign-in does not reset an active challenge's attempt count or expiry. Password-change codes use a separate purpose and cannot grant sign-in access. Password resets invalidate pending verification challenges.
+Registration sends a verification challenge before granting access. Password and Google sign-in require an emailed code when the account has two-factor authentication enabled. The client calls `/api/auth/2fa/verify` to complete a challenge; `/api/auth/2fa/resend` sends a replacement after a 60-second cooldown. Codes expire in 10 minutes, allow five incorrect attempts, are consumed once, and are stored as keyed hashes. Repeating sign-in or resending does not reset an active challenge's attempt count or expiry. Password-change codes use a separate purpose and cannot grant sign-in access. Password resets invalidate pending challenges.
 
-If SMTP is missing or unavailable, new account access fails until mail is restored. Existing sessions keep their current expiration. No development response or in-app notification exposes a verification code or password reset token.
+Flows requiring email fail when the selected email provider is unavailable. Existing sessions keep their current expiration. No development response or in-app notification exposes a verification code or password reset token.

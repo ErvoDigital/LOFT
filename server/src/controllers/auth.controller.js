@@ -41,7 +41,7 @@ const challengeSchema = z.object({ challengeId: z.string().length(32) });
 const verifyChallengeSchema = challengeSchema.extend({ code: z.string().regex(/^\d{6}$/) });
 
 function requireMail() {
-  if (!isMailConfigured()) throw new ApiError(503, "Email is unavailable. Please ask the administrator to check the SMTP settings.");
+  if (!isMailConfigured()) throw new ApiError(503, "Email is unavailable. Please ask the administrator to check the email settings.");
 }
 
 async function welcomeEmail(user) {

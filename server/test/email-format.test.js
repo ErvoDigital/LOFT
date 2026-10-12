@@ -6,10 +6,11 @@ import { buildInviteEmail } from "../src/utils/inviteEmail.js";
 import { sendMail, setMailTransport } from "../src/services/mail.service.js";
 
 const savedEnv = {};
-const keys = ["SMTP_HOST", "SMTP_USER", "SMTP_PASS", "MAIL_FROM", "MAIL_REPLY_TO", "CLIENT_URL"];
+const keys = ["MAIL_PROVIDER", "SMTP_HOST", "SMTP_USER", "SMTP_PASS", "MAIL_FROM", "MAIL_REPLY_TO", "CLIENT_URL"];
 before(() => {
   for (const key of keys) savedEnv[key] = process.env[key];
   Object.assign(process.env, {
+    MAIL_PROVIDER: "smtp",
     SMTP_HOST: "smtp.test", SMTP_USER: "sender@example.com", SMTP_PASS: "test-secret",
     MAIL_FROM: "Ervo Digital <sender@example.com>", MAIL_REPLY_TO: "support@loft-client.site",
     CLIENT_URL: "https://www.loft-client.site",

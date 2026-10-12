@@ -131,12 +131,13 @@ describe("Workspace invites (in-memory)", () => {
   let sentMail;
   let tokens;
   const savedEnv = {};
-  const ENV_KEYS = ["JWT_SECRET", "SMTP_HOST", "SMTP_USER", "SMTP_PASS", "CLIENT_URL"];
+  const ENV_KEYS = ["JWT_SECRET", "MAIL_PROVIDER", "SMTP_HOST", "SMTP_USER", "SMTP_PASS", "CLIENT_URL"];
 
   before(async () => {
     for (const key of ENV_KEYS) savedEnv[key] = process.env[key];
     // jwt.js reads its secret at import time, so the app is imported after this.
     process.env.JWT_SECRET = "invite-test-secret";
+    process.env.MAIL_PROVIDER = "smtp";
     process.env.SMTP_HOST = "smtp.test";
     process.env.SMTP_USER = "loft@test";
     process.env.SMTP_PASS = "secret";

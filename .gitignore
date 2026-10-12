@@ -13,6 +13,7 @@ server/.mail-previews/
 
 .vercel
 .env*
+!server/.env.example
 .neon
 
 # macOS metadata
