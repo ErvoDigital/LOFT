@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
-import { Layers, Mic, Sparkles, X } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
+import { AlertTriangle, Layers, Mic, Sparkles, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
 import WorkspaceMark from "../common/WorkspaceMark.jsx";
@@ -20,20 +20,25 @@ const SUGGESTIONS = [
 
 const PRIORITY_NAMES = { TIER_1: "Critical", TIER_2: "Time-sensitive", TIER_3: "Flexible", TIER_4: "Backlog" };
 
-// Chat composers, document controls and meetings run along the bottom edge and put
-// a button in the right corner, so on those pages the launcher sits higher.
-const hasBottomControls = (pathname) => /\/(chat|meeting)$|\/docs\/[^/]+$/.test(pathname);
-
 let nextId = 0;
 const MAX_RECORDING_MS = 30000;
 const NO_SPEECH = "I didn't catch that. Tap Ask again or hold M to try again.";
+const ASSISTANT_UNAVAILABLE_MESSAGE = "We're having trouble connecting to the AI service. Please try again in a moment. You can keep using your workspace.";
+
+function isAssistantUnavailable(err) {
+  return [502, 503, 504].includes(err?.response?.status)
+    || ["ERR_NETWORK", "ECONNABORTED", "ETIMEDOUT"].includes(err?.code);
+}
+
+function assistantErrorMessage(err) {
+  return isAssistantUnavailable(err) ? ASSISTANT_UNAVAILABLE_MESSAGE : apiErrorMessage(err);
+}
 
 // Conversation history stays in memory; tools and confirmations run on the server.
 export default function AssistantWidget() {
   const { user } = useAuth();
   const { workspaces } = useWorkspaces();
   const { workspaceId } = useParams();
-  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const messagesRef = useRef(messages);
@@ -56,6 +61,7 @@ export default function AssistantWidget() {
   const recordingTimeoutRef = useRef(null);
   const contextVersion = useRef(0);
   const [configured, setConfigured] = useState(null);
+  const [unavailable, setUnavailable] = useState(false);
   const [error, setError] = useState("");
   const [voiceError, setVoiceError] = useState("");
   const [confirming, setConfirming] = useState(null);
@@ -70,7 +76,6 @@ export default function AssistantWidget() {
 
   const workspace = workspaces.find((w) => w.id === workspaceId);
   const firstName = user?.name?.trim().split(/\s+/)[0];
-  const raised = hasBottomControls(pathname);
 
   useEffect(() => {
     contextVersion.current++;
@@ -128,7 +133,11 @@ export default function AssistantWidget() {
   useEffect(() => {
     if (!open) return;
     let current = true;
-    assistantStatus().then((status) => { if (current) setConfigured(status.configured); }).catch(() => { if (current) { setConfigured(null); setError("Could not check assistant setup. Close and reopen to retry."); } });
+    assistantStatus().then((status) => { if (current) setConfigured(status.configured); }).catch((err) => { if (current) {
+      setConfigured(null);
+      if (isAssistantUnavailable(err)) setUnavailable(true);
+      setError(isAssistantUnavailable(err) ? ASSISTANT_UNAVAILABLE_MESSAGE : "Couldn't check Lofty's availability. Close and reopen to try again.");
+    } });
     return () => { current = false; };
   }, [open]);
 
@@ -245,7 +254,7 @@ export default function AssistantWidget() {
     } catch (err) {
       const reportError = !controller.signal.aborted && version === contextVersion.current;
       if (ttsRef.current?.controller === controller) ttsRef.current = null;
-      if (reportError) updateVoiceReply(messageId, { audioStatus: "failed", audioError: apiErrorMessage(err) });
+      if (reportError) updateVoiceReply(messageId, { audioStatus: "failed", audioError: assistantErrorMessage(err) });
     }
   }
 
@@ -309,7 +318,7 @@ export default function AssistantWidget() {
             await send(result.transcript, { voice: true });
           }
         } catch (err) {
-          if (!controller.signal.aborted && contextVersion.current === version) setVoiceError(apiErrorMessage(err));
+          if (!controller.signal.aborted && contextVersion.current === version) setVoiceError(assistantErrorMessage(err));
         } finally {
           if (contextVersion.current === version && voiceSession === voiceSessionRef.current) setTranscribing(false);
         }
@@ -368,13 +377,16 @@ export default function AssistantWidget() {
     try {
       const result = await sendAssistantMessage({ message: content, interactionMode: voice ? "voice" : "text", history, ...(workspaceId ? { workspaceId } : {}), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Manila" }, controller.signal, voice ? undefined : showProgress);
       if (!controller.signal.aborted && version === contextVersion.current) {
+        setUnavailable(false);
+        setError((current) => current === ASSISTANT_UNAVAILABLE_MESSAGE ? "" : current);
         const reply = { id: replyId, role: "assistant", content: result.reply, actions: result.actions, replyMode: voice ? "voice" : "text", ...(voice ? { audioStatus: "canceled" } : {}) };
         setMessages((m) => [...m.filter((item) => item.id !== replyId), reply]);
         if (voice) void playReply(result.reply, version, voiceSession, replyId);
       }
     } catch (err) {
       if (!controller.signal.aborted && version === contextVersion.current) {
-        (voice ? setVoiceError : setError)(apiErrorMessage(err));
+        if (isAssistantUnavailable(err)) setUnavailable(true);
+        (voice ? setVoiceError : setError)(assistantErrorMessage(err));
         setMessages((m) => m.filter((item) => item.id !== replyId).map((item) => item.id === messageId ? { ...item, failed: true } : item));
         if (!voice) setDraft(content);
       }
@@ -465,7 +477,7 @@ export default function AssistantWidget() {
     : "done";
 
   return (
-    <div className="print:hidden">
+    <div role="group" aria-label="Lofty controls" className="assistant-dock flex shrink-0 items-center justify-end gap-3 border-t border-ink-900/[0.06] px-3 dark:border-white/[0.06] sm:px-5 print:hidden">
       <button
         ref={launcherRef}
         type="button"
@@ -475,9 +487,7 @@ export default function AssistantWidget() {
         aria-controls="loft-assistant"
         title="Lofty chat"
         style={{ "--level": 0, "--turn": 0 }}
-        className={`absolute right-3 z-30 flex h-12 w-12 items-center justify-center rounded-full transition-[transform,opacity,filter] duration-200 hover:-translate-y-0.5 hover:brightness-110 active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 sm:right-5 sm:h-14 sm:w-14 ${
-          raised ? "bottom-[max(4.75rem,var(--chat-composer-clearance,0px),var(--meeting-controls-clearance,0px))] sm:bottom-[max(6rem,var(--chat-composer-clearance,0px),var(--meeting-controls-clearance,0px))]" : "bottom-3 sm:bottom-5"
-        } ${open ? "invisible scale-75 opacity-0" : ""}`}
+        className={`relative order-last flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-[transform,opacity,filter] duration-200 hover:-translate-y-0.5 hover:brightness-110 active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 sm:h-14 sm:w-14 ${open ? "invisible scale-75 opacity-0" : ""}`}
       >
         <VoiceOrb state="done" className="voice-orb-launcher" />
       </button>
@@ -489,9 +499,7 @@ export default function AssistantWidget() {
           aria-label="Talk to Lofty"
           title="Talk to Lofty"
           disabled={thinking || transcribing || Boolean(confirming)}
-          className={`btn-secondary absolute right-[4.5rem] z-30 flex h-12 w-12 items-center justify-center rounded-full p-0 shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50 sm:right-[5.25rem] sm:h-14 sm:w-14 ${
-            raised ? "bottom-[max(4.75rem,var(--chat-composer-clearance,0px),var(--meeting-controls-clearance,0px))] sm:bottom-[max(6rem,var(--chat-composer-clearance,0px),var(--meeting-controls-clearance,0px))]" : "bottom-3 sm:bottom-5"
-          }`}
+          className="btn-secondary flex h-12 w-12 shrink-0 items-center justify-center rounded-full p-0 shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50 sm:h-14 sm:w-14"
         >
           <Mic className="h-5 w-5" />
         </button>
@@ -519,8 +527,8 @@ export default function AssistantWidget() {
               <div className="min-w-0 flex-1">
                 <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-50">Lofty</h2>
                 <p className="flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent-500" aria-hidden="true" />
-                  {configured === null ? "Checking setup" : configured ? "Ready to ask" : "Setup needed"}
+                  <span className={`h-1.5 w-1.5 rounded-full ${unavailable || configured === false ? "bg-amber-500" : configured === null ? "bg-ink-400" : "bg-accent-500"}`} aria-hidden="true" />
+                  {unavailable ? "Temporarily unavailable" : configured === null ? "Checking setup" : configured ? "Ready to ask" : "Setup needed"}
                 </p>
               </div>
               <button
@@ -561,6 +569,21 @@ export default function AssistantWidget() {
                 <span className="truncate">{workspace ? workspace.name : "All your workspaces"}</span>
               </span>
             </div>
+
+            {unavailable && (
+              <div role="alert" className="mx-4 mt-3 flex shrink-0 gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">Lofty is temporarily unavailable</p>
+                  <p className="mt-1 text-xs leading-relaxed">{ASSISTANT_UNAVAILABLE_MESSAGE}</p>
+                  {configured && draft.trim() && (
+                    <button type="button" onClick={() => send(draft)} disabled={thinking || Boolean(confirming) || transcribing || recording} className="mt-2 min-h-9 rounded-lg border border-amber-300 px-3 text-xs font-semibold transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/30 dark:hover:bg-amber-500/10">
+                      Try again
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4" aria-live="polite">
               <div className="space-y-1.5">
@@ -628,7 +651,7 @@ export default function AssistantWidget() {
                 </div>
               ))}
 
-              {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</p>}
+              {error && !(unavailable && error === ASSISTANT_UNAVAILABLE_MESSAGE) && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</p>}
 
               {thinking && (
                 <div
@@ -680,7 +703,6 @@ export default function AssistantWidget() {
       )}
 
       <VoiceAssistant
-        raised={raised}
         active={Boolean(bubble)}
         inputMode={bubble?.inputMode}
         canTalk={!thinking && !transcribing && !recording && !confirming && !bubble?.holding}

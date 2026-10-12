@@ -42,7 +42,7 @@ export default function NotificationToasts() {
   const raised = /\/(chat|meeting)$|\/docs\/[^/]+$/.test(pathname);
 
   return (
-    <section aria-label="Notification pop-ups" aria-live="polite" aria-relevant="additions" aria-atomic="false" className={`pointer-events-none absolute right-3 z-40 flex w-[min(24rem,calc(100%-1.5rem))] max-h-[calc(100dvh-14rem)] flex-col gap-2 overflow-y-auto overscroll-contain sm:right-5 sm:max-h-[calc(100dvh-16rem)] print:hidden ${raised ? "bottom-[calc(max(4.75rem,var(--chat-composer-clearance,0px),var(--meeting-controls-clearance,0px))+4.5rem)] sm:bottom-[calc(max(6rem,var(--chat-composer-clearance,0px),var(--meeting-controls-clearance,0px))+4.75rem)]" : "bottom-[max(5.5rem,env(safe-area-inset-bottom))] sm:bottom-24"}`}>
+    <section aria-label="Notification pop-ups" aria-live="polite" aria-relevant="additions" aria-atomic="false" className={`pointer-events-none absolute right-3 z-40 flex w-[min(24rem,calc(100%-1.5rem))] max-h-[calc(100dvh-14rem)] flex-col gap-2 overflow-y-auto overscroll-contain sm:right-5 sm:max-h-[calc(100dvh-16rem)] print:hidden ${raised ? "bottom-[calc(var(--assistant-dock-height)+max(4.75rem,var(--chat-composer-clearance,0px),var(--meeting-controls-clearance,0px))+0.75rem)] sm:bottom-[calc(var(--assistant-dock-height)+max(6rem,var(--chat-composer-clearance,0px),var(--meeting-controls-clearance,0px))+0.75rem)]" : "bottom-[calc(var(--assistant-dock-height)+0.75rem)]"}`}>
       {toasts.map((toast) => <NotificationToast key={toast.id} toast={toast} onDismiss={dismissToast} />)}
     </section>
   );

@@ -70,7 +70,7 @@ export default function AppShell() {
           Phones and tablets get it edge to edge, with no frame. */}
       <div className="app-content relative flex min-w-0 flex-1 flex-col overflow-hidden lg:my-2 lg:mr-2 lg:rounded-2xl lg:border lg:border-white/60 lg:shadow-glass lg:dark:border-white/[0.07] print:m-0 print:rounded-none print:border-0">
         <Topbar title={title} context={context} navOpen={navOpen} onOpenNav={() => setNavOpen(true)} />
-        <main className="relative flex-1 overflow-y-auto overscroll-contain print:overflow-visible">
+        <main className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain print:overflow-visible">
           <Outlet />
         </main>
         <MiniCallPlayer />

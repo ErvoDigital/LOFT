@@ -3,6 +3,14 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --assistant-dock-height: calc(4rem + env(safe-area-inset-bottom, 0px));
+  }
+  @screen sm {
+    :root {
+      --assistant-dock-height: calc(5rem + env(safe-area-inset-bottom, 0px));
+    }
+  }
   html {
     font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
     /* Phones: no grey flash over tapped controls (they have their own
@@ -73,6 +81,12 @@
 }
 
 @layer components {
+  /* Reserve space for Lofty's launchers so page content and composers stay
+     above them. The shared height also keeps floating notices clear. */
+  .assistant-dock {
+    height: var(--assistant-dock-height);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
   /* The colour wash the frosted panels blur against. Without something
      varied behind them, backdrop-blur renders as flat translucency and the
      glass reads as plain grey. Mounted once, fixed, in AppShell. */

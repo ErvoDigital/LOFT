@@ -71,7 +71,7 @@ async function mount(t, overrides = {}) {
     require: createRequire(import.meta.url),
     mocks: {
       "react-router-dom": { Link: ({ to, children }) => React.createElement("a", { href: to }, children), useLocation: () => ({ pathname: "/" }), useParams: () => ({}) },
-      "lucide-react": Object.fromEntries(["Layers", "Mic", "Sparkles", "Square", "Volume2", "VolumeX", "X"].map((name) => [name, () => null])),
+      "lucide-react": Object.fromEntries(["AlertTriangle", "Layers", "Mic", "Sparkles", "Square", "Volume2", "VolumeX", "X"].map((name) => [name, () => null])),
       "../../context/AuthContext.jsx": { useAuth: () => ({ user: { id: "tester", name: "Tester" } }) },
       "../../context/WorkspaceContext.jsx": { useWorkspaces: () => ({ workspaces: [] }) },
       "../common/WorkspaceMark.jsx": mockComponent,
@@ -276,6 +276,81 @@ test("A failed stream removes provisional text and restores the question for ret
   assert.ok(!JSON.stringify(widget.view.toJSON()).includes("An unfinished answer"));
   assert.equal(widget.view.root.findByType("input").props.value, "Plan my day");
   assert.ok(JSON.stringify(widget.view.toJSON()).includes("Stream interrupted"));
+});
+
+test("Gateway outages show a friendly warning and a successful retry restores availability", async (t) => {
+  for (const failure of [
+    ...[502, 503, 504].map((status) => ({ response: { status } })),
+    ...["ERR_NETWORK", "ECONNABORTED", "ETIMEDOUT"].map((code) => ({ code })),
+  ]) {
+    const reply = deferred();
+    const overrides = { reply };
+    const widget = await mount(t, overrides);
+    await widget.type("Plan my day");
+    await widget.submit();
+    await act(async () => widget.progress({ type: "delta", text: "An unfinished answer" }));
+    await act(async () => reply.reject(Object.assign(new Error("Check the gateway logs and OpenRouter key or credits."), failure)));
+
+    const content = JSON.stringify(widget.view.toJSON());
+    assert.match(content, /Lofty is temporarily unavailable/);
+    assert.match(content, /Please try again in a moment/);
+    assert.match(content, /You can keep using your workspace/);
+    assert.doesNotMatch(content, /gateway logs|OpenRouter|An unfinished answer|Ready to ask/);
+    assert.equal(widget.view.root.findAll((node) => node.props.role === "alert").length, 1);
+    assert.equal(widget.view.root.findByType("input").props.value, "Plan my day");
+
+    await widget.click("Close Lofty");
+    await widget.click("Open Lofty");
+    assert.match(JSON.stringify(widget.view.toJSON()), /Temporarily unavailable/);
+    overrides.reply = null;
+    await act(async () => widget.view.root.findAllByType("button").find((button) => button.children.includes("Try again")).props.onClick());
+    assert.equal(widget.messages[1].message, "Plan my day");
+    assert.equal(widget.messages[1].history.length, 0);
+    assert.equal(widget.view.root.findByType("input").props.value, "");
+    assert.match(JSON.stringify(widget.view.toJSON()), /Ready to ask/);
+    assert.equal(widget.view.root.findAll((node) => node.props.role === "alert").length, 0);
+  }
+});
+
+test("Permission and rate limit errors keep their specific messages", async (t) => {
+  for (const status of [403, 429]) {
+    const reply = deferred();
+    const widget = await mount(t, { reply });
+    await widget.type("Plan my day");
+    await widget.submit();
+    await act(async () => reply.reject(Object.assign(new Error("Please check your access or wait before sending another message."), { response: { status } })));
+    const content = JSON.stringify(widget.view.toJSON());
+    assert.match(content, /Please check your access or wait/);
+    assert.match(content, /Ready to ask/);
+    assert.doesNotMatch(content, /temporarily unavailable/);
+  }
+});
+
+test("A successful voice question clears an earlier chat outage warning", async (t) => {
+  const reply = deferred();
+  const overrides = { reply };
+  const widget = await mount(t, overrides);
+  await widget.type("Plan my day");
+  await widget.submit();
+  await act(async () => reply.reject(Object.assign(new Error("Gateway unavailable"), { response: { status: 503 } })));
+  overrides.reply = null;
+  await widget.record();
+  assert.match(JSON.stringify(widget.view.toJSON()), /Ready to ask/);
+  assert.equal(widget.view.root.findAll((node) => node.props.role === "alert").length, 0);
+});
+
+test("Voice questions show the same friendly gateway warning with chat closed", async (t) => {
+  const reply = deferred();
+  const widget = await mount(t, { reply, closed: true });
+  await widget.record();
+  await act(async () => reply.reject(Object.assign(new Error("OpenClaw is unavailable. Check the gateway."), { response: { status: 503 } })));
+  assert.equal(widget.bubble.phase, "error");
+  assert.match(widget.bubble.error, /trouble connecting to the AI service/);
+  assert.doesNotMatch(widget.bubble.error, /OpenClaw|gateway/);
+  assert.equal(widget.bubble.canTalk, true);
+  assert.equal(widget.speech.length, 0);
+  await widget.click("Close voice bubble");
+  assert.match(JSON.stringify(widget.view.toJSON()), /Lofty is temporarily unavailable/);
 });
 
 test("Meeting draft previews handle absent dates and save only after confirmation", async (t) => {

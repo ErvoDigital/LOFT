@@ -146,7 +146,6 @@ function useMicLevel(stream) {
 // it keeps running. `raised` matches the launcher's lifted position on pages
 // with bottom controls.
 export default function VoiceAssistant({
-  raised,
   active,
   inputMode,
   canTalk,
@@ -457,19 +456,17 @@ export default function VoiceAssistant({
     document.body
   );
 
-  // Minimized: a pill stacked just above the launcher, in the same corner.
+  // Minimized voice controls share the reserved dock with the chat launcher.
   const pill = (
     <div
       ref={pillRef}
-      className={`absolute right-3 z-30 flex max-w-[calc(100%-1.5rem)] animate-slide-fade-in items-center gap-0.5 rounded-full border border-white/60 bg-white/85 p-1 shadow-glass-lg backdrop-blur-xl dark:border-white/[0.08] dark:bg-ink-900/85 sm:right-5 print:hidden ${
-        raised ? "bottom-[8.375rem] sm:bottom-[10.25rem]" : "bottom-[4.375rem] sm:bottom-[5.5rem]"
-      }`}
+      className="relative flex min-w-0 max-w-full animate-slide-fade-in items-center gap-0.5 rounded-full border border-white/60 bg-white/85 p-1 shadow-glass-lg backdrop-blur-xl dark:border-white/[0.08] dark:bg-ink-900/85 print:hidden"
     >
       <button
         type="button"
         onClick={() => setMinimized(false)}
         title="Show Lofty voice"
-        className="flex min-w-0 items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-900/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-100 dark:hover:bg-white/[0.06]"
+        className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-900/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-100 dark:hover:bg-white/[0.06]"
       >
         <VoiceOrb state={phase} small />
         <span className="truncate">{audioStatus === "generating" ? "Generating audio…" : PILL_LABEL[phase]}</span>
