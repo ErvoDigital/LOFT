@@ -7,6 +7,7 @@ import MiniCallPlayer from "../meeting/MiniCallPlayer.jsx";
 import AssistantWidget from "../assistant/AssistantWidget.jsx";
 import NotificationToasts from "../notifications/NotificationToasts.jsx";
 import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
+import useMediaQuery from "../../hooks/useMediaQuery.js";
 
 // The page name, plus the workspace it belongs to when there is one. The
 // desktop topbar joins them on one line; the phone topbar stacks them.
@@ -40,6 +41,8 @@ export default function AppShell() {
   const { title, context } = useTitle();
   const location = useLocation();
   const [navOpen, setNavOpen] = useState(false);
+  const [assistantControlsHost, setAssistantControlsHost] = useState(null);
+  const desktop = useMediaQuery("(min-width: 1024px)");
   const closeNav = useCallback(() => setNavOpen(false), []);
 
   // Picking a destination in the drawer navigates, and navigating closes it.
@@ -48,11 +51,8 @@ export default function AppShell() {
   // Widening past the drawer breakpoint swaps in the desktop sidebar, so an
   // open drawer shouldn't reappear the next time the window narrows.
   useEffect(() => {
-    const desktop = window.matchMedia("(min-width: 1024px)");
-    const onChange = (e) => e.matches && setNavOpen(false);
-    desktop.addEventListener("change", onChange);
-    return () => desktop.removeEventListener("change", onChange);
-  }, []);
+    if (desktop) setNavOpen(false);
+  }, [desktop]);
 
   // h-dvh after h-screen: mobile browsers size 100vh as if their toolbars were
   // hidden, which pushes the bottom of the app under them. Browsers without
@@ -62,7 +62,7 @@ export default function AppShell() {
       {/* The colour the frosted panels blur against — without it the glass
           surfaces read as flat translucent grey. */}
       <div className="app-backdrop pointer-events-none fixed inset-0 -z-10 print:hidden" aria-hidden="true" />
-      <Sidebar />
+      <Sidebar assistantControlsRef={setAssistantControlsHost} />
       <MobileNav open={navOpen} onClose={closeNav} />
       {/* Framed content column — the layered, floating-panel look the rail and
           workspace panel share. No background of its own, so the page keeps
@@ -74,7 +74,7 @@ export default function AppShell() {
           <Outlet />
         </main>
         <MiniCallPlayer />
-        <AssistantWidget />
+        <AssistantWidget launcherContainer={desktop ? assistantControlsHost : null} />
         <NotificationToasts />
       </div>
     </div>

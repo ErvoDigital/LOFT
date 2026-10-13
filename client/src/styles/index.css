@@ -11,6 +11,11 @@
       --assistant-dock-height: calc(5rem + env(safe-area-inset-bottom, 0px));
     }
   }
+  @screen lg {
+    :root {
+      --assistant-dock-height: 0px;
+    }
+  }
   html {
     font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
     /* Phones: no grey flash over tapped controls (they have their own
@@ -81,8 +86,8 @@
 }
 
 @layer components {
-  /* Reserve space for Lofty's launchers so page content and composers stay
-     above them. The shared height also keeps floating notices clear. */
+  /* Reserve space for Lofty's mobile launchers. On desktop they live in the
+     sidebar, so floating notices don't need any extra footer clearance. */
   .assistant-dock {
     height: var(--assistant-dock-height);
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -593,6 +598,11 @@
 @media (min-width: 640px) {
   .voice-orb-launcher {
     --orb: 3.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .voice-orb-launcher {
+    --orb: 2.5rem;
   }
 }
 .voice-orb-halo,

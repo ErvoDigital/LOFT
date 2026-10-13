@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useParams } from "react-router-dom";
 import { AlertTriangle, Layers, Mic, Sparkles, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -35,7 +36,7 @@ function assistantErrorMessage(err) {
 }
 
 // Conversation history stays in memory; tools and confirmations run on the server.
-export default function AssistantWidget() {
+export default function AssistantWidget({ launcherContainer = null }) {
   const { user } = useAuth();
   const { workspaces } = useWorkspaces();
   const { workspaceId } = useParams();
@@ -476,8 +477,24 @@ export default function AssistantWidget() {
     : voiceError || bubbleAnswer?.audioError || !bubbleQuestion ? "error"
     : "done";
 
-  return (
-    <div role="group" aria-label="Lofty controls" className="assistant-dock flex shrink-0 items-center justify-end gap-3 border-t border-ink-900/[0.06] px-3 dark:border-white/[0.06] sm:px-5 print:hidden">
+  // Only the launchers move into the sidebar. The conversation and voice
+  // session stay mounted here when the viewport changes.
+  const launchers = (
+    <div role="group" aria-label="Lofty controls" className={launcherContainer
+      ? "flex shrink-0 flex-col items-center gap-3 print:hidden"
+      : "assistant-dock flex shrink-0 items-center justify-end gap-3 border-t border-ink-900/[0.06] px-3 dark:border-white/[0.06] sm:px-5 print:hidden"}>
+      {!open && !bubble && (
+        <button
+          type="button"
+          onClick={startTouchTurn}
+          aria-label="Talk to Lofty"
+          title="Talk to Lofty"
+          disabled={thinking || transcribing || Boolean(confirming)}
+          className="btn-secondary flex h-12 w-12 shrink-0 items-center justify-center rounded-full p-0 shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50 sm:h-14 sm:w-14 lg:h-10 lg:w-10 lg:border-white/10 lg:bg-white/[0.06] lg:text-ink-300 lg:shadow-none lg:hover:bg-white/[0.1] lg:hover:text-white"
+        >
+          <Mic className="h-5 w-5" />
+        </button>
+      )}
       <button
         ref={launcherRef}
         type="button"
@@ -487,23 +504,17 @@ export default function AssistantWidget() {
         aria-controls="loft-assistant"
         title="Lofty chat"
         style={{ "--level": 0, "--turn": 0 }}
-        className={`relative order-last flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-[transform,opacity,filter] duration-200 hover:-translate-y-0.5 hover:brightness-110 active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 sm:h-14 sm:w-14 ${open ? "invisible scale-75 opacity-0" : ""}`}
+        className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-[transform,opacity,filter] duration-200 hover:-translate-y-0.5 hover:brightness-110 active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 sm:h-14 sm:w-14 lg:h-10 lg:w-10 ${open ? "invisible scale-75 opacity-0" : ""}`}
       >
         <VoiceOrb state="done" className="voice-orb-launcher" />
       </button>
 
-      {!open && !bubble && (
-        <button
-          type="button"
-          onClick={startTouchTurn}
-          aria-label="Talk to Lofty"
-          title="Talk to Lofty"
-          disabled={thinking || transcribing || Boolean(confirming)}
-          className="btn-secondary flex h-12 w-12 shrink-0 items-center justify-center rounded-full p-0 shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50 sm:h-14 sm:w-14"
-        >
-          <Mic className="h-5 w-5" />
-        </button>
-      )}
+    </div>
+  );
+
+  return (
+    <>
+      {launcherContainer ? createPortal(launchers, launcherContainer) : launchers}
 
       {open && (
         <>
@@ -731,6 +742,6 @@ export default function AssistantWidget() {
         onSkip={stopPlayback}
         onClose={closeBubble}
       />
-    </div>
+    </>
   );
 }
