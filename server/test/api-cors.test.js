@@ -2,7 +2,8 @@ import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { clientOrigins } from "../src/config/clientOrigins.js";
 
-const appOrigin = "https://app.loft-client.site";
+const appOrigin = "https://client.synctayo.online";
+const legacyAppOrigin = "https://app.loft-client.site";
 const legacyOrigin = "https://www.loft-client.site";
 const extraOrigin = "https://preview.loft.test";
 const localOrigin = "http://localhost:5173";
@@ -12,9 +13,9 @@ let server, baseUrl, token, fake, clearPrismaClient;
 
 before(async () => {
   process.env.JWT_SECRET = "api-cors-test-secret";
-  // Reproduce a deployment that still uses the previous www origin.
-  process.env.CLIENT_URL = legacyOrigin;
-  process.env.CLIENT_ALLOWED_ORIGINS = `${extraOrigin}/, ${localOrigin}`;
+  // Reproduce a deployment that still uses the previous app origin.
+  process.env.CLIENT_URL = legacyAppOrigin;
+  process.env.CLIENT_ALLOWED_ORIGINS = `${legacyOrigin}, ${extraOrigin}/, ${localOrigin}`;
   const { createApp } = await import("../src/app.js");
   const prismaModule = await import("../src/db/prisma.js");
   clearPrismaClient = prismaModule.clearPrismaClient;
@@ -83,7 +84,7 @@ test("workspace and assistant reads ignore old cache validators instead of retur
 });
 
 test("each configured browser origin receives its own matching CORS header", async () => {
-  for (const origin of [appOrigin, legacyOrigin, extraOrigin, localOrigin]) {
+  for (const origin of [appOrigin, legacyAppOrigin, legacyOrigin, extraOrigin, localOrigin]) {
     const res = await request("/workspaces", origin);
     assert.equal(res.status, 200);
     assertReadable(res, origin);
@@ -92,7 +93,7 @@ test("each configured browser origin receives its own matching CORS header", asy
 });
 
 test("preflight permits authorization headers from the app and configured origins", async () => {
-  for (const origin of [appOrigin, legacyOrigin, extraOrigin, localOrigin]) {
+  for (const origin of [appOrigin, legacyAppOrigin, legacyOrigin, extraOrigin, localOrigin]) {
     const res = await request("/workspaces", origin, {
       method: "OPTIONS",
       headers: { "Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": "authorization" },
@@ -103,8 +104,36 @@ test("preflight permits authorization headers from the app and configured origin
   }
 });
 
+test("login and registration preflight allow the new client despite the previous CLIENT_URL", async () => {
+  for (const path of ["/auth/login", "/auth/register", "/auth/2fa/verify"]) {
+    const res = await fetch(`${baseUrl}${path}`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: appOrigin,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type,authorization",
+      },
+    });
+    assert.equal(res.status, 204);
+    assertReadable(res, appOrigin);
+    assert.match(res.headers.get("access-control-allow-methods"), /(?:^|,)POST(?:,|$)/);
+    assert.equal(res.headers.get("access-control-allow-headers"), "content-type,authorization");
+  }
+});
+
+test("login validation errors remain readable from the new client", async () => {
+  const res = await fetch(`${baseUrl}/auth/login`, {
+    method: "POST",
+    headers: { Origin: appOrigin, "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  assert.equal(res.status, 400);
+  assertReadable(res, appOrigin);
+  assert.equal(typeof (await res.json()).error, "string");
+});
+
 test("unrelated origins and lookalike domains are not granted browser access", async () => {
-  for (const origin of ["https://evil.test", `${appOrigin}.evil.test`, "http://app.loft-client.site", "null"]) {
+  for (const origin of ["https://evil.test", `${appOrigin}.evil.test`, "https://synctayo.online", "http://client.synctayo.online", `${legacyAppOrigin}.evil.test`, "http://app.loft-client.site", "null"]) {
     const res = await request("/workspaces", origin);
     assert.equal(res.headers.get("access-control-allow-origin"), null);
     await res.arrayBuffer();
@@ -122,5 +151,9 @@ test("origin configuration normalizes URLs, removes duplicates and excludes wild
   assert.deepEqual(clientOrigins({
     CLIENT_URL: `${appOrigin}/`,
     CLIENT_ALLOWED_ORIGINS: `${appOrigin}, ${legacyOrigin}/, *, ftp://example.test, invalid`,
-  }), [appOrigin, legacyOrigin]);
+  }), [appOrigin, legacyAppOrigin, legacyOrigin]);
+});
+
+test("the current and previous production clients remain allowed without environment overrides", () => {
+  assert.deepEqual(clientOrigins({}), [appOrigin, legacyAppOrigin]);
 });

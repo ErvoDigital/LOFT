@@ -1,21 +1,29 @@
-# Custom domain storage and realtime access
+# Custom domain API, storage, and realtime access
 
-The production client uses `https://app.loft-client.site`. Moving the client to a custom domain also requires updating the origins allowed by S3 and the realtime function.
+The production client uses `https://client.synctayo.online`. Moving the client to a custom domain also requires updating the origins allowed by the API, S3, and the realtime function.
+
+## Login after the SyncTayo domain change
+
+On 2026-10-15, the live API returned HTTP 204 for `OPTIONS /api/auth/login` from `https://client.synctayo.online` without an `Access-Control-Allow-Origin` header. The same preflight from `https://app.loft-client.site` included the matching header, confirming that the deployed API still allowed the previous client domain.
+
+The API allowlist now always includes the current and previous production app origins, even when `CLIENT_URL` is unset or still points to the previous domain. Login, registration, and email-code verification preflight requests receive the matching origin, credentials, methods, and requested headers. Unrelated origins are still excluded.
+
+Deploy the updated **loft-server** project to apply this fix. In Vercel, also set **Production** `CLIENT_URL=https://client.synctayo.online` so password-reset and invitation emails link to the current app. Changing local `server/.env` does not update Vercel; redeploy after changing the production environment. Verify that the login preflight includes `Access-Control-Allow-Origin: https://client.synctayo.online`.
 
 ## Workspace and assistant API access
 
 On 2026-10-08, the browser reported blocked `/api/workspaces` and `/api/assistant/status` requests from `https://app.loft-client.site`: their HTTP 304 responses carried `Access-Control-Allow-Origin: https://www.loft-client.site`. Fresh unauthenticated requests to both endpoints returned the app origin when checked afterward, so the stale responses must also be bypassed when verifying the fix.
 
-In Vercel's **loft-server** project, set **Production** `CLIENT_URL=https://app.loft-client.site` and redeploy the server. Changing local `server/.env` does not update Vercel. To retain additional browser origins, configure the optional comma-separated `CLIENT_ALLOWED_ORIGINS`, for example:
+In Vercel's **loft-server** project, set **Production** `CLIENT_URL=https://client.synctayo.online` and redeploy the server. Changing local `server/.env` does not update Vercel. To retain additional browser origins, configure the optional comma-separated `CLIENT_ALLOWED_ORIGINS`, for example:
 
 ```env
-CLIENT_URL=https://app.loft-client.site
+CLIENT_URL=https://client.synctayo.online
 CLIENT_ALLOWED_ORIGINS=https://www.loft-client.site,https://loft-client.site,https://loft-client.vercel.app
 ```
 
-The server now always includes the app origin and matches it, `CLIENT_URL`, and any additional configured origins exactly. An allowed request receives its own origin in the response, with `Vary: Origin`; unrelated domains receive no CORS allow header. See the [Express CORS configuration](https://expressjs.com/en/resources/middleware/cors/).
+The server always includes the current and previous app origins and matches them, `CLIENT_URL`, and any additional configured origins exactly. An allowed request receives its own origin in the response, with `Vary: Origin`; unrelated domains receive no CORS allow header. See the [Express CORS configuration](https://expressjs.com/en/resources/middleware/cors/).
 
-API responses use `Cache-Control: private, no-store`, disable generated ETags, and ignore GET/HEAD cache validators so a saved response from before the domain change cannot turn into another HTTP 304. See [HTTP caching](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching). Deploy the server changes, then open browser DevTools, enable **Disable cache** in Network, and reload the app. Confirm the authenticated workspace request returns HTTP 200 with `Access-Control-Allow-Origin: https://app.loft-client.site` and the existing workspace list. The client changes show an error and retry action if that request fails.
+API responses use `Cache-Control: private, no-store`, disable generated ETags, and ignore GET/HEAD cache validators so a saved response from before the domain change cannot turn into another HTTP 304. See [HTTP caching](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching). Deploy the server changes, then open browser DevTools, enable **Disable cache** in Network, and reload the app. Confirm the authenticated workspace request returns HTTP 200 with `Access-Control-Allow-Origin: https://client.synctayo.online` and the existing workspace list. The client changes show an error and retry action if that request fails.
 
 This repair changes HTTP origin and caching behavior; existing workspace memberships and data need no database migration.
 
