@@ -55,6 +55,20 @@ npm run ai:lightsail:logs
 
 The check does not require a database. An authenticated model list verifies connectivity, not OpenRouter credits or inference. DNS/certificate issuance may take time after first startup; retry the check once Caddy logs show that HTTPS is ready. Requests with missing/incorrect bearer tokens must be rejected by the gateway. An unauthenticated request to `https://ai.example.com/v1/models` should return 401; `/` should return 404 over HTTPS.
 
+## Production hostname update (2026-10-15)
+
+The Lightsail host at `54.79.215.235` now serves `https://ai.synctayo.online`. Its saved `infra/openclaw/.env.lightsail` already contained the new hostname, but the running Caddy container still had `OPENCLAW_DOMAIN=openclaw.loft-client.site`. Recreating only Caddy loaded the saved value. Public HTTPS now presents a valid certificate for `ai.synctayo.online`, unauthenticated `/v1/models` returns 401, and the authenticated gateway check passes. A live request through the public `/v1/responses` endpoint returned HTTP 200, completed successfully, and produced the expected diagnostic answer in approximately 74 seconds after the gateway restart.
+
+When changing `OPENCLAW_DOMAIN`, recreate Caddy to load its new environment. From `/home/ubuntu/LOFT/infra/openclaw` on the VPS:
+
+```bash
+docker compose --project-name openclaw --env-file .env.lightsail \
+  -f compose.yml -f compose.lightsail.yml \
+  up -d --no-deps --force-recreate caddy
+```
+
+This targets Caddy and preserves the existing OpenClaw process and persistent volumes. A container restart alone retains its previous environment. Set the Vercel **loft-server** project's `OPENCLAW_GATEWAY_URL` to `https://ai.synctayo.online`, retain the matching gateway token, and redeploy the backend. The Vercel production environment was not inspected during this gateway check.
+
 ## Upgrade an existing gateway for audio
 
 The Gemini PCM-to-WAV fix was deployed to `openclaw.loft-client.site` on October 6, 2026. OpenClaw was restarted, the authenticated gateway check passed, and a live speech request returned valid `audio/wav` with 24 kHz mono samples. The previous plugin is backed up on the VPS at `/home/ubuntu/loft-speech-upgrade-nm1mz5el/index.js.previous`. This deployment updated the gateway plugin; website changes have their own deployment.
