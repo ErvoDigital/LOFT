@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import dotenv from "dotenv";
+import { gatewayConfig } from "../server/src/config/openclaw.js";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 for (let index = 3; index < process.argv.length; index++) {
@@ -66,7 +67,7 @@ else {
   const env = { ...fileEnv, ...process.env };
   if (command === "check") {
     if (!env.OPENCLAW_GATEWAY_TOKEN) throw new Error("Configure OPENCLAW_GATEWAY_TOKEN or run the appropriate ai:setup command first.");
-    const url = (env.OPENCLAW_GATEWAY_URL || (lightsail && env.OPENCLAW_DOMAIN ? `https://${env.OPENCLAW_DOMAIN}` : "http://127.0.0.1:18789")).replace(/\/+$/, "");
+    const { url } = gatewayConfig({ ...env, OPENCLAW_GATEWAY_URL: env.OPENCLAW_GATEWAY_URL || (lightsail && env.OPENCLAW_DOMAIN ? `https://${env.OPENCLAW_DOMAIN}` : undefined) });
     const response = await fetch(`${url}/v1/models`, { headers: { Authorization: `Bearer ${env.OPENCLAW_GATEWAY_TOKEN}` }, redirect: "error", signal: AbortSignal.timeout(10000) });
     if (!response.ok) throw new Error(`Gateway check failed (HTTP ${response.status}). Check the gateway URL, token and logs.`);
     const data = await response.json();

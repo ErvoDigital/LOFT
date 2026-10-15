@@ -59,6 +59,15 @@ async function mount(t, overrides = {}) {
   return { view, events, listeners, timers, frames, body, click, update, tick, spokenText };
 }
 
+test("The bubble distinguishes transcription from reasoning in both expanded and minimized views", async (t) => {
+  const bubble = await mount(t, { phase: "thinking", transcribing: true, audioStatus: undefined, canPlay: false });
+  assert.match(JSON.stringify(bubble.view.toJSON()), /Transcribing/);
+  await bubble.click("Minimize");
+  assert.match(JSON.stringify(bubble.view.toJSON()), /Transcribing/);
+  await bubble.update({ transcribing: false });
+  assert.match(JSON.stringify(bubble.view.toJSON()), /Thinking/);
+});
+
 test("The talk key prepares playback during the gesture before the hold timer starts recording", async (t) => {
   const bubble = await mount(t, { active: false });
   bubble.listeners.get("keydown")({ key: "m", target: bubble.body });

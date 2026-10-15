@@ -148,6 +148,7 @@ function useMicLevel(stream) {
 // with bottom controls.
 export default function VoiceAssistant({
   active,
+  transcribing,
   inputMode,
   canTalk,
   phase,
@@ -320,7 +321,7 @@ export default function VoiceAssistant({
 
   const finished = phase === "done" || phase === "error";
   const closeLabel = heard ? "Close and continue in chat" : "Close";
-  const status = audioStatus === "generating" ? "Generating audio…" : STATUS[phase];
+  const status = transcribing ? "Transcribing…" : audioStatus === "generating" ? "Generating audio…" : STATUS[phase];
   const playLabel = audioStatus === "ready" ? "Play voice reply" : "Retry voice reply";
   const currentTime = Number.isFinite(audio?.currentTime) ? audio.currentTime : 0;
   const playingText = transcript.audio === audio && transcript.replyId === replyId && transcript.time <= currentTime
@@ -472,7 +473,7 @@ export default function VoiceAssistant({
         className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-900/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-100 dark:hover:bg-white/[0.06]"
       >
         <VoiceOrb state={phase} small />
-        <span className="truncate">{audioStatus === "generating" ? "Generating audio…" : PILL_LABEL[phase]}</span>
+        <span className="truncate">{transcribing ? "Transcribing…" : audioStatus === "generating" ? "Generating audio…" : PILL_LABEL[phase]}</span>
       </button>
       {phase === "listening" ? (
         <button

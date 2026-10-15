@@ -69,6 +69,10 @@ docker compose --project-name openclaw --env-file .env.lightsail \
 
 This targets Caddy and preserves the existing OpenClaw process and persistent volumes. A container restart alone retains its previous environment. Set the Vercel **loft-server** project's `OPENCLAW_GATEWAY_URL` to `https://ai.synctayo.online`, retain the matching gateway token, and redeploy the backend. The Vercel production environment was not inspected during this gateway check.
 
+Voice was also checked through the new public hostname on October 15: authenticated speech generation returned HTTP 200 with a valid 92,204-byte WAV in approximately 3 seconds. Sending that diagnostic audio to the authenticated transcription endpoint returned HTTP 200 and the expected text in approximately 1.3 seconds. The website's transcription and speech CORS preflights both allow `https://client.synctayo.online`. These checks cover the gateway and public API preflights; they do not establish that Vercel's saved gateway URL and token match the live Lightsail settings.
+
+A separate synthetic tool-assisted answer also passed through the new hostname in approximately 21 seconds: the gateway requested one diagnostic tool, accepted its result, and completed the answer within the backend's 90-second budget. This test used no workspace data or record writes. The application changes for hostname migration, the explicit Vercel runtime allowance, and voice-stage errors still require server/client deployment.
+
 ## Upgrade an existing gateway for audio
 
 The Gemini PCM-to-WAV fix was deployed to `openclaw.loft-client.site` on October 6, 2026. OpenClaw was restarted, the authenticated gateway check passed, and a live speech request returned valid `audio/wav` with 24 kHz mono samples. The previous plugin is backed up on the VPS at `/home/ubuntu/loft-speech-upgrade-nm1mz5el/index.js.previous`. This deployment updated the gateway plugin; website changes have their own deployment.

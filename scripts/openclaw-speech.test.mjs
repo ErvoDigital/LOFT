@@ -4,6 +4,8 @@ import http from "node:http";
 import { Readable } from "node:stream";
 import plugin, { createSpeechHandler, gatewaySpeechConfig, pcmToWav } from "../infra/openclaw/plugins/loft-speech/index.js";
 import { speechConfig, transcribeAssistantAudio, synthesizeAssistantSpeech } from "../server/src/services/speech.service.js";
+import { gatewayConfig } from "../server/src/config/openclaw.js";
+import { runOpenClaw } from "../server/src/services/openclaw.service.js";
 
 async function host(t, action, options) {
   const server = http.createServer(createSpeechHandler(action, options));
@@ -22,6 +24,35 @@ test("Speech uses the same gateway settings as text and registers gateway-authen
     { path: "/v1/audio/transcriptions", auth: "gateway", match: "exact" },
     { path: "/v1/audio/speech", auth: "gateway", match: "exact" },
   ]);
+});
+
+test("Retired production gateway settings migrate without changing local or custom gateways", () => {
+  for (const configuredUrl of ["https://openclaw.loft-client.site", " https://openclaw.loft-client.site/ ", "https://openclaw.loft-client.site:443/", "http://openclaw.loft-client.site"]) {
+    assert.deepEqual(gatewayConfig({ OPENCLAW_GATEWAY_URL: configuredUrl, OPENCLAW_GATEWAY_TOKEN: "same-token" }), { url: "https://ai.synctayo.online", token: "same-token" });
+  }
+  for (const configuredUrl of ["https://ai.synctayo.online", "http://127.0.0.1:18789", "https://custom.example", "https://openclaw.loft-client.site.other.example"]) {
+    assert.equal(gatewayConfig({ OPENCLAW_GATEWAY_URL: configuredUrl }).url, configuredUrl);
+  }
+  assert.equal(gatewayConfig({}).url, "http://127.0.0.1:18789");
+});
+
+test("Text, transcription and playback send authenticated requests to the new domain with legacy backend settings", async () => {
+  const env = { OPENCLAW_GATEWAY_URL: "https://openclaw.loft-client.site/", OPENCLAW_GATEWAY_TOKEN: "same-token" };
+  const paths = [];
+  const fetchImpl = async (url, init) => {
+    assert.equal(init.headers.Authorization, "Bearer same-token");
+    assert.equal(init.redirect, "error");
+    const path = new URL(url).pathname;
+    assert.equal(new URL(url).origin, "https://ai.synctayo.online");
+    paths.push(path);
+    if (path === "/v1/responses") return Response.json({ output: [{ type: "message", content: [{ type: "output_text", text: "Hello." }] }] });
+    if (path === "/v1/audio/transcriptions") return Response.json({ text: "Hello." });
+    return new Response(Buffer.from("audio"), { headers: { "Content-Type": "audio/wav" } });
+  };
+  assert.equal(await runOpenClaw({ message: "Hello", history: [], instructions: "Reply briefly", tools: [], config: gatewayConfig(env), fetchImpl }), "Hello.");
+  assert.equal((await transcribeAssistantAudio({ audioBuffer: Buffer.from("voice"), mimeType: "audio/webm" }, { config: speechConfig(env), fetchImpl })).transcript, "Hello.");
+  assert.equal((await synthesizeAssistantSpeech({ text: "Hello." }, { config: speechConfig(env), fetchImpl })).contentType, "audio/wav");
+  assert.deepEqual(paths, ["/v1/responses", "/v1/audio/transcriptions", "/v1/audio/speech"]);
 });
 
 test("Browser capture formats reach STT correctly even when the upload filename is webm", async (t) => {

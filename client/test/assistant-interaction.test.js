@@ -453,13 +453,13 @@ test("A successful voice question clears an earlier chat outage warning", async 
   assert.equal(widget.view.root.findAll((node) => node.props.role === "alert").length, 0);
 });
 
-test("Voice questions show the same friendly gateway warning with chat closed", async (t) => {
+test("Voice questions identify answer generation failures with chat closed", async (t) => {
   const reply = deferred();
   const widget = await mount(t, { reply, closed: true });
   await widget.record();
   await act(async () => reply.reject(Object.assign(new Error("OpenClaw is unavailable. Check the gateway."), { response: { status: 503 } })));
   assert.equal(widget.bubble.phase, "error");
-  assert.match(widget.bubble.error, /trouble connecting to the AI service/);
+  assert.match(widget.bubble.error, /couldn't finish your answer/);
   assert.doesNotMatch(widget.bubble.error, /OpenClaw|gateway/);
   assert.equal(widget.bubble.canTalk, true);
   assert.equal(widget.speech.length, 0);
@@ -627,6 +627,36 @@ test("Voice generation errors are reported in the bubble and retry only synthesi
   assert.equal(widget.messages.length, 1);
   assert.equal(widget.speech.length, 2);
   assert.equal(widget.audio[0].played, true);
+});
+
+test("Speech gateway outages and timeouts preserve the answer and let Retry audio retry only synthesis", async (t) => {
+  for (const failure of [{ response: { status: 502 } }, { response: { status: 503 } }, { response: { status: 504 } }, { code: "ECONNABORTED" }]) {
+    const overrides = { speechError: Object.assign(new Error("Private gateway details"), failure) };
+    const widget = await mount(t, overrides);
+    await widget.record();
+    assert.equal(widget.bubble.phase, "error");
+    assert.match(widget.bubble.error, /voice audio.*Retry audio/);
+    assert.doesNotMatch(widget.bubble.error, /Private gateway|trouble connecting to the AI/);
+    assert.equal(widget.bubble.canPlay, true);
+    if (failure.response?.status === 504 || failure.code === "ECONNABORTED") assert.match(widget.bubble.error, /took too long/);
+    overrides.speechError = null;
+    await widget.click("Retry voice reply");
+    assert.equal(widget.messages.length, 1);
+    assert.equal(widget.speech.length, 2);
+    assert.equal(widget.audio[0].played, true);
+  }
+});
+
+test("Transcription failures identify the recording stage before requesting an answer", async (t) => {
+  const transcript = deferred();
+  const widget = await mount(t, { transcript });
+  await widget.record();
+  assert.equal(widget.bubble.transcribing, true);
+  await act(async () => transcript.reject(Object.assign(new Error("Private provider details"), { response: { status: 503 } })));
+  assert.match(widget.bubble.error, /couldn't turn your recording into text/);
+  assert.doesNotMatch(widget.bubble.error, /Private provider|trouble connecting to the AI/);
+  assert.equal(widget.messages.length, 0);
+  assert.equal(widget.speech.length, 0);
 });
 
 test("Autoplay restrictions preserve generated audio for one-click playback", async (t) => {

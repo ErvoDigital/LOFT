@@ -37,6 +37,20 @@ function assistantErrorMessage(err) {
   return isAssistantUnavailable(err) ? ASSISTANT_UNAVAILABLE_MESSAGE : apiErrorMessage(err);
 }
 
+function voiceErrorMessage(err, stage) {
+  if (!isAssistantUnavailable(err)) return apiErrorMessage(err);
+  const timedOut = err?.response?.status === 504 || ["ECONNABORTED", "ETIMEDOUT"].includes(err?.code);
+  if (stage === "transcription") return timedOut
+    ? "Turning your recording into text took too long. Please try recording again."
+    : "Lofty couldn't turn your recording into text. Please try recording again.";
+  if (stage === "playback") return timedOut
+    ? "Generating voice audio took too long. Your answer is available in chat. Tap Retry audio to try again."
+    : "Lofty couldn't generate voice audio. Your answer is available in chat. Tap Retry audio to try again.";
+  return timedOut
+    ? "Lofty took too long to answer. Please try asking again."
+    : "Lofty couldn't finish your answer. Please try asking again.";
+}
+
 // Conversation history stays in memory; tools and confirmations run on the server.
 export default function AssistantWidget({ launcherContainer = null }) {
   const { user } = useAuth();
@@ -263,7 +277,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
     } catch (err) {
       const reportError = !controller.signal.aborted && version === contextVersion.current;
       if (ttsRef.current?.controller === controller) ttsRef.current = null;
-      if (reportError) updateVoiceReply(messageId, { audioStatus: "failed", audioError: assistantErrorMessage(err) });
+      if (reportError) updateVoiceReply(messageId, { audioStatus: "failed", audioError: voiceErrorMessage(err, "playback") });
     }
   }
 
@@ -327,7 +341,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
             await send(result.transcript, { voice: true });
           }
         } catch (err) {
-          if (!controller.signal.aborted && contextVersion.current === version) setVoiceError(assistantErrorMessage(err));
+          if (!controller.signal.aborted && contextVersion.current === version) setVoiceError(voiceErrorMessage(err, "transcription"));
         } finally {
           if (contextVersion.current === version && voiceSession === voiceSessionRef.current) setTranscribing(false);
         }
@@ -395,7 +409,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
     } catch (err) {
       if (!controller.signal.aborted && version === contextVersion.current) {
         if (isAssistantUnavailable(err)) setUnavailable(true);
-        (voice ? setVoiceError : setError)(assistantErrorMessage(err));
+        (voice ? setVoiceError : setError)(voice ? voiceErrorMessage(err, "reply") : assistantErrorMessage(err));
         setMessages((m) => m.filter((item) => item.id !== replyId).map((item) => item.id === messageId ? { ...item, failed: true } : item));
         if (!voice) setDraft(content);
       }
@@ -730,6 +744,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
 
       <VoiceAssistant
         active={Boolean(bubble)}
+        transcribing={transcribing}
         inputMode={bubble?.inputMode}
         canTalk={!thinking && !transcribing && !recording && !confirming && !bubble?.holding}
         phase={bubblePhase}

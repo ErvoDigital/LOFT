@@ -1,12 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { ApiError } from "../utils/ApiError.js";
 import { readResponseStream } from "../utils/responseStream.js";
+import { gatewayConfig } from "../config/openclaw.js";
+
+export { gatewayConfig } from "../config/openclaw.js";
 
 const READ_TOOLS = new Set(["list_workspaces", "list_my_tasks", "list_upcoming_events", "list_my_meeting_drafts", "find_conflicts", "list_workspace_members"]);
-
-export function gatewayConfig(env = process.env) {
-  return { url: env.OPENCLAW_GATEWAY_URL || "http://127.0.0.1:18789", token: env.OPENCLAW_GATEWAY_TOKEN };
-}
 
 // Each turn gets an isolated session. Only continuations within that turn share it.
 // Never accept a gateway session ID or previous_response_id from the browser.
