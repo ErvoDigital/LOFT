@@ -5,11 +5,12 @@ import { requireAuth } from "../middleware/auth.js";
 import { ApiError } from "../utils/ApiError.js";
 import { answerAssistant, assertMembership, confirmAction } from "../services/assistant.service.js";
 import { gatewayConfig } from "../services/openclaw.service.js";
-import { synthesizeAssistantSpeech, transcribeAssistantAudio } from "../services/speech.service.js";
+import { synthesizeAssistantSpeech, transcribeAssistantAudio, validateCaptionAudio } from "../services/speech.service.js";
 
 const router = Router();
 router.use(requireAuth);
 const uploadAudio = multer({ storage: multer.memoryStorage(), limits: { files: 1, fileSize: 8 * 1024 * 1024 } });
+const uploadCaptionAudio = multer({ storage: multer.memoryStorage(), limits: { files: 1, fileSize: 960044 } });
 const requestSchema = z.object({
   message: z.string().trim().min(1).max(4000),
   interactionMode: z.enum(["text", "voice"]).default("text"),
@@ -24,6 +25,8 @@ const speechSchema = z.object({ text: z.string().trim().min(1).max(4000), worksp
 // gateway/proxy rate limiter is still needed for a large replicated deployment.
 const active = new Set();
 const recent = new Map();
+const liveActive = new Set();
+const liveRecent = new Map();
 router.get("/status", (req, res) => res.json({ configured: Boolean(gatewayConfig().token) }));
 router.post("/message", async (req, res) => {
   const data = requestSchema.parse(req.body);
@@ -66,6 +69,29 @@ router.post("/message", async (req, res) => {
 router.post("/confirm", async (req, res) => {
   const { token } = z.object({ token: z.string().min(1).max(12000) }).strict().parse(req.body);
   res.json(await confirmAction(token, req.userId));
+});
+router.post("/transcribe/preview", uploadCaptionAudio.single("audio"), async (req, res) => {
+  const { workspaceId } = contextSchema.parse({ workspaceId: req.body?.workspaceId || undefined });
+  if (workspaceId) await assertMembership(req.userId, workspaceId);
+  validateCaptionAudio(req.file?.buffer);
+  const now = Date.now();
+  for (const [key, times] of liveRecent) if (!times.some((time) => time > now - 60000)) liveRecent.delete(key);
+  const times = (liveRecent.get(req.userId) || []).filter((time) => time > now - 60000);
+  if (liveActive.has(req.userId) || times.length >= 24) throw new ApiError(429, "Live captions are busy. Your full recording can still be transcribed when you stop.");
+  liveRecent.set(req.userId, [...times, now]);
+  liveActive.add(req.userId);
+  const controller = new AbortController();
+  const cancel = () => { if (!res.writableEnded) controller.abort(); };
+  res.on("close", cancel);
+  try {
+    const result = await transcribeAssistantAudio({ audioBuffer: req.file.buffer, mimeType: "audio/wav", fileName: "live-captions.wav" }, { signal: controller.signal, timeoutMs: 15000, allowEmpty: true });
+    if (!controller.signal.aborted && !res.destroyed) res.json({ ...result, interim: true });
+  } catch (err) {
+    if (!controller.signal.aborted) throw err;
+  } finally {
+    res.off("close", cancel);
+    liveActive.delete(req.userId);
+  }
 });
 router.post("/transcribe", uploadAudio.single("audio"), async (req, res) => {
   const { workspaceId } = contextSchema.parse({ workspaceId: req.body?.workspaceId || undefined });

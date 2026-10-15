@@ -50,6 +50,31 @@ function CornerButton({ label, onClick, children }) {
   );
 }
 
+function RecordingTranscript({ text, interim, hasReply }) {
+  const viewportRef = useRef(null);
+  const following = useRef(true);
+
+  useEffect(() => { following.current = true; }, [interim]);
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (viewport && following.current) viewport.scrollTop = interim ? viewport.scrollHeight : 0;
+  }, [text, interim]);
+
+  return (
+    <div className="w-full max-w-lg">
+      {interim && <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">Live captions</p>}
+      <div ref={viewportRef} className="max-h-[min(12rem,24dvh)] overflow-y-auto overscroll-contain rounded-lg px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60" role="region" aria-label={interim ? "Live recording transcript" : "Your voice question"} tabIndex={0}
+        onScroll={({ currentTarget: viewport }) => { following.current = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 12; }}>
+        <p className={`whitespace-pre-wrap break-words font-medium tracking-tight transition-[font-size,color] duration-300 ${
+          hasReply ? "text-lg text-ink-500 dark:text-ink-400" : "text-2xl leading-snug text-ink-900 dark:text-ink-50 sm:text-[1.75rem]"
+        }`}>
+          {text}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function VoiceTranscript({ text, replyId, audio }) {
   const viewportRef = useRef(null);
   const following = useRef(true);
@@ -153,6 +178,8 @@ export default function VoiceAssistant({
   canTalk,
   phase,
   heard,
+  interimTranscript,
+  captionsUnavailable,
   reply,
   replyId,
   audio,
@@ -320,7 +347,7 @@ export default function VoiceAssistant({
   }
 
   const finished = phase === "done" || phase === "error";
-  const closeLabel = heard ? "Close and continue in chat" : "Close";
+  const closeLabel = heard && !interimTranscript ? "Close and continue in chat" : "Close";
   const status = transcribing ? "Transcribing…" : audioStatus === "generating" ? "Generating audio…" : STATUS[phase];
   const playLabel = audioStatus === "ready" ? "Play voice reply" : "Retry voice reply";
   const currentTime = Number.isFinite(audio?.currentTime) ? audio.currentTime : 0;
@@ -368,13 +395,7 @@ export default function VoiceAssistant({
           )}
 
           {heard ? (
-            <p
-              className={`max-w-lg text-balance font-medium tracking-tight transition-[font-size,color] duration-300 ${
-                spokenReply ? "text-lg text-ink-500 dark:text-ink-400" : "text-2xl leading-snug text-ink-900 dark:text-ink-50 sm:text-[1.75rem]"
-              }`}
-            >
-              {heard}
-            </p>
+            <RecordingTranscript text={heard} interim={interimTranscript} hasReply={Boolean(spokenReply)} />
           ) : (
             phase === "listening" && (
               <p className="text-2xl font-medium tracking-tight text-ink-400 dark:text-ink-500 sm:text-[1.75rem]">
@@ -382,6 +403,8 @@ export default function VoiceAssistant({
               </p>
             )
           )}
+
+          {captionsUnavailable && phase === "listening" && <p className="max-w-md px-2 text-xs text-ink-500 dark:text-ink-400">Live captions are unavailable. Your recording will be transcribed when you stop.</p>}
 
           {phase === "error" && (
             <p role="alert" className="max-w-md text-balance text-lg font-medium leading-snug text-ink-800 dark:text-ink-100">{error}</p>

@@ -13,6 +13,7 @@ const { setPrismaClient, clearPrismaClient } = await import("../src/db/prisma.js
 const { createApp } = await import("../src/app.js");
 const { signToken, verifyToken } = await import("../src/utils/jwt.js");
 const { createSpeechHandler } = await import("../../infra/openclaw/plugins/loft-speech/index.js");
+const { captionWav } = await import("../../client/src/utils/liveCaptions.js");
 
 const userId = "11111111-1111-4111-8111-111111111111";
 const partnerId = "22222222-2222-4222-8222-222222222222";
@@ -395,6 +396,86 @@ test("HTTP assistant routes require auth and reject client authority/history inj
     await new Promise((resolve) => gateway.close(resolve));
     if (originalUrl === undefined) delete process.env.OPENCLAW_GATEWAY_URL;
     else process.env.OPENCLAW_GATEWAY_URL = originalUrl;
+    clearPrismaClient(fake.db);
+  }
+});
+
+test("Live caption previews require auth, membership and valid bounded WAV audio without executing assistant actions", async () => {
+  const fake = fakeDatabase();
+  setPrismaClient(fake.db);
+  const appServer = http.createServer(createApp());
+  await new Promise((resolve) => appServer.listen(0, "127.0.0.1", resolve));
+  const url = `http://127.0.0.1:${appServer.address().port}/api/assistant/transcribe/preview`;
+  const headers = { Authorization: "Bearer " + signToken({ sub: userId }) };
+  const originalGateway = process.env.OPENCLAW_GATEWAY_URL;
+  let providerCalls = 0;
+  let transcript = "Words while speaking";
+  let release;
+  let started;
+  let hold = false;
+  const handler = createSpeechHandler("transcribe", {
+    config: { apiKey: "provider-test-key", baseUrl: "https://provider.example", sttModel: "preview-stt" },
+    fetchImpl: async (_url, init) => {
+      providerCalls++;
+      assert.equal(JSON.parse(init.body).input_audio.format, "wav");
+      if (hold) { started?.(); await new Promise((resolve) => { release = resolve; }); }
+      return Response.json({ text: transcript });
+    },
+  });
+  const gateway = http.createServer((req, res) => {
+    assert.equal(req.headers.authorization, "Bearer private-test-gateway-token");
+    assert.equal(req.url, "/v1/audio/transcriptions");
+    handler(req, res);
+  });
+  await new Promise((resolve) => gateway.listen(0, "127.0.0.1", resolve));
+  process.env.OPENCLAW_GATEWAY_URL = `http://127.0.0.1:${gateway.address().port}`;
+  const audio = await captionWav([new Float32Array(16000).fill(0.1)], 16000).arrayBuffer();
+  const form = (bytes = audio, context = workspaceId) => {
+    const body = new FormData();
+    body.set("audio", new Blob([bytes], { type: "audio/wav" }), "preview.wav");
+    if (context) body.set("workspaceId", context);
+    return body;
+  };
+  try {
+    assert.equal((await fetch(url, { method: "POST", body: form() })).status, 401);
+    assert.equal((await fetch(url, { method: "POST", headers, body: form(audio, inaccessible) })).status, 403);
+    assert.equal((await fetch(url, { method: "POST", headers, body: form("invalid wav") })).status, 400);
+    assert.equal((await fetch(url, { method: "POST", headers, body: form(new Uint8Array(960045)) })).status, 413);
+    assert.equal(providerCalls, 0);
+    const response = await fetch(url, { method: "POST", headers, body: form() });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { transcript, confidence: null, provider: "openclaw", model: "preview-stt", interim: true });
+    transcript = "";
+    const quiet = await fetch(url, { method: "POST", headers, body: form() });
+    assert.equal(quiet.status, 200);
+    assert.equal((await quiet.json()).transcript, "");
+    hold = true;
+    const requestStarted = new Promise((resolve) => { started = resolve; });
+    const pending = fetch(url, { method: "POST", headers, body: form() });
+    await requestStarted;
+    const callsBefore = providerCalls;
+    assert.equal((await fetch(url, { method: "POST", headers, body: form() })).status, 429);
+    assert.equal(providerCalls, callsBefore);
+    release();
+    await pending;
+    hold = false;
+    // A new recording cannot use previews to make unbounded paid requests.
+    let limited = false;
+    for (let index = 0; index < 25; index++) {
+      const result = await fetch(url, { method: "POST", headers, body: form() });
+      if (result.status === 429) { limited = true; break; }
+      assert.equal(result.status, 200);
+    }
+    assert.equal(limited, true);
+    assert.equal(providerCalls, 24);
+    assert.equal(fake.records.task.size, 0);
+    assert.equal(fake.records.event.size, 0);
+  } finally {
+    release?.();
+    appServer.closeAllConnections(); gateway.closeAllConnections();
+    await Promise.all([new Promise((resolve) => appServer.close(resolve)), new Promise((resolve) => gateway.close(resolve))]);
+    if (originalGateway === undefined) delete process.env.OPENCLAW_GATEWAY_URL;
+    else process.env.OPENCLAW_GATEWAY_URL = originalGateway;
     clearPrismaClient(fake.db);
   }
 });

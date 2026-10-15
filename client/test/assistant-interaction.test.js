@@ -46,6 +46,7 @@ async function mount(t, overrides = {}) {
   const audio = [];
   const revoked = [];
   const confirmations = [];
+  const liveCaptions = [];
   const listeners = new Map();
   const recordingTimers = new Map();
   const document = { visibilityState: "visible", addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: (name) => listeners.delete(name) };
@@ -58,6 +59,7 @@ async function mount(t, overrides = {}) {
     confirmAssistantAction: async (token) => { confirmations.push(token); return { id: "saved", workspaceId: "workspace" }; },
     sendAssistantMessage: async (body, signal, onProgress) => { messages.push(body); progress = onProgress; return overrides.reply ? overrides.reply.promise : { reply: "Your summary.", actions: [] }; },
     transcribeAssistantAudio: async () => overrides.transcript ? overrides.transcript.promise : { transcript: "What is due today?" },
+    transcribeLiveAudio: async () => ({ transcript: "What is due" }),
     speakAssistantReply: async (text, context, signal) => {
       speech.push({ text, context, signal });
       if (overrides.speechError) throw overrides.speechError;
@@ -78,6 +80,11 @@ async function mount(t, overrides = {}) {
       "../common/WorkspaceMark.jsx": mockComponent,
       "./VoiceRecordingIndicator.jsx": mockComponent,
       "./VoiceAssistant.jsx": VoiceAssistant,
+      "../../utils/liveCaptions.js": { createLiveCaptions: (options) => {
+        const session = { ...options, stopped: false, stop() { this.stopped = true; } };
+        liveCaptions.push(session);
+        return session;
+      } },
       "../../api/assistant.js": api,
       "../../api/client.js": { apiErrorMessage: (err) => err.message },
     },
@@ -139,8 +146,45 @@ async function mount(t, overrides = {}) {
   const record = async () => { await startRecording(); await act(async () => bubble().onHoldEnd()); };
   const hide = async () => { document.visibilityState = "hidden"; await act(async () => listeners.get("visibilitychange")?.()); };
   if (!overrides.closed) await click("Open Lofty");
-  return { view, messages, speech, audio, revoked, confirmations, recordingTimers, click, type, submit, record, startRecording, hide, get progress() { return progress; }, get bubble() { return bubble(); }, get recorder() { return recorder; }, get stoppedTracks() { return stoppedTracks; }, get microphoneRequests() { return microphoneRequests; } };
+  return { view, messages, speech, audio, revoked, confirmations, liveCaptions, recordingTimers, click, type, submit, record, startRecording, hide, get progress() { return progress; }, get bubble() { return bubble(); }, get recorder() { return recorder; }, get stoppedTracks() { return stoppedTracks; }, get microphoneRequests() { return microphoneRequests; } };
 }
+
+test("Live captions update while recording and only the final transcript submits a question", async (t) => {
+  const transcript = deferred();
+  const widget = await mount(t, { transcript, closed: true });
+  await widget.click("Talk to Lofty");
+  await act(async () => widget.liveCaptions[0].onTranscript("What is due"));
+  assert.equal(widget.bubble.heard, "What is due");
+  assert.equal(widget.bubble.interimTranscript, true);
+  assert.equal(widget.recorder.state, "recording");
+  assert.equal(widget.messages.length, 0);
+  assert.equal(widget.confirmations.length, 0);
+  await act(async () => widget.bubble.onHoldEnd());
+  assert.equal(widget.liveCaptions[0].stopped, true);
+  assert.equal(widget.bubble.heard, "What is due");
+  await act(async () => transcript.resolve({ transcript: "What is due today?" }));
+  assert.equal(widget.bubble.heard, "What is due today?");
+  assert.equal(widget.bubble.interimTranscript, false);
+  assert.equal(widget.messages.length, 1);
+  assert.equal(widget.messages[0].message, "What is due today?");
+});
+
+test("Caption failures preserve recording and closing voice ignores late caption responses", async (t) => {
+  const widget = await mount(t, { closed: true });
+  await widget.click("Talk to Lofty");
+  const first = widget.liveCaptions[0];
+  await act(async () => first.onUnavailable());
+  assert.equal(widget.bubble.captionsUnavailable, true);
+  assert.equal(widget.bubble.phase, "listening");
+  assert.equal(widget.recorder.state, "recording");
+  await widget.click("Close voice bubble");
+  assert.equal(first.stopped, true);
+  await widget.click("Talk to Lofty");
+  await act(async () => first.onTranscript("Late previous recording"));
+  assert.equal(widget.bubble.heard, "");
+  assert.equal(widget.bubble.captionsUnavailable, false);
+  assert.equal(widget.microphoneRequests, 2);
+});
 
 test("Mobile chat follows the visible keyboard area and removes viewport listeners on close", async (t) => {
   const listeners = new Map();

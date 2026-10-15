@@ -10,7 +10,8 @@ import VoiceAssistant from "./VoiceAssistant.jsx";
 import VoiceOrb from "./VoiceOrb.jsx";
 import useVisualViewport from "../../hooks/useVisualViewport.js";
 import { createAssistantAudio } from "../../utils/assistantAudio.js";
-import { assistantStatus, sendAssistantMessage, confirmAssistantAction, speakAssistantReply, transcribeAssistantAudio } from "../../api/assistant.js";
+import { createLiveCaptions } from "../../utils/liveCaptions.js";
+import { assistantStatus, sendAssistantMessage, confirmAssistantAction, speakAssistantReply, transcribeAssistantAudio, transcribeLiveAudio } from "../../api/assistant.js";
 import { apiErrorMessage } from "../../api/client.js";
 
 // Supported by the SyncTayo tools exposed to the OpenClaw gateway.
@@ -75,6 +76,9 @@ export default function AssistantWidget({ launcherContainer = null }) {
   const voiceAudioRef = useRef(new Map());
   const [playingReplyId, setPlayingReplyId] = useState(null);
   const recorderRef = useRef(null);
+  const liveCaptionRef = useRef(null);
+  const [liveTranscript, setLiveTranscript] = useState("");
+  const [captionsUnavailable, setCaptionsUnavailable] = useState(false);
   const mediaStreamRef = useRef(null);
   const recordingTimeoutRef = useRef(null);
   const contextVersion = useRef(0);
@@ -108,6 +112,9 @@ export default function AssistantWidget({ launcherContainer = null }) {
     voiceAudioRef.current.clear();
     setPlayingReplyId(null);
     voiceEnabledRef.current = false;
+    stopLiveCaptions();
+    setLiveTranscript("");
+    setCaptionsUnavailable(false);
     clearTimeout(recordingTimeoutRef.current);
     if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -132,6 +139,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
       playbackRef.current = null;
       for (const { url } of voiceAudioRef.current.values()) if (url) URL.revokeObjectURL(url);
       voiceAudioRef.current.clear();
+      stopLiveCaptions();
       audioContextRef.current?.close().catch(() => {});
       audioContextRef.current = null;
       clearTimeout(recordingTimeoutRef.current);
@@ -319,6 +327,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
         if (recorderRef.current !== recorder) return;
+        stopLiveCaptions();
         recorderRef.current = null;
         clearTimeout(recordingTimeoutRef.current);
         mediaStreamRef.current = null;
@@ -347,11 +356,23 @@ export default function AssistantWidget({ launcherContainer = null }) {
         }
       };
       recorder.start();
+      liveCaptionRef.current = createLiveCaptions({
+        stream,
+        context: audioContextRef.current,
+        transcribe: (audio, signal) => transcribeLiveAudio(audio, { ...(workspaceId ? { workspaceId } : {}) }, signal),
+        onTranscript: (text) => {
+          if (voiceEnabledRef.current && voiceSession === voiceSessionRef.current && version === contextVersion.current && recorderRef.current === recorder) setLiveTranscript(text);
+        },
+        onUnavailable: () => {
+          if (voiceEnabledRef.current && voiceSession === voiceSessionRef.current && version === contextVersion.current && recorderRef.current === recorder) setCaptionsUnavailable(true);
+        },
+      });
       setRecording(true);
       recordingTimeoutRef.current = setTimeout(() => { if (recorder.state !== "inactive") recorder.stop(); }, MAX_RECORDING_MS);
     } catch {
       if (!voiceEnabledRef.current || voiceSession !== voiceSessionRef.current || version !== contextVersion.current) return;
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      stopLiveCaptions();
       mediaStreamRef.current = null;
       recorderRef.current = null;
       setRecording(false);
@@ -361,7 +382,13 @@ export default function AssistantWidget({ launcherContainer = null }) {
     }
   }
 
+  function stopLiveCaptions() {
+    liveCaptionRef.current?.stop();
+    liveCaptionRef.current = null;
+  }
+
   function stopRecording() {
+    stopLiveCaptions();
     clearTimeout(recordingTimeoutRef.current);
     if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
     else setRecording(false);
@@ -438,6 +465,8 @@ export default function AssistantWidget({ launcherContainer = null }) {
     // new one), but a spoken answer can: recording stops the playback.
     if (thinking || transcribing || confirming || recording || bubbleHolding.current) return false;
     setVoiceError("");
+    setLiveTranscript("");
+    setCaptionsUnavailable(false);
     bubbleHolding.current = true;
     setBubble({ fromId: nextId, holding: true, inputMode });
     if (!configured) {
@@ -748,7 +777,9 @@ export default function AssistantWidget({ launcherContainer = null }) {
         inputMode={bubble?.inputMode}
         canTalk={!thinking && !transcribing && !recording && !confirming && !bubble?.holding}
         phase={bubblePhase}
-        heard={bubbleQuestion?.content || ""}
+        heard={bubbleQuestion?.content || liveTranscript}
+        interimTranscript={!bubbleQuestion && Boolean(liveTranscript)}
+        captionsUnavailable={captionsUnavailable}
         reply={bubbleAnswer?.content || ""}
         replyId={bubbleAnswer?.id}
         audio={bubbleAnswer ? voiceAudioRef.current.get(bubbleAnswer.id)?.audio : null}

@@ -15,7 +15,7 @@ function speechApi(post) {
 
 function assistantApi(post) {
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, Blob, Response, TextDecoder, require: () => ({ api: { post } }) });
+  vm.runInNewContext(code, { module, Blob, FormData, Response, TextDecoder, require: () => ({ api: { post } }) });
   return module.exports;
 }
 
@@ -94,6 +94,20 @@ test("Real Axios streams reply text early and preserves request authentication",
   assert.equal(completed, false);
   finish();
   assert.equal((await result).reply, "Early text, finished.");
+});
+
+test("Live caption API sends the WAV snapshot and workspace through the authenticated API client", async () => {
+  const signal = new AbortController().signal;
+  const { transcribeLiveAudio } = assistantApi(async (path, form, config) => {
+    assert.equal(path, "/assistant/transcribe/preview");
+    assert.equal(form.get("workspaceId"), "workspace");
+    assert.equal(form.get("audio").name, "live-captions.wav");
+    assert.equal(form.get("audio").type, "audio/wav");
+    assert.equal(config.signal, signal);
+    assert.equal(config.timeout, 20000);
+    return { data: { transcript: "Partial words", interim: true } };
+  });
+  assert.equal((await transcribeLiveAudio(new Blob(["RIFF"], { type: "audio/wav" }), { workspaceId: "workspace" }, signal)).transcript, "Partial words");
 });
 
 test("Speech API returns generated audio without converting it to text", async () => {

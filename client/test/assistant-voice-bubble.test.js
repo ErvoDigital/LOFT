@@ -49,7 +49,7 @@ async function mount(t, overrides = {}) {
   });
   let view;
   await act(async () => { view = create(React.createElement(exported.exports.default, props), {
-    createNodeMock: ({ props: nodeProps }) => nodeProps["aria-label"] === "Lofty's voice transcript" ? overrides.transcriptViewport || null : null,
+    createNodeMock: ({ props: nodeProps }) => nodeProps["aria-label"] === "Lofty's voice transcript" ? overrides.transcriptViewport || null : nodeProps["aria-label"] === "Live recording transcript" ? overrides.recordingViewport || null : null,
   }); });
   t.after(() => act(() => view.unmount()));
   const click = async (label) => act(async () => view.root.findAllByType("button").find((b) => b.props["aria-label"] === label || b.props.title === label).props.onClick());
@@ -58,6 +58,39 @@ async function mount(t, overrides = {}) {
   const spokenText = () => view.root.findAllByProps({ "aria-label": "Lofty's spoken reply" })[0]?.children.join("") || "";
   return { view, events, listeners, timers, frames, body, click, update, tick, spokenText };
 }
+
+test("Live captions display beneath the orb during recording and become a final question afterwards", async (t) => {
+  const bubble = await mount(t, { phase: "listening", heard: "Words as you speak", interimTranscript: true, micReady: true, canPlay: false, reply: "" });
+  assert.ok(bubble.view.root.findByProps({ "aria-label": "Live recording transcript" }));
+  assert.match(JSON.stringify(bubble.view.toJSON()), /Live captions/);
+  assert.ok(bubble.view.root.findByProps({ "aria-label": "Stop and send" }));
+  await bubble.update({ phase: "thinking", heard: "The complete final question", interimTranscript: false });
+  assert.equal(bubble.view.root.findAllByProps({ "aria-label": "Live recording transcript" }).length, 0);
+  assert.ok(bubble.view.root.findByProps({ "aria-label": "Your voice question" }));
+});
+
+test("Unavailable live captions leave the Stop and send control available", async (t) => {
+  const bubble = await mount(t, { phase: "listening", heard: "", reply: "", captionsUnavailable: true, micReady: true, canPlay: false });
+  assert.match(JSON.stringify(bubble.view.toJSON()), /will be transcribed when you stop/);
+  assert.equal(bubble.view.root.findByProps({ "aria-label": "Stop and send" }).props.disabled, false);
+});
+
+test("Live captions follow new words until the user scrolls back, then reset for the final question", async (t) => {
+  const viewport = { scrollTop: 0, scrollHeight: 500, clientHeight: 120 };
+  const bubble = await mount(t, { phase: "listening", heard: "First words", interimTranscript: true, recordingViewport: viewport });
+  assert.equal(viewport.scrollTop, 500);
+  viewport.scrollTop = 40;
+  bubble.view.root.findByProps({ "aria-label": "Live recording transcript" }).props.onScroll({ currentTarget: viewport });
+  await bubble.update({ heard: "More words while reading earlier words" });
+  assert.equal(viewport.scrollTop, 40);
+  viewport.scrollTop = 380;
+  bubble.view.root.findByProps({ "aria-label": "Live recording transcript" }).props.onScroll({ currentTarget: viewport });
+  viewport.scrollHeight = 600;
+  await bubble.update({ heard: "Latest words" });
+  assert.equal(viewport.scrollTop, 600);
+  await bubble.update({ interimTranscript: false, heard: "The final question" });
+  assert.equal(viewport.scrollTop, 0);
+});
 
 test("The bubble distinguishes transcription from reasoning in both expanded and minimized views", async (t) => {
   const bubble = await mount(t, { phase: "thinking", transcribing: true, audioStatus: undefined, canPlay: false });

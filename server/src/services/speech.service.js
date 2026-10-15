@@ -34,7 +34,20 @@ function speechProviderError(response, action) {
   return new ApiError(502, `Voice ${action} failed. Check the OpenClaw speech configuration, model access and credits.`);
 }
 
-export async function transcribeAssistantAudio({ audioBuffer, mimeType, fileName }, { fetchImpl = fetch, config = speechConfig() } = {}) {
+export function validateCaptionAudio(bytes) {
+  if (!Buffer.isBuffer(bytes) || bytes.length < 44 || bytes.length > 960044
+    || bytes.toString("ascii", 0, 4) !== "RIFF" || bytes.toString("ascii", 8, 16) !== "WAVEfmt "
+    || bytes.readUInt32LE(4) !== bytes.length - 8 || bytes.readUInt32LE(16) !== 16
+    || bytes.readUInt16LE(20) !== 1 || bytes.readUInt16LE(22) !== 1
+    || bytes.readUInt32LE(24) !== 16000 || bytes.readUInt32LE(28) !== 32000
+    || bytes.readUInt16LE(32) !== 2 || bytes.readUInt16LE(34) !== 16
+    || bytes.toString("ascii", 36, 40) !== "data" || bytes.readUInt32LE(40) !== bytes.length - 44
+    || (bytes.length - 44) % 2 || bytes.length < 16044) {
+    throw new ApiError(400, "Live captions require 0.5 to 30 seconds of mono 16 kHz PCM WAV audio.");
+  }
+}
+
+export async function transcribeAssistantAudio({ audioBuffer, mimeType, fileName }, { fetchImpl = fetch, config = speechConfig(), signal: requestSignal, timeoutMs = 60000, allowEmpty = false } = {}) {
   if (!config.token) throw new ApiError(503, "OpenClaw voice transcription is not configured.");
   const form = new FormData();
   const blob = new Blob([audioBuffer], { type: mimeType || "audio/webm" });
@@ -46,7 +59,7 @@ export async function transcribeAssistantAudio({ audioBuffer, mimeType, fileName
       headers: authHeaders(config),
       body: form,
       redirect: "error",
-      signal: AbortSignal.timeout(60000),
+      signal: requestSignal ? AbortSignal.any([requestSignal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
     });
   } catch {
     throw new ApiError(503, "Voice transcription is unavailable right now.");
@@ -55,7 +68,7 @@ export async function transcribeAssistantAudio({ audioBuffer, mimeType, fileName
   let data;
   try { data = await response.json(); } catch { throw new ApiError(502, "Voice transcription returned an invalid response."); }
   const transcript = normalizeTranscript(data?.text);
-  if (!transcript) throw new ApiError(502, "No speech was detected. Please try again.");
+  if (!transcript && !allowEmpty) throw new ApiError(502, "No speech was detected. Please try again.");
   return {
     transcript,
     confidence: typeof data?.confidence === "number" ? data.confidence : null,

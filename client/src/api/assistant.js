@@ -65,6 +65,12 @@ export const transcribeAssistantAudio = (audioBlob, { workspaceId } = {}, signal
   if (workspaceId) form.append("workspaceId", workspaceId);
   return api.post("/assistant/transcribe", form, { signal, timeout: 70000 }).then((r) => r.data);
 };
+export const transcribeLiveAudio = (audioBlob, { workspaceId } = {}, signal) => {
+  const form = new FormData();
+  form.append("audio", audioBlob, "live-captions.wav");
+  if (workspaceId) form.append("workspaceId", workspaceId);
+  return api.post("/assistant/transcribe/preview", form, { signal, timeout: 20000 }).then((r) => r.data);
+};
 export async function speakAssistantReply(text, { workspaceId, voice } = {}, signal) {
   try {
     const response = await api.post("/assistant/speak", { text, ...(workspaceId ? { workspaceId } : {}), ...(voice ? { voice } : {}) }, { signal, timeout: 70000, responseType: "blob" });
