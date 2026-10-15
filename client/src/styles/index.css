@@ -665,6 +665,8 @@
 }
 .voice-content > .voice-orb { margin-top: auto; }
 .voice-content > .voice-details { margin-bottom: auto; }
+.voice-overlay[data-interactive="true"] .voice-content > .voice-orb { --orb: 6rem; margin-top: 0; }
+.voice-overlay[data-interactive="true"] .voice-details { margin-top: 1.5rem; margin-bottom: 0; }
 .voice-overlay[data-compact="true"] .voice-content > .voice-orb { --orb: 5rem; }
 .voice-overlay[data-compact="true"] .voice-details { margin-top: 1rem; }
 .voice-transcript[data-scrolled="true"] {

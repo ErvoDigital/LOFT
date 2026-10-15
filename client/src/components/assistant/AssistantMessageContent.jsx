@@ -1,6 +1,7 @@
 import { memo } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { humanizePriorityTerms } from "../../lib/priorities.js";
 
 const REMARK_PLUGINS = [remarkGfm];
 const COMPONENTS = {
@@ -27,7 +28,7 @@ function AssistantMessageContent({ content }) {
   return (
     <div className="assistant-message min-w-0">
       <Markdown remarkPlugins={REMARK_PLUGINS} components={COMPONENTS} skipHtml>
-        {content}
+        {humanizePriorityTerms(content)}
       </Markdown>
     </div>
   );

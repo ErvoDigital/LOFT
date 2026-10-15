@@ -5,15 +5,9 @@ import MonthGrid from "../calendar/MonthGrid.jsx";
 import { TierBadge } from "../common/Badges.jsx";
 import EmptyState from "../common/EmptyState.jsx";
 import { MonthPicker } from "../common/DatePicker.jsx";
-
-function formatDuration(minutes) {
-  const m = Number(minutes) || 0;
-  const h = Math.floor(m / 60);
-  const rest = m % 60;
-  if (h === 0) return `${rest}m`;
-  if (rest === 0) return `${h}h`;
-  return `${h}h ${rest}m`;
-}
+import { planDate } from "./manualPlan.js";
+import { byPriority } from "./planModel.js";
+import PlanTaskRow from "./PlanTaskRow.jsx";
 
 // True for an event whose location is a SyncTayo meeting link (what
 // ScheduleMeetingModal fills in), vs. a plain calendar event/appointment.
@@ -26,16 +20,16 @@ function isMeetingEvent(event) {
 // upcoming events (including scheduled meetings) across every workspace, so
 // "what's due and what's scheduled" has one month view next to the
 // day-by-day schedule instead of a separate page.
-export default function PlanCalendar({ tasks, events = [], onTaskClick }) {
+export default function PlanCalendar({ tasks, events = [], onTaskClick, onMove, onEditTask, onPlannedDateChange, statusesByWorkspace, onStatusChange, onTogglePin, onToggleSnooze }) {
   const navigate = useNavigate();
   const [monthDate, setMonthDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const datedTasks = tasks.filter((t) => t.dueDate);
+  const datedTasks = tasks.filter((t) => planDate(t));
   const taskChips = datedTasks.map((t) => ({
     id: t.id,
     title: t.title,
-    startTime: t.dueDate,
+    startTime: planDate(t),
     workspaceColor: t.workspaceColor,
   }));
   const eventChips = events.map((e) => ({
@@ -46,8 +40,8 @@ export default function PlanCalendar({ tasks, events = [], onTaskClick }) {
   }));
 
   const dayTasks = datedTasks
-    .filter((t) => new Date(t.dueDate).toDateString() === selectedDate.toDateString())
-    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    .filter((t) => new Date(planDate(t)).toDateString() === selectedDate.toDateString())
+    .sort(byPriority);
 
   const dayEvents = events
     .filter((e) => new Date(e.startTime).toDateString() === selectedDate.toDateString())
@@ -105,21 +99,8 @@ export default function PlanCalendar({ tasks, events = [], onTaskClick }) {
               <EmptyState icon={<CalendarCheck className="h-5 w-5" />} title="Nothing scheduled" description="No tasks or events for this day." />
             ) : dayTasks.length > 0 ? (
               <div className="space-y-2">
-                {dayTasks.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => onTaskClick(t)}
-                    className="block w-full rounded-lg border border-ink-200 p-3 text-left hover:border-brand-300 hover:bg-brand-50/40 dark:border-ink-600 dark:hover:border-brand-500 dark:hover:bg-brand-500/10"
-                  >
-                    <div className="mb-1 flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium text-ink-700 dark:text-ink-100">{t.title}</p>
-                      <TierBadge tier={t.tier} compact />
-                    </div>
-                    <p className="text-xs text-ink-400">
-                      {t.workspaceName} · {formatDuration(t.estimatedMinutes)}
-                    </p>
-                  </button>
-                ))}
+                {dayTasks.map((task, index) => <PlanTaskRow key={task.id} item={task} rank={index + 1} onTaskClick={onTaskClick} statuses={statusesByWorkspace?.[task.workspaceId]} onStatusChange={onStatusChange} onTogglePin={onTogglePin} onToggleSnooze={onToggleSnooze} onMove={onMove && ((item, direction) => onMove(item.taskId, direction, dayTasks))} canMoveUp={index > 0} canMoveDown={index < dayTasks.length - 1} onEditTask={onEditTask} onPlannedDateChange={onPlannedDateChange} />)}
+
               </div>
             ) : null}
           </div>

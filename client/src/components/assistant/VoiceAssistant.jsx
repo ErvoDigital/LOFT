@@ -185,7 +185,7 @@ export default function VoiceAssistant({
   audio,
   error,
   audioStatus,
-  pendingActions,
+  replyControls,
   micReady,
   stream,
   canSkip,
@@ -347,7 +347,7 @@ export default function VoiceAssistant({
   }
 
   const finished = phase === "done" || phase === "error";
-  const closeLabel = heard && !interimTranscript ? "Close and continue in chat" : "Close";
+  const closeLabel = "Close";
   const status = transcribing ? "Transcribing…" : audioStatus === "generating" ? "Generating audio…" : STATUS[phase];
   const playLabel = audioStatus === "ready" ? "Play voice reply" : "Retry voice reply";
   const currentTime = Number.isFinite(audio?.currentTime) ? audio.currentTime : 0;
@@ -363,6 +363,7 @@ export default function VoiceAssistant({
       role="dialog"
       aria-modal="true"
       aria-label="Lofty voice"
+      data-interactive={Boolean(replyControls)}
       tabIndex={-1}
       className="voice-overlay fixed inset-x-0 z-[65] flex animate-fade-in flex-col items-center overflow-hidden px-4 focus:outline-none print:hidden"
     >
@@ -435,14 +436,9 @@ export default function VoiceAssistant({
                   </button>
                 )}
               </div>
-              {pendingActions > 0 && (
-                <p className="max-w-md text-xs text-ink-500 dark:text-ink-400">
-                  Lofty prepared {pendingActions === 1 ? "something" : `${pendingActions} things`} for you to confirm. Close this to
-                  review {pendingActions === 1 ? "it" : "them"} in the chat.
-                </p>
-              )}
             </div>
           )}
+          {replyControls && <div className="pointer-events-auto w-full max-w-lg space-y-3 text-ink-900 dark:text-ink-100" aria-label="Lofty reply controls">{replyControls}</div>}
         </div>
       </div>
 

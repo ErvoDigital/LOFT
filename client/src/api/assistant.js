@@ -26,7 +26,8 @@ export async function readAssistantReply(stream, onProgress) {
         if (event.type === "error") throw streamError(event.error, event.status);
         if (event.type === "result") {
           if (typeof event.reply !== "string" || !Array.isArray(event.actions)) throw streamError("The assistant returned an invalid response.");
-          return { reply: event.reply, actions: event.actions };
+          if (event.detailRequests !== undefined && !Array.isArray(event.detailRequests)) throw streamError("The assistant returned invalid detail fields.");
+          return { reply: event.reply, actions: event.actions, ...(event.detailRequests ? { detailRequests: event.detailRequests } : {}) };
         }
         if (event.type === "delta" || event.type === "reset") onProgress(event);
       }

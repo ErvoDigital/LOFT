@@ -53,8 +53,8 @@ function DateTile({ lane, compact = false }) {
 }
 
 function laneHeading(lane) {
-  if (lane.kind === "overdue") return { title: "Overdue", subtitle: "Past their due date, ranked against each other" };
-  if (lane.kind === "undated") return { title: "No due date", subtitle: "No deadline, so ranked by priority" };
+  if (lane.kind === "overdue") return { title: "Overdue", subtitle: "Past their planned day or deadline" };
+  if (lane.kind === "undated") return { title: "No planned day", subtitle: "Choose a work day or use the priority order" };
   const full = lane.date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
   const subtitle = lane.offset > 1 ? `${lane.date.toLocaleDateString([], { month: "long", day: "numeric" })} · in ${lane.offset} days` : full;
   return { title: relativeDayName(lane.offset, lane.date), subtitle };
@@ -90,7 +90,7 @@ function LaneLoad({ lane, capacity }) {
 
 // One row of the Day-by-day timeline: a date tile on the spine and a card of
 // that day's tasks, ranked 1..n among themselves only.
-export default function PlanDayGroup({ lane, capacity, statusesByWorkspace, onStatusChange, onTogglePin, onToggleSnooze, onTaskClick }) {
+export default function PlanDayGroup({ lane, capacity, statusesByWorkspace, onStatusChange, onTogglePin, onToggleSnooze, onTaskClick, onMove, onEditTask, onPlannedDateChange }) {
   const { title, subtitle } = laneHeading(lane);
   const isToday = lane.kind === "day" && lane.offset === 0;
   const empty = lane.items.length === 0;
@@ -127,7 +127,7 @@ export default function PlanDayGroup({ lane, capacity, statusesByWorkspace, onSt
 
         {empty ? (
           <p className="px-2 pb-1 pt-3 text-sm text-ink-500 dark:text-ink-400">
-            Nothing due {isToday ? "today" : "tomorrow"}. A clear day.
+            Nothing planned {isToday ? "today" : "tomorrow"}. A clear day.
           </p>
         ) : (
           <div className="mt-3 space-y-0.5">
@@ -137,13 +137,18 @@ export default function PlanDayGroup({ lane, capacity, statusesByWorkspace, onSt
                 item={item}
                 rank={i + 1}
                 highlight={i === 0}
-                when={lane.kind === "overdue" ? `due ${new Date(item.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}, ${daysLate(item)}d late` : undefined}
+                when={lane.kind === "overdue" ? item.plannedDate ? `planned ${new Date(item.plannedDate + "T12:00:00").toLocaleDateString()}` : `due ${new Date(item.dueDate).toLocaleDateString([], { month: "short", day: "numeric" })}, ${daysLate(item)}d late` : undefined}
                 whenTone="danger"
                 statuses={statusesByWorkspace?.[item.workspaceId]}
                 onStatusChange={onStatusChange}
                 onTogglePin={onTogglePin}
                 onToggleSnooze={onToggleSnooze}
                 onTaskClick={onTaskClick}
+                onMove={onMove && ((task, direction) => onMove(task.taskId, direction, lane.items))}
+                canMoveUp={i > 0}
+                canMoveDown={i < lane.items.length - 1}
+                onEditTask={onEditTask}
+                onPlannedDateChange={onPlannedDateChange}
               />
             ))}
           </div>

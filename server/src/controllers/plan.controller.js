@@ -1,99 +1,57 @@
+import { z } from "zod";
+import { ApiError } from "../utils/ApiError.js";
+import { getPlanData } from "../services/planData.service.js";
+import { recommendPlan } from "../services/planRecommendations.service.js";
 import { prisma } from "../db/prisma.js";
-import { buildPlan, PLAN_HORIZON_DAYS } from "../services/plan.service.js";
-import { calculatePriorityScore } from "../services/priority.service.js";
-import { detectConflicts } from "../services/conflict.service.js";
+import { createHash } from "node:crypto";
 
-// My Plan — every open task assigned to the caller across all their
-// workspaces, ranked by the Smart Priority Engine (tier + deadline decay +
-// pin/snooze overrides) and laid out into a day-by-day schedule based on
-// each task's estimated effort and due date. Also runs the same
-// cross-workspace conflict detection the dashboard uses, scoped down to just
-// this user's own tasks and the events they're attending — this is meant to
-// be the one place prioritization and SyncTayo's "chain reaction" conflicts show
-// up together, instead of split across two pages.
+const capacitySchema = z.coerce.number().min(1).max(16);
+const dateKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => Number.isFinite(new Date(value).getTime()) && new Date(value).toISOString().slice(0, 10) === value, "Invalid planned day");
+const recommendationsSchema = z.object({
+  capacity: capacitySchema.default(6),
+  timeZone: z.string().max(100).default("Asia/Manila").refine((value) => { try { new Intl.DateTimeFormat("en", { timeZone: value }); return true; } catch { return false; } }, "Invalid time zone"),
+  manual: z.object({ order: z.array(z.string().uuid()).max(1000), dates: z.record(z.string().uuid(), dateKey).refine((value) => Object.keys(value).length <= 1000) }).strict().optional(),
+}).strict();
+const active = new Set();
+const recent = new Map();
+const cachedAnalysis = new Map();
+
 export async function getPlan(req, res) {
-  const userId = req.userId;
-  const dailyCapacityHours = Math.max(1, Math.min(16, Number(req.query.capacity) || 6));
-  const now = new Date();
-  const horizon = new Date(now.getTime() + PLAN_HORIZON_DAYS * 24 * 60 * 60 * 1000);
+  const dailyCapacityHours = capacitySchema.default(6).parse(req.query.capacity);
+  res.json(await getPlanData({ userId: req.userId, dailyCapacityHours }));
+}
 
-  const doneStatuses = await prisma.taskStatus.findMany({ where: { isDone: true }, select: { id: true } });
-  const doneStatusIds = doneStatuses.map((s) => s.id);
-
-  const [tasks, events] = await Promise.all([
-    prisma.task.findMany({
-      where: { assigneeId: userId, status: { notIn: doneStatusIds } },
-      include: { workspace: { select: { name: true, color: true } } },
-      orderBy: [{ dueDate: "asc" }],
-    }),
-    prisma.event.findMany({
-      where: { attendees: { some: { userId } }, startTime: { gte: now, lte: horizon } },
-      include: { workspace: { select: { name: true, color: true } } },
-      orderBy: [{ startTime: "asc" }],
-    }),
-  ]);
-
-  // My Plan's day rows let you re-column a task's status inline without
-  // opening it, but each workspace has its own custom status set — so the
-  // options for that dropdown have to travel with the plan response, keyed
-  // by workspace, same as workspaceName/workspaceColor already do per task.
-  const workspaceIds = [...new Set(tasks.map((t) => t.workspaceId))];
-  const workspaceStatuses = workspaceIds.length
-    ? await prisma.taskStatus.findMany({
-        where: { workspaceId: { in: workspaceIds } },
-        orderBy: [{ order: "asc" }],
-      })
-    : [];
-  const statusesByWorkspace = {};
-  for (const s of workspaceStatuses) {
-    (statusesByWorkspace[s.workspaceId] ??= []).push({ id: s.id, label: s.label, color: s.color, isDone: s.isDone });
+export async function getRecommendations(req, res) {
+  const data = recommendationsSchema.parse(req.body);
+  const user = await prisma.user.findUnique({ where: { id: req.userId }, select: { aiPriorityEnabled: true } });
+  if (!user) throw new ApiError(401, "User not found");
+  if (user.aiPriorityEnabled === false) return res.json({ enabled: false, order: [], items: [], summary: "Automatic AI priority analysis is off in your personal settings." });
+  const plan = await getPlanData({ userId: req.userId, dailyCapacityHours: data.capacity });
+  const input = { userId: req.userId, ...data, tasks: plan.tasks.map(({ score, ...task }) => task), events: plan.events, period: Math.floor(Date.now() / 600000) };
+  const cacheKey = createHash("sha256").update(JSON.stringify(input)).digest("hex");
+  const now = Date.now();
+  for (const [key, value] of cachedAnalysis) if (value.until <= now) cachedAnalysis.delete(key);
+  const cached = cachedAnalysis.get(cacheKey);
+  if (cached) return res.json(cached.result);
+  for (const [id, times] of recent) if (!times.some((time) => time > now - 60000)) recent.delete(id);
+  const times = (recent.get(req.userId) || []).filter((time) => time > now - 60000);
+  if (active.has(req.userId) || times.length >= 5) throw new ApiError(429, "Please wait before asking Lofty to review your plan again.");
+  active.add(req.userId);
+  recent.set(req.userId, [...times, now]);
+  const controller = new AbortController();
+  const cancel = () => { if (!res.writableEnded) controller.abort(); };
+  res.on("close", cancel);
+  try {
+    const result = await recommendPlan(plan, { timeZone: data.timeZone, manual: data.manual, signal: controller.signal });
+    if (!controller.signal.aborted && !res.destroyed) {
+      cachedAnalysis.set(cacheKey, { result, until: Date.now() + 600000 });
+      if (cachedAnalysis.size > 100) cachedAnalysis.delete(cachedAnalysis.keys().next().value);
+      res.json(result);
+    }
+  } catch (err) {
+    if (!controller.signal.aborted) throw err;
+  } finally {
+    active.delete(req.userId);
+    res.off("close", cancel);
   }
-
-  const planTasks = tasks.map((t) => ({
-    id: t.id,
-    title: t.title,
-    workspaceId: t.workspaceId,
-    workspaceName: t.workspace.name,
-    workspaceColor: t.workspace.color,
-    tier: t.tier,
-    status: t.status,
-    estimatedMinutes: t.estimatedMinutes,
-    isPinned: t.isPinned,
-    isSnoozed: t.isSnoozed,
-    dueDate: t.dueDate,
-  }));
-  const planEvents = events.map((e) => ({
-    id: e.id,
-    title: e.title,
-    workspaceId: e.workspaceId,
-    workspaceName: e.workspace.name,
-    workspaceColor: e.workspace.color,
-    location: e.location,
-    startTime: e.startTime,
-    endTime: e.endTime,
-  }));
-
-  const plan = buildPlan({ tasks: planTasks, now, dailyCapacityHours });
-  const conflicts = detectConflicts({ events: planEvents, tasks: planTasks });
-
-  res.json({
-    tasks: tasks.map((t) => ({
-      id: t.id,
-      workspaceId: t.workspaceId,
-      workspaceName: t.workspace.name,
-      workspaceColor: t.workspace.color,
-      title: t.title,
-      tier: t.tier,
-      estimatedMinutes: t.estimatedMinutes,
-      isPinned: t.isPinned,
-      isSnoozed: t.isSnoozed,
-      status: t.status,
-      dueDate: t.dueDate,
-      score: calculatePriorityScore(t, now),
-    })),
-    conflicts,
-    statusesByWorkspace,
-    events: planEvents,
-    ...plan,
-  });
 }

@@ -4,6 +4,7 @@
 // here rather than on the server so "today" is the viewer's local day, not
 // the server's UTC one.
 import { dayKey, startOfDay } from "../dashboard/fortnight.js";
+import { planDate } from "./manualPlan.js";
 
 export const WEEK_LENGTH = 7;
 
@@ -20,8 +21,11 @@ function daysBetween(from, to) {
 
 // Highest score first. Ties fall back to the earlier deadline, then the
 // title, so the order is stable between reloads.
-function byPriority(a, b) {
+export function byPriority(a, b) {
   return (
+    (a.manualRank ?? Infinity) - (b.manualRank ?? Infinity) ||
+    Number(Boolean(b.isPinned && !b.isSnoozed)) - Number(Boolean(a.isPinned && !a.isSnoozed)) ||
+    (a.aiRank ?? Infinity) - (b.aiRank ?? Infinity) ||
     (b.score ?? 0) - (a.score ?? 0) ||
     new Date(a.dueDate || 8.64e15) - new Date(b.dueDate || 8.64e15) ||
     a.title.localeCompare(b.title)
@@ -92,9 +96,10 @@ export function buildDayLanes(items, now = new Date()) {
   laneFor(today);
   laneFor(addDays(today, 1));
   for (const item of items) {
-    if (!item.dueDate) undated.push(item);
-    else if (startOfDay(item.dueDate) < today) overdue.push(item);
-    else laneFor(startOfDay(item.dueDate)).items.push(item);
+    const date = planDate(item);
+    if (!date) undated.push(item);
+    else if (startOfDay(date) < today) overdue.push(item);
+    else laneFor(startOfDay(date)).items.push(item);
   }
 
   let previous = null;
@@ -133,8 +138,8 @@ export function buildWeek(items, page = 0, now = new Date()) {
   const overdue = [];
 
   for (const item of items) {
-    if (!item.dueDate) continue;
-    const due = startOfDay(item.dueDate);
+    if (!planDate(item)) continue;
+    const due = startOfDay(planDate(item));
     if (due < today) {
       if (page === 0) overdue.push(item);
     } else {
@@ -166,6 +171,12 @@ export function buildWeek(items, page = 0, now = new Date()) {
 // something due; failing that, the top task with no date. Snoozed tasks are
 // never put forward.
 export function pickFocus(lanes) {
+  const ranked = lanes.flatMap((lane) => lane.items).filter((item) => !item.isSnoozed);
+  if (ranked.some((item) => item.manualRank !== undefined || item.aiRank !== undefined || item.isPinned)) {
+    const item = ranked.sort(byPriority)[0];
+    const lane = lanes.find((lane) => lane.items.includes(item));
+    return { item, reason: lane.kind === "overdue" ? "overdue" : lane.kind === "undated" ? "undated" : lane.offset === 0 ? "today" : "next" };
+  }
   const awake = (kind, test = () => true) =>
     lanes.filter((l) => l.kind === kind && test(l)).flatMap((l) => l.items.filter((it) => !it.isSnoozed));
 
@@ -190,9 +201,9 @@ export function relativeDayName(offset, date) {
 // Where a task falls, in the few words a row has room for: "Today",
 // "Tue 22", or "Overdue · Sep 17".
 export function whenLabel(item, now = new Date()) {
-  if (!item.dueDate) return "No due date";
-  const offset = daysBetween(now, item.dueDate);
-  const due = new Date(item.dueDate);
+  if (!planDate(item)) return "No planned day";
+  const offset = daysBetween(now, planDate(item));
+  const due = new Date(planDate(item));
   if (offset < 0) return `Overdue · ${due.toLocaleDateString([], { month: "short", day: "numeric" })}`;
   if (offset === 0) return "Today";
   if (offset === 1) return "Tomorrow";

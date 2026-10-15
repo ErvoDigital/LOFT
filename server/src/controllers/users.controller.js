@@ -28,6 +28,7 @@ const updateSchema = z.object({
   avatarColor: z.string().min(3).max(20).optional(),
   avatarUrl: imageDataUrlSchema,
   twoFactorEnabled: z.boolean().optional(),
+  aiPriorityEnabled: z.boolean().optional(),
 });
 
 const verifyPasswordCodeSchema = z.object({ code: z.string().regex(/^\d{6}$/) });

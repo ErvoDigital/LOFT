@@ -75,6 +75,20 @@ test("Unavailable live captions leave the Stop and send control available", asyn
   assert.equal(bubble.view.root.findByProps({ "aria-label": "Stop and send" }).props.disabled, false);
 });
 
+test("Confirmation and detail controls render inside the expanded voice dialog and survive minimizing", async (t) => {
+  const controls = React.createElement("form", { "aria-label": "Inline details" }, React.createElement("input", { "aria-label": "Meeting title", type: "text" }), React.createElement("button", { type: "button" }, "Confirm"));
+  const bubble = await mount(t, { replyControls: controls });
+  const dialog = () => bubble.view.root.findByProps({ role: "dialog" });
+  assert.equal(dialog().findAllByProps({ "aria-label": "Inline details" }).length, 1);
+  assert.doesNotMatch(JSON.stringify(bubble.view.toJSON()), /review.*in the chat|continue in chat/);
+  bubble.listeners.get("keydown")({ key: "m", target: { tagName: "INPUT", type: "text" } });
+  assert.deepEqual(bubble.events, []);
+  await bubble.click("Minimize");
+  assert.equal(bubble.view.root.findAllByProps({ role: "dialog" }).length, 0);
+  await bubble.click("Show Lofty voice");
+  assert.equal(dialog().findAllByProps({ "aria-label": "Inline details" }).length, 1);
+});
+
 test("Live captions follow new words until the user scrolls back, then reset for the final question", async (t) => {
   const viewport = { scrollTop: 0, scrollHeight: 500, clientHeight: 120 };
   const bubble = await mount(t, { phase: "listening", heard: "First words", interimTranscript: true, recordingViewport: viewport });

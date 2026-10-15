@@ -2,15 +2,15 @@ import { TIER_META } from "../common/Badges.jsx";
 import { formatHours, whenLabel } from "./planModel.js";
 
 const INTRO = {
-  overdue: "Overdue, so this comes first",
+  overdue: "Catch up on this first",
   today: "Up first today",
-  next: "Nothing due today. Next up",
+  next: "Next in your plan",
   undated: "Nothing on the calendar. Top of your open list",
 };
 
 // "due today", "due Tue 22", or "Overdue · Sep 17".
 function duePhrase(item) {
-  const when = whenLabel(item);
+  const when = whenLabel({ ...item, plannedDate: undefined });
   if (when.startsWith("Overdue")) return when;
   return `due ${when === "Today" || when === "Tomorrow" ? when.toLowerCase() : when}`;
 }
@@ -27,7 +27,7 @@ function LoadRing({ hours, capacity }) {
 
   return (
     <div className="flex items-center gap-3.5 border-t border-white/10 pt-4 sm:block sm:border-0 sm:pt-0">
-      <div className="relative h-14 w-14 shrink-0 sm:h-32 sm:w-32" role="img" aria-label={`${formatHours(hours)} due today of ${capacity}h`}>
+      <div className="relative h-14 w-14 shrink-0 sm:h-32 sm:w-32" role="img" aria-label={`${formatHours(hours)} planned today of ${capacity}h`}>
         <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" aria-hidden="true">
           <circle cx="50" cy="50" r={r} fill="none" strokeWidth="8" className="stroke-white/15" />
           {ratio > 0 && (

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { AlertTriangle, Layers, Mic, Sparkles, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
 import WorkspaceMark from "../common/WorkspaceMark.jsx";
 import AssistantMessageContent from "./AssistantMessageContent.jsx";
+import AssistantActionCards from "./AssistantActionCards.jsx";
+import AssistantDetailForm from "./AssistantDetailForm.jsx";
 import VoiceAssistant from "./VoiceAssistant.jsx";
 import VoiceOrb from "./VoiceOrb.jsx";
 import useVisualViewport from "../../hooks/useVisualViewport.js";
@@ -13,6 +15,7 @@ import { createAssistantAudio } from "../../utils/assistantAudio.js";
 import { createLiveCaptions } from "../../utils/liveCaptions.js";
 import { assistantStatus, sendAssistantMessage, confirmAssistantAction, speakAssistantReply, transcribeAssistantAudio, transcribeLiveAudio } from "../../api/assistant.js";
 import { apiErrorMessage } from "../../api/client.js";
+import { humanizePriorityTerms } from "../../lib/priorities.js";
 
 // Supported by the SyncTayo tools exposed to the OpenClaw gateway.
 const SUGGESTIONS = [
@@ -21,8 +24,6 @@ const SUGGESTIONS = [
   "Add a task to finish the presentation tomorrow",
   "Schedule a meeting with my team Friday at 10",
 ];
-
-const PRIORITY_NAMES = { TIER_1: "Critical", TIER_2: "Time-sensitive", TIER_3: "Flexible", TIER_4: "Backlog" };
 
 let nextId = 0;
 const MAX_RECORDING_MS = 30000;
@@ -87,6 +88,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
   const [error, setError] = useState("");
   const [voiceError, setVoiceError] = useState("");
   const [confirming, setConfirming] = useState(null);
+  const confirmingRef = useRef(null);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const voiceEnabledRef = useRef(false);
@@ -398,7 +400,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
     const content = text.trim();
     // The recorder callback retains the state from when recording started.
     // Voice submissions already passed the transcription and context checks.
-    if (!content || thinking || confirming || (!voice && (transcribing || recording)) || !configured) return;
+    if (!content || thinking || confirmingRef.current || (requestRef.current && !requestRef.current.signal.aborted) || (!voice && (transcribing || recording)) || !configured) return false;
     // The input feature owns the reply mode; text never generates speech or
     // interrupts a bubble reply that is still generating or playing.
     const version = contextVersion.current;
@@ -429,9 +431,11 @@ export default function AssistantWidget({ launcherContainer = null }) {
       if (!controller.signal.aborted && version === contextVersion.current) {
         setUnavailable(false);
         setError((current) => current === ASSISTANT_UNAVAILABLE_MESSAGE ? "" : current);
-        const reply = { id: replyId, role: "assistant", content: result.reply, actions: result.actions, replyMode: voice ? "voice" : "text", ...(voice ? { audioStatus: "canceled" } : {}) };
+        const replyText = humanizePriorityTerms(result.reply);
+        const reply = { id: replyId, role: "assistant", content: replyText, actions: result.actions, detailRequests: result.detailRequests, replyMode: voice ? "voice" : "text", ...(voice ? { audioStatus: "canceled" } : {}) };
         setMessages((m) => [...m.filter((item) => item.id !== replyId), reply]);
-        if (voice) void playReply(result.reply, version, voiceSession, replyId);
+        if (voice) void playReply(replyText, version, voiceSession, replyId);
+        return true;
       }
     } catch (err) {
       if (!controller.signal.aborted && version === contextVersion.current) {
@@ -440,23 +444,52 @@ export default function AssistantWidget({ launcherContainer = null }) {
         setMessages((m) => m.filter((item) => item.id !== replyId).map((item) => item.id === messageId ? { ...item, failed: true } : item));
         if (!voice) setDraft(content);
       }
-    } finally { if (version === contextVersion.current) setPendingReplyMode(null); }
+    } finally {
+      if (requestRef.current === controller) requestRef.current = null;
+      if (version === contextVersion.current) setPendingReplyMode(null);
+    }
+    return false;
   }
 
   async function confirm(action) {
-    if (confirming || thinking) return;
+    if (confirmingRef.current || thinking || recording || transcribing || action.result || action.dismissed) return;
     const version = contextVersion.current;
+    confirmingRef.current = action.id;
     setConfirming(action.id);
-    setError("");
+    const update = (patch) => {
+      if (version === contextVersion.current) setMessages((items) => items.map((item) => ({ ...item, actions: item.actions?.map((a) => a.id === action.id ? { ...a, ...patch } : a) })));
+    };
+    update({ error: "" });
     try {
       const result = await confirmAssistantAction(action.token);
-      if (version === contextVersion.current) setMessages((m) => m.map((item) => ({ ...item, actions: item.actions?.map((a) => a.id === action.id ? { ...a, result } : a) })));
-    } catch (err) { if (version === contextVersion.current) setError(apiErrorMessage(err)); }
-    finally { if (version === contextVersion.current) setConfirming(null); }
+      update({ result });
+    } catch (err) { update({ error: apiErrorMessage(err) }); }
+    finally { confirmingRef.current = null; if (version === contextVersion.current) setConfirming(null); }
   }
 
   function dismiss(actionId) {
     setMessages((m) => m.map((item) => ({ ...item, actions: item.actions?.map((a) => a.id === actionId ? { ...a, dismissed: true } : a) })));
+  }
+
+  async function submitDetails(message, request, text) {
+    if (request.submitted) return false;
+    const version = contextVersion.current;
+    if (message.replyMode === "voice") prepareVoicePlayback();
+    const sent = await send(text, { voice: message.replyMode === "voice" && voiceEnabledRef.current });
+    if (sent && version === contextVersion.current) setMessages((items) => items.map((item) => item.id === message.id ? {
+      ...item, detailRequests: item.detailRequests?.map((detail) => detail.id === request.id ? { ...detail, submitted: true } : detail),
+    } : item));
+    return sent;
+  }
+
+  function replyControls(message) {
+    const disabled = thinking || recording || transcribing || Boolean(confirming);
+    return <>
+      <AssistantActionCards actions={message.actions} workspaces={workspaces} userId={user?.id} confirming={confirming} disabled={disabled} onConfirm={confirm} onDismiss={dismiss} />
+      {message.detailRequests?.map((request) => <AssistantDetailForm key={request.id} request={request} disabled={disabled}
+        onChange={(name, value) => setMessages((items) => items.map((item) => item.id === message.id ? { ...item, detailRequests: item.detailRequests?.map((detail) => detail.id === request.id ? { ...detail, values: { ...detail.values, [name]: value } } : detail) } : item))}
+        onSubmit={(text) => submitDetails(message, request, text)} />)}
+    </>;
   }
 
   // Voice capture/playback belongs to the bubble; both features share history.
@@ -506,15 +539,10 @@ export default function AssistantWidget({ launcherContainer = null }) {
   // conversation remains available, including an answer still on its way.
   function closeBubble() {
     if (!bubble) return;
-    const asked = messages.some((m) => m.id > bubble.fromId && m.role === "user");
     bubbleHolding.current = false;
     setBubble(null);
     changeVoiceMode(false);
-    if (asked) {
-      setOpen(true);
-    } else {
-      setVoiceError("");
-    }
+    setVoiceError("");
   }
 
   const bubbleTurn = bubble ? messages.filter((m) => m.id > bubble.fromId && (m.voice || m.replyMode === "voice")) : [];
@@ -680,27 +708,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
                     ) : <AssistantMessageContent content={m.content} />}
                   </div>
                 </div>
-                {m.actions?.map((action) => (
-                  <div key={action.id} className="min-w-0 rounded-xl border border-ink-200 bg-white p-3 text-sm [overflow-wrap:anywhere] dark:border-ink-700 dark:bg-ink-800">
-                    <p className="font-semibold">{action.kind === "task" ? "Create task" : action.kind === "event_draft" ? "Save meeting draft" : "Create meeting"}: {action.data.title}</p>
-                    <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">Workspace: {action.preview?.workspaceName || workspaces.find((w) => w.id === action.data.workspaceId)?.name || action.data.workspaceId}</p>
-                    {action.data.description && <p className="mt-1 whitespace-pre-wrap">{action.data.description}</p>}
-                    {action.data.location && <p className="mt-1 text-xs">Location: {action.data.location}</p>}
-                    {action.kind === "task" ? <>
-                      <p className="mt-1 text-xs">Priority: {PRIORITY_NAMES[action.data.tier]}{action.data.deferredFields?.includes("tier") ? " (default until you edit it)" : ""} · {action.data.assigneeId ? `Assigned to ${action.data.assigneeId === user?.id ? "you" : action.preview?.people?.[0]?.name || action.data.assigneeId}` : "Unassigned"}</p>
-                      {action.data.dueDate && <p className="mt-1 text-xs">Due: {new Date(action.data.dueDate).toLocaleString()}</p>}
-                    </> : <>
-                      <p className="mt-1 text-xs">{action.kind === "event_draft" ? "Unscheduled draft — finish the details in your workspace calendar." : `${new Date(action.data.startTime).toLocaleString()} – ${new Date(action.data.endTime).toLocaleString()}`}</p>
-                      {action.kind === "event_draft" && action.data.startTime && <p className="mt-1 text-xs">Proposed start: {new Date(action.data.startTime).toLocaleString()}</p>}
-                      {action.kind === "event_draft" && action.data.endTime && <p className="mt-1 text-xs">Proposed end: {new Date(action.data.endTime).toLocaleString()}</p>}
-                      <p className="mt-1 text-xs">Attendees: {action.preview?.people?.map((p) => p.name).join(", ") || action.data.attendeeIds?.join(", ") || "To add later"}</p>
-                    </>}
-                    {action.data.deferredFields?.length > 0 && <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">You can add the remaining details later.</p>}
-                    {action.result ? <Link className="mt-2 inline-block text-brand-600 underline dark:text-brand-400" to={`/workspaces/${action.result.workspaceId}/${action.kind === "task" ? "tasks" : "calendar"}`}>Saved — open {action.kind === "task" ? "task board" : "calendar"}</Link>
-                      : action.dismissed ? <p className="mt-2 text-xs">Dismissed</p>
-                      : <div className="mt-3 flex flex-wrap gap-2"><button type="button" className="btn-primary min-h-11" onClick={() => confirm(action)} disabled={Boolean(confirming) || thinking}>{confirming === action.id ? "Saving…" : "Confirm"}</button><button type="button" className="btn-secondary min-h-11" onClick={() => dismiss(action.id)} disabled={Boolean(confirming)}>Dismiss</button></div>}
-                  </div>
-                ))}
+                {replyControls(m)}
                 </div>
               ))}
 
@@ -785,7 +793,9 @@ export default function AssistantWidget({ launcherContainer = null }) {
         audio={bubbleAnswer ? voiceAudioRef.current.get(bubbleAnswer.id)?.audio : null}
         error={voiceError || bubbleAnswer?.audioError || NO_SPEECH}
         audioStatus={bubbleAnswer?.audioStatus}
-        pendingActions={bubbleAnswer?.actions?.filter((a) => !a.result && !a.dismissed).length || 0}
+        replyControls={bubbleTurn.some((message) => message.actions?.length || message.detailRequests?.length) ? bubbleTurn.filter((message) => message.role === "assistant").map((message) => (
+          <div key={message.id} className="space-y-3">{replyControls(message)}</div>
+        )) : null}
         micReady={recording}
         stream={recording ? mediaStreamRef.current : null}
         canSkip={answerPlaying || answerGenerating}

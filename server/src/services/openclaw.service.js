@@ -5,11 +5,11 @@ import { gatewayConfig } from "../config/openclaw.js";
 
 export { gatewayConfig } from "../config/openclaw.js";
 
-const READ_TOOLS = new Set(["list_workspaces", "list_my_tasks", "list_upcoming_events", "list_my_meeting_drafts", "find_conflicts", "list_workspace_members"]);
+const READ_TOOLS = new Set(["list_workspaces", "list_my_tasks", "get_my_plan", "list_upcoming_events", "list_my_meeting_drafts", "find_conflicts", "list_workspace_members"]);
 
 // Each turn gets an isolated session. Only continuations within that turn share it.
 // Never accept a gateway session ID or previous_response_id from the browser.
-export async function runOpenClaw({ message, history, instructions, tools, executeTool, onProgress, signal: requestSignal, fetchImpl = fetch, config = gatewayConfig() }) {
+export async function runOpenClaw({ message, history, instructions, tools, executeTool, onProgress, signal: requestSignal, fetchImpl = fetch, config = gatewayConfig(), maxOutputTokens = 1800 }) {
   if (!config.token) throw new ApiError(503, "Lofty needs setup. Run npm run ai:setup and start the OpenClaw gateway.");
   const session = `loft:${randomUUID()}`;
   let input = [...history.map(({ role, content }) => `${role}: ${content}`), `user: ${message}`].join("\n");
@@ -24,7 +24,7 @@ export async function runOpenClaw({ message, history, instructions, tools, execu
       response = await fetchImpl(`${config.url.replace(/\/$/, "")}/v1/responses`, {
         method: "POST", signal, redirect: "error",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.token}`, "x-openclaw-session-key": session },
-        body: JSON.stringify({ model: "openclaw", input, instructions, tools, tool_choice: "auto", max_output_tokens: 1800, ...(onProgress ? { stream: true } : {}), ...(previousResponseId ? { previous_response_id: previousResponseId } : {}) }),
+        body: JSON.stringify({ model: "openclaw", input, instructions, tools, tool_choice: "auto", max_output_tokens: maxOutputTokens, ...(onProgress ? { stream: true } : {}), ...(previousResponseId ? { previous_response_id: previousResponseId } : {}) }),
       });
     } catch {
       throw new ApiError(503, "OpenClaw is unavailable or timed out. Check that the gateway is running.");

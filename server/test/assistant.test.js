@@ -77,6 +77,56 @@ test("OpenClaw continuation uses server-only auth and an isolated session", asyn
   assert.equal(requests[0].body.user, undefined);
 });
 
+test("Inline detail requests expose authorized choices without creating proposals or records", async () => {
+  const fake = fakeDatabase();
+  const result = await answerAssistant({ userId, workspaceId, message: "Create a task", history: [], timeZone: "Asia/Manila", interactionMode: "voice" }, fake.db, async ({ instructions, tools, executeTool }) => {
+    assert.ok(tools.some((tool) => tool.name === "request_details"));
+    assert.match(instructions, /Confirm inside their voice popup/);
+    const requested = await executeTool("request_details", { kind: "task", prompt: "Who should own this, and what priority?", fields: ["assigneeId", "tier"] });
+    assert.equal(requested.status, "awaiting_user_details");
+    await assert.rejects(executeTool("request_details", { kind: "clarification", prompt: "Another form", fields: ["answer"] }), /one focused details form/);
+    return "Fill in the details below.";
+  });
+  assert.equal(result.actions.length, 0);
+  assert.equal(fake.creates, 0);
+  const fields = result.detailRequests[0].fields;
+  assert.deepEqual(fields[0].options.map((option) => option.value), ["unassigned", userId, partnerId]);
+  assert.equal(fields[1].options[2].label, "Medium");
+  assert.equal(result.detailRequests[0].token, undefined);
+});
+
+test("Lofty reads the actual scoped My Plan and exposes only standard priority names in replies", async () => {
+  const fake = fakeDatabase();
+  const result = await answerAssistant({ userId, workspaceId, message: "What should I do first in My Plan?", history: [], timeZone: "Asia/Manila" }, fake.db, async ({ executeTool }) => {
+    const plan = await executeTool("get_my_plan", { dailyCapacityHours: 4 });
+    assert.equal(plan.capacityHours, 4);
+    assert.equal(plan.tasks.length, 0);
+    await assert.rejects(executeTool("get_my_plan", { workspaceId: inaccessible }));
+    return "Use TIER_1 before Tier 2, then TIER_3 and tier-4.";
+  });
+  assert.equal(result.reply, "Use Urgent before High, then Medium and Low.");
+  const query = fake.queries.find((query) => query.where.assigneeId === userId);
+  assert.equal(query.where.workspaceId, workspaceId);
+  assert.equal(query.where.workspace.members.some.userId, userId);
+  assert.equal(fake.creates, 0);
+});
+
+test("Inline details reject foreign workspace choices, unsupported fields and fabricated options", async () => {
+  const fake = fakeDatabase();
+  const ask = (args, activeWorkspaceId = workspaceId) => answerAssistant({ userId, workspaceId: activeWorkspaceId, message: "Help create a meeting", history: [], timeZone: "Asia/Manila" }, fake.db, async ({ executeTool }) => {
+    await executeTool("request_details", args); return "Details below.";
+  });
+  await assert.rejects(ask({ kind: "event", prompt: "Attendees?", workspaceId: otherWorkspaceId, fields: ["attendeeIds"] }), /Switch workspace context/);
+  await assert.rejects(ask({ kind: "event", prompt: "Attendees?", workspaceId: inaccessible, fields: ["attendeeIds"] }, null), /not a member/);
+  await assert.rejects(ask({ kind: "task", prompt: "Attendees?", fields: ["attendeeIds"] }), /Unsupported detail fields/);
+  await assert.rejects(ask({ kind: "task", prompt: "Owner?", fields: ["assigneeId"], options: [{ value: inaccessible }] }));
+  // Unknown workspace is resolved before fetching its people.
+  await assert.rejects(ask({ kind: "task", prompt: "Owner?", fields: ["assigneeId"] }, null), /workspace first/);
+  const result = await ask({ kind: "event", prompt: "Which workspace?", fields: ["workspaceId"] }, null);
+  assert.deepEqual(result.detailRequests[0].fields[0].options, [{ value: workspaceId, label: "School" }]);
+  assert.equal(fake.creates, 0);
+});
+
 test("Gateway failures are sanitized and never expose provider bodies or tokens", async () => {
   const args = { message: "Hi", history: [], instructions: "", tools: [], executeTool: async () => {} };
   await assert.rejects(runOpenClaw({ ...args, config: { url: "http://gateway" }, fetchImpl: () => assert.fail("No fetch without token") }), (e) => e.statusCode === 503);

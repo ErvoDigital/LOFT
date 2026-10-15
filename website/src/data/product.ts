@@ -97,7 +97,7 @@ export const FEATURES = [
     Icon: CheckSquare,
     title: "Tasks with a clear next step",
     description:
-      "Organize work on drag-and-drop boards with configurable statuses, assignees, priority tiers, due dates, difficulty, effort estimates, and attachments.",
+      "Organize work on drag-and-drop boards with configurable statuses, assignees, Urgent, High, Medium, or Low priorities, due dates, difficulty, effort estimates, and attachments.",
     details: [
       "Boards with customizable task statuses",
       "Assignments, deadlines, and attachments",

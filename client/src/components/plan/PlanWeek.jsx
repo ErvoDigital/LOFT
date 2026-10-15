@@ -113,7 +113,7 @@ function DayColumn({ column, capacity, selected, onSelect }) {
 
 // The Week lens: seven days at a glance, then every task due in them ranked
 // against the whole week rather than just its own day.
-export default function PlanWeek({ items, capacity, statusesByWorkspace, onStatusChange, onTogglePin, onToggleSnooze, onTaskClick }) {
+export default function PlanWeek({ items, capacity, statusesByWorkspace, onStatusChange, onTogglePin, onToggleSnooze, onTaskClick, onMove, onEditTask, onPlannedDateChange }) {
   const [page, setPage] = useState(0);
   const [selectedKey, setSelectedKey] = useState(null);
   const week = useMemo(() => buildWeek(items, page), [items, page]);
@@ -141,6 +141,11 @@ export default function PlanWeek({ items, capacity, statusesByWorkspace, onStatu
       onTogglePin,
       onToggleSnooze,
       onTaskClick,
+      onMove: onMove && ((task, direction) => onMove(task.taskId, direction, week.ranked)),
+      canMoveUp: rank > 1,
+      canMoveDown: rank < week.ranked.length,
+      onEditTask,
+      onPlannedDateChange,
     };
   };
 

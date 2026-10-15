@@ -1,8 +1,10 @@
-import { Pin, Moon } from "lucide-react";
+import { Pin, Moon, ArrowUp, ArrowDown, Pencil } from "lucide-react";
 import { TierBadge } from "../common/Badges.jsx";
 import { displayColor } from "../../lib/colors.js";
 import Select from "../common/Select.jsx";
 import { formatHours } from "./planModel.js";
+import { planDate } from "./manualPlan.js";
+import { dayKey } from "../dashboard/fortnight.js";
 
 // The rank numeral leading a row. The group's top pick(s) take the brand
 // fill so the eye lands there first; the rest stay quiet.
@@ -34,9 +36,15 @@ export default function PlanTaskRow({
   onTogglePin,
   onToggleSnooze,
   onTaskClick,
+  onMove,
+  canMoveUp,
+  canMoveDown,
+  onEditTask,
+  onPlannedDateChange,
 }) {
   return (
     <div
+      data-task-id={item.taskId}
       className={`flex flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-xl px-2 py-2 transition-colors hover:bg-ink-900/[0.04] dark:hover:bg-white/[0.04] ${
         item.isSnoozed ? "opacity-60" : ""
       }`}
@@ -113,6 +121,12 @@ export default function PlanTaskRow({
           <Moon className="h-3.5 w-3.5" />
         </button>
       </div>
+      {onMove && <div className="flex w-full flex-wrap items-end gap-2 border-t border-ink-900/[0.05] pt-2 dark:border-white/[0.05]">
+        <button type="button" className="btn-secondary min-h-11 !px-3" disabled={!canMoveUp} aria-label={`Move ${item.title} up`} onClick={() => onMove(item, -1)}><ArrowUp className="h-4 w-4" /></button>
+        <button type="button" className="btn-secondary min-h-11 !px-3" disabled={!canMoveDown} aria-label={`Move ${item.title} down`} onClick={() => onMove(item, 1)}><ArrowDown className="h-4 w-4" /></button>
+        <button type="button" className="btn-secondary inline-flex min-h-11 items-center gap-1.5 !px-3" aria-label={`Edit task ${item.title}`} onClick={() => onEditTask(item)}><Pencil className="h-3.5 w-3.5" />Edit</button>
+        <label className="min-w-0 flex-1 basis-36 text-xs text-ink-500">Planned day<input type="date" aria-label={`Planned day for ${item.title}`} className="input mt-1 min-h-11 w-full min-w-0 !text-base" value={planDate(item) ? dayKey(new Date(planDate(item))) : ""} onChange={({ target }) => onPlannedDateChange(item.taskId, target.value)} /></label>
+      </div>}
     </div>
   );
 }

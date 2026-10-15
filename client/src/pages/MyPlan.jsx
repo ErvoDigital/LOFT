@@ -5,12 +5,17 @@ import * as tasksApi from "../api/tasks.js";
 import * as workspacesApi from "../api/workspaces.js";
 import * as taskStatusesApi from "../api/taskStatuses.js";
 import { useSocket } from "../context/SocketContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
+import { apiErrorMessage } from "../api/client.js";
 import AtRiskPanel from "../components/plan/AtRiskPanel.jsx";
 import ConflictsPanel from "../components/dashboard/ConflictsPanel.jsx";
 import PlanFocusHero from "../components/plan/PlanFocusHero.jsx";
 import PlanTimeline from "../components/plan/PlanTimeline.jsx";
 import PlanWeek from "../components/plan/PlanWeek.jsx";
 import PlanCalendar from "../components/plan/PlanCalendar.jsx";
+import PlanRecommendations from "../components/plan/PlanRecommendations.jsx";
+import { applyManualPlan, emptyManualPlan, manualPlanKey, movePlanItem, readManualPlan, validPlanDay } from "../components/plan/manualPlan.js";
+import usePlanAnalysis from "../hooks/usePlanAnalysis.js";
 import { buildDayLanes, pickFocus, toPlanItems } from "../components/plan/planModel.js";
 import TaskModal from "../components/tasks/TaskModal.jsx";
 import TaskDetailsPanel from "../components/tasks/TaskDetailsPanel.jsx";
@@ -28,6 +33,11 @@ const VIEWS = [
 ];
 
 export default function MyPlan() {
+  const { user } = useAuth();
+  return <MyPlanPage key={user.id} userId={user.id} aiEnabled={user.aiPriorityEnabled !== false} />;
+}
+
+function MyPlanPage({ userId, aiEnabled }) {
   const { socket } = useSocket();
   const [view, setView] = useState(() => {
     try {
@@ -38,9 +48,15 @@ export default function MyPlan() {
     }
   });
   const [capacity, setCapacity] = useState(() => {
-    const stored = Number(localStorage.getItem(CAPACITY_KEY));
-    return CAPACITY_OPTIONS.includes(stored) ? stored : 6;
+    try {
+      const stored = Number(localStorage.getItem(`${CAPACITY_KEY}:${userId}`) || localStorage.getItem(CAPACITY_KEY));
+      return CAPACITY_OPTIONS.includes(stored) ? stored : 6;
+    } catch { return 6; }
   });
+  const [preferences, setPreferences] = useState(() => readManualPlan(userId));
+  const [aiOrder, setAiOrder] = useState([]);
+  const [storageError, setStorageError] = useState("");
+  const [error, setError] = useState("");
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null); // { workspaceId, members, statuses, task }
@@ -48,32 +64,40 @@ export default function MyPlan() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const requestId = useRef(0);
+  const savingTasks = useRef(new Set());
 
   // Two loads can overlap (e.g. a priority edit's reload racing a socket-driven
   // one) — only the most recently issued response is allowed to land, so a
   // slow, now-stale request can't clobber a fresher one.
   const load = useCallback(() => {
     const id = ++requestId.current;
-    planApi.getPlan().then((data) => {
-      if (id === requestId.current) setPlan(data);
+    return planApi.getPlan(capacity).then((data) => {
+      if (id === requestId.current) { setPlan(data); setError(""); }
+    }).catch((err) => {
+      if (id === requestId.current) setError(apiErrorMessage(err));
     }).finally(() => {
       if (id === requestId.current) setLoading(false);
     });
-  }, []);
+  }, [capacity]);
 
   useEffect(() => {
     load();
+    return () => { requestId.current++; };
   }, [load]);
 
-  // Daily hours only change how the plan is measured (lane load, at-risk),
-  // which is worked out here, so a new value needs no reload.
+  // Keep the server's capacity and Lofty's context consistent with the UI.
   useEffect(() => {
     try {
-      localStorage.setItem(CAPACITY_KEY, String(capacity));
+      localStorage.setItem(`${CAPACITY_KEY}:${userId}`, String(capacity));
     } catch {
       // localStorage unavailable — capacity just won't persist.
     }
-  }, [capacity]);
+  }, [capacity, userId]);
+
+  useEffect(() => {
+    try { localStorage.setItem(manualPlanKey(userId), JSON.stringify(preferences)); setStorageError(""); }
+    catch { setStorageError("Your personal plan edits are available for this session. This browser could not save them for your next visit."); }
+  }, [preferences, userId]);
 
   useEffect(() => {
     try {
@@ -93,23 +117,32 @@ export default function MyPlan() {
 
   // Every view is derived from the flat task list, so patching the one task
   // there updates the day lanes, the week and the calendar at once.
-  const items = useMemo(() => toPlanItems(plan?.tasks, capacity), [plan, capacity]);
+  const items = useMemo(() => applyManualPlan(toPlanItems(plan?.tasks, capacity), preferences, aiEnabled ? aiOrder : []), [plan, capacity, preferences, aiEnabled, aiOrder]);
   const lanes = useMemo(() => buildDayLanes(items), [items]);
   const atRisk = useMemo(() => items.filter((it) => it.atRisk), [items]);
+  const manual = useMemo(() => ({ order: preferences.order.filter((id) => plan?.tasks.some((task) => task.id === id)), dates: Object.fromEntries(Object.entries(preferences.dates).filter(([id]) => plan?.tasks.some((task) => task.id === id))) }), [preferences, plan]);
+  const analysis = usePlanAnalysis({ userId, enabled: aiEnabled, plan, capacity, manual });
+  useEffect(() => { if (analysis.data?.order) setAiOrder(analysis.data.order); }, [analysis.data]);
 
   // Shared by the status select and the pin/snooze toggles: patch the task
   // in place for an instant-feeling UI, persist it, then reload so the
   // server re-scores it — a pin or snooze moves the task's rank, not just
   // its badge.
   async function patchItem(item, patch) {
+    if (savingTasks.current.has(item.taskId)) return;
+    savingTasks.current.add(item.taskId);
+    const previous = plan.tasks.find((task) => task.id === item.taskId);
     setPlan((prev) =>
       prev && {
         ...prev,
         tasks: prev.tasks.map((t) => (t.id === item.taskId ? { ...t, ...patch } : t)),
       }
     );
-    await tasksApi.updateTask(item.workspaceId, item.taskId, patch);
-    load();
+    try { await tasksApi.updateTask(item.workspaceId, item.taskId, patch); await load(); }
+    catch (err) {
+      setPlan((current) => current && { ...current, tasks: current.tasks.map((task) => task.id === item.taskId ? previous : task) });
+      setError(apiErrorMessage(err));
+    } finally { savingTasks.current.delete(item.taskId); }
   }
 
   const handleStatusChange = (item, status) => patchItem(item, { status });
@@ -123,7 +156,7 @@ export default function MyPlan() {
   // plus that workspace's members/statuses are fetched fresh — this is what
   // makes a task "clickable to show details" from a cross-workspace view
   // without duplicating TaskModal's form logic.
-  async function openTaskDetail(item) {
+  async function openTaskDetail(item, edit = false) {
     const workspaceId = item.workspaceId;
     const taskId = item.taskId || item.id;
     setDetailLoading(true);
@@ -136,8 +169,10 @@ export default function MyPlan() {
       const task = tasks.find((t) => t.id === taskId);
       if (task) {
         setDetail({ workspaceId, members: workspace.members, statuses, task });
-        setDetailsOpen(true);
+        setDetailsOpen(!edit);
+        setEditorOpen(edit);
       }
+    } catch (err) { setError(apiErrorMessage(err));
     } finally {
       setDetailLoading(false);
     }
@@ -157,7 +192,7 @@ export default function MyPlan() {
   const stats = {
     open: items.length,
     urgent: items.filter((t) => t.tier === "TIER_1").length,
-    overdue: lanes.find((l) => l.kind === "overdue")?.items.length || 0,
+    overdue: items.filter((item) => item.dueDate && new Date(item.dueDate) < new Date(new Date().setHours(0, 0, 0, 0))).length,
     atRisk: atRisk.length,
   };
   const rowHandlers = {
@@ -166,7 +201,19 @@ export default function MyPlan() {
     onTogglePin: handleTogglePin,
     onToggleSnooze: handleToggleSnooze,
     onTaskClick: openTaskDetail,
+    onEditTask: (item) => openTaskDetail(item, true),
+    onMove: (taskId, direction, visible) => setPreferences((current) => movePlanItem(current, visible, taskId, direction)),
+    onPlannedDateChange: changePlannedDay,
   };
+
+  function changePlannedDay(taskId, date) {
+    if (date && !validPlanDay(date)) return;
+    setPreferences((current) => {
+      const dates = { ...current.dates };
+      if (date) dates[taskId] = date; else delete dates[taskId];
+      return { ...current, dates };
+    });
+  }
 
   return (
     <>
@@ -174,7 +221,7 @@ export default function MyPlan() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold text-ink-900 dark:text-ink-50">My Plan</h2>
-            <p className="text-sm text-ink-500">Every open task across your workspaces, ranked by Smart Priority within its day or its week.</p>
+            <p className="text-sm text-ink-500">Your tasks across workspaces, with Lofty’s guidance and room to plan your own way.</p>
             {view !== "calendar" && (
               <div className="mt-2 flex items-center gap-2 text-sm text-ink-600 dark:text-ink-300">
                 <label htmlFor="plan-capacity">Hours per day</label>
@@ -214,7 +261,10 @@ export default function MyPlan() {
           </div>
         </div>
 
-        {!hasTasks && !hasConflicts ? (
+        {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">{error}<button type="button" className="ml-3 min-h-11 underline" onClick={load}>Retry</button></div>}
+        {storageError && <p role="status" className="text-sm text-ink-500">{storageError}</p>}
+
+        {!plan ? null : !hasTasks && !hasConflicts ? (
           <EmptyState
             icon={<CalendarCheck className="h-5 w-5" />}
             title="Nothing to plan yet"
@@ -222,6 +272,13 @@ export default function MyPlan() {
           />
         ) : (
           <>
+            {hasTasks && <>
+              <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-ink-500">
+                <p>{aiEnabled ? "Lofty analyzes priorities automatically. Reorder or edit any task below." : "Automatic AI analysis is off. Reorder or edit any task below."}</p>
+                {(preferences.order.length > 0 || Object.keys(preferences.dates).length > 0) && <button type="button" className="min-h-11 text-brand-700 underline dark:text-brand-300" onClick={() => setPreferences(emptyManualPlan())}>Reset personal changes</button>}
+              </div>
+              {aiEnabled && <PlanRecommendations analysis={analysis} tasks={plan.tasks} onOpen={openTaskDetail} />}
+            </>}
             {hasTasks && (
               <PlanFocusHero
                 focus={pickFocus(lanes)}
@@ -243,7 +300,7 @@ export default function MyPlan() {
                 {view === "day" && <PlanTimeline lanes={lanes} capacity={capacity} {...rowHandlers} />}
                 {view === "week" && <PlanWeek items={items} capacity={capacity} {...rowHandlers} />}
                 {view === "calendar" && (
-                  <PlanCalendar tasks={plan.tasks} events={plan.events || []} onTaskClick={openTaskDetail} />
+                  <PlanCalendar tasks={items} events={plan.events || []} {...rowHandlers} />
                 )}
               </>
             )}

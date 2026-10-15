@@ -5,5 +5,6 @@ import { requireAuth } from "../middleware/auth.js";
 const router = Router();
 router.use(requireAuth);
 router.get("/", planController.getPlan);
+router.post("/recommendations", planController.getRecommendations);
 
 export default router;

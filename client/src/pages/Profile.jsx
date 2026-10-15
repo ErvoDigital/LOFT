@@ -9,6 +9,7 @@ import Avatar from "../components/common/Avatar.jsx";
 import GoogleSignInButton from "../components/common/GoogleSignInButton.jsx";
 import ChangePasswordModal from "../components/profile/ChangePasswordModal.jsx";
 import AppearanceSettings from "../components/profile/AppearanceSettings.jsx";
+import PlanSettings from "../components/profile/PlanSettings.jsx";
 import FollowsPanel from "../components/profile/FollowsPanel.jsx";
 import { displayColor } from "../lib/colors.js";
 
@@ -198,6 +199,7 @@ export default function Profile() {
       </div>
 
       <AppearanceSettings />
+      <PlanSettings />
 
       <div className="card p-5 sm:p-6">
         <h2 className="mb-4 text-base font-semibold text-ink-800 dark:text-ink-100">Sign-in methods</h2>

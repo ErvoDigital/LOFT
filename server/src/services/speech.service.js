@@ -1,5 +1,6 @@
 import { ApiError } from "../utils/ApiError.js";
 import { gatewayConfig } from "./openclaw.service.js";
+import { humanizePriorityTerms } from "../utils/priorities.js";
 
 const TRANSCRIPT_LIMIT = 4000;
 const SPEECH_LIMIT = 2400;
@@ -19,7 +20,7 @@ export function normalizeTranscript(raw) {
 
 function normalizeSpeechInput(raw) {
   if (!raw) return "";
-  return String(raw).replace(/\s+/g, " ").trim().slice(0, SPEECH_LIMIT);
+  return humanizePriorityTerms(raw).replace(/\s+/g, " ").trim().slice(0, SPEECH_LIMIT);
 }
 
 function authHeaders(config) {

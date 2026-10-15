@@ -1,5 +1,6 @@
 import { AlertTriangle, Clock3, CircleDot, Archive } from "lucide-react";
 import { ROLE_LABELS } from "../../lib/access.js";
+import { PRIORITY_LABELS } from "../../lib/priorities.js";
 
 const STATUS_STYLES = {
   TODO: "bg-ink-100 text-ink-500 dark:bg-ink-700 dark:text-ink-300",
@@ -21,7 +22,7 @@ const STATUS_LABELS = {
 // rest fade down to Low's quiet outlined pill.
 export const TIER_META = {
   TIER_1: {
-    label: "Urgent",
+    label: PRIORITY_LABELS.TIER_1,
     description: "Needs attention right away",
     Icon: AlertTriangle,
     className: "bg-red-600 text-white",
@@ -29,21 +30,21 @@ export const TIER_META = {
     pulse: true,
   },
   TIER_2: {
-    label: "High",
+    label: PRIORITY_LABELS.TIER_2,
     description: "Important, with a deadline coming up",
     Icon: Clock3,
     className: "bg-accent-600 text-white",
     dot: "bg-accent-500",
   },
   TIER_3: {
-    label: "Medium",
+    label: PRIORITY_LABELS.TIER_3,
     description: "Regular work with flexible timing",
     Icon: CircleDot,
     className: "bg-brand-600 text-white",
     dot: "bg-brand-500",
   },
   TIER_4: {
-    label: "Low",
+    label: PRIORITY_LABELS.TIER_4,
     description: "Nice to have, whenever there's time",
     Icon: Archive,
     className: "border border-ink-300 bg-white text-ink-500 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-400",

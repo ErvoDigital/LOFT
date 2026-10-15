@@ -21,8 +21,8 @@ const bundled = await build({
     name: "widget-dependencies",
     setup(builder) {
       builder.onResolve({ filter: /.*/ }, ({ path, kind, resolveDir }) => {
-        if (kind === "entry-point" || path === "react" || path === "react/jsx-runtime" || path.endsWith("/assistantAudio.js") || path.endsWith("/VoiceOrb.jsx")
-          || path.endsWith("/AssistantMessageContent.jsx") || path.endsWith("/useVisualViewport.js") || path === "react-markdown" || path === "remark-gfm" || resolveDir.includes("node_modules")) return;
+        if (kind === "entry-point" || path === "react" || path === "react/jsx-runtime" || path.endsWith("/priorities.js") || path.endsWith("/assistantAudio.js") || path.endsWith("/VoiceOrb.jsx")
+          || path.endsWith("/AssistantMessageContent.jsx") || path.endsWith("/AssistantActionCards.jsx") || path.endsWith("/AssistantDetailForm.jsx") || path.endsWith("/useVisualViewport.js") || path === "react-markdown" || path === "remark-gfm" || resolveDir.includes("node_modules")) return;
         return { path, namespace: "mock" };
       });
       builder.onLoad({ filter: /.*/, namespace: "mock" }, ({ path }) => ({
@@ -49,14 +49,14 @@ async function mount(t, overrides = {}) {
   const liveCaptions = [];
   const listeners = new Map();
   const recordingTimers = new Map();
-  const document = { visibilityState: "visible", addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: (name) => listeners.delete(name) };
+  const document = { activeElement: overrides.focusedField, visibilityState: "visible", addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: (name) => listeners.delete(name) };
   let progress;
   let recorder;
   let stoppedTracks = 0;
   let microphoneRequests = 0;
   const api = {
     assistantStatus: async () => ({ configured: overrides.configured ?? true }),
-    confirmAssistantAction: async (token) => { confirmations.push(token); return { id: "saved", workspaceId: "workspace" }; },
+    confirmAssistantAction: async (token) => { confirmations.push(token); if (overrides.confirmationError) throw overrides.confirmationError; return overrides.confirmation ? overrides.confirmation.promise : { id: "saved", workspaceId: "workspace" }; },
     sendAssistantMessage: async (body, signal, onProgress) => { messages.push(body); progress = onProgress; return overrides.reply ? overrides.reply.promise : { reply: "Your summary.", actions: [] }; },
     transcribeAssistantAudio: async () => overrides.transcript ? overrides.transcript.promise : { transcript: "What is due today?" },
     transcribeLiveAudio: async () => ({ transcript: "What is due" }),
@@ -67,7 +67,7 @@ async function mount(t, overrides = {}) {
     },
   };
   const mockComponent = () => null;
-  const VoiceAssistant = () => null;
+  const VoiceAssistant = ({ active, replyControls }) => active ? replyControls || null : null;
   const exported = { exports: {} };
   vm.runInNewContext(bundled.outputFiles[0].text, {
     module: exported,
@@ -90,6 +90,8 @@ async function mount(t, overrides = {}) {
     },
     document,
     window: {
+      requestAnimationFrame: overrides.requestAnimationFrame,
+      cancelAnimationFrame: overrides.cancelAnimationFrame,
       ...(overrides.audioContext ? { AudioContext: class { constructor() { return overrides.audioContext; } } } : {}),
       visualViewport: overrides.viewport,
       matchMedia: () => ({ matches: Boolean(overrides.touch) }),
@@ -140,8 +142,8 @@ async function mount(t, overrides = {}) {
     const voiceActions = { "Close voice bubble": "onClose", "Play voice reply": "onPlay", "Retry voice reply": "onPlay", "Stop voice reply": "onSkip" };
     await act(async () => voiceActions[label] ? bubble()[voiceActions[label]]() : button(label).props.onClick());
   };
-  const type = async (value) => { await act(async () => view.root.findByType("input").props.onChange({ target: { value } })); };
-  const submit = async () => { await act(async () => view.root.findByType("form").props.onSubmit({ preventDefault() {} })); };
+  const type = async (value) => { await act(async () => view.root.findByProps({ "aria-label": "Message Lofty" }).props.onChange({ target: { value } })); };
+  const submit = async () => { await act(async () => view.root.findAllByType("form").find((form) => !form.props["aria-label"]).props.onSubmit({ preventDefault() {} })); };
   const startRecording = async () => { await act(async () => { bubble().onPrepareAudio(); return bubble().onHoldStart(); }); };
   const record = async () => { await startRecording(); await act(async () => bubble().onHoldEnd()); };
   const hide = async () => { document.visibilityState = "hidden"; await act(async () => listeners.get("visibilitychange")?.()); };
@@ -217,6 +219,30 @@ test("Desktop chat still focuses the text composer", async (t) => {
   let inputFocus = 0;
   await mount(t, { input: { focus: () => inputFocus++ } });
   assert.equal(inputFocus, 1);
+});
+
+test("A focused popup field stays visible after keyboard resize and pending scroll work is cleaned up", async (t) => {
+  const viewportListeners = new Map();
+  const elementListeners = new Map();
+  const frames = new Map();
+  const scrolls = [];
+  let frameId = 0;
+  const field = { matches: (selector) => selector.includes("input"), scrollIntoView: (options) => scrolls.push(options) };
+  const panel = { style: { setProperty() {}, removeProperty() {} }, dataset: {}, focus() {}, contains: (node) => node === field,
+    addEventListener: (name, callback) => elementListeners.set(name, callback), removeEventListener: (name) => elementListeners.delete(name) };
+  const viewport = { height: 740, offsetTop: 0, addEventListener: (name, callback) => viewportListeners.set(name, callback), removeEventListener: (name) => viewportListeners.delete(name) };
+  const widget = await mount(t, { touch: true, panel, viewport, focusedField: field,
+    requestAnimationFrame: (callback) => { frames.set(++frameId, callback); return frameId; }, cancelAnimationFrame: (id) => frames.delete(id) });
+  viewport.height = 340;
+  viewportListeners.get("resize")();
+  assert.equal(frames.size, 1);
+  const reveal = [...frames.values()][0]; frames.clear(); reveal();
+  assert.equal(scrolls[0].block, "nearest");
+  elementListeners.get("focusin")();
+  assert.equal(frames.size, 1);
+  await widget.click("Close Lofty");
+  assert.equal(frames.size, 0);
+  assert.equal(elementListeners.size, 0);
 });
 
 test("The touch launcher records with chat closed and Stop sends a voice question", async (t) => {
@@ -508,6 +534,7 @@ test("Voice questions identify answer generation failures with chat closed", asy
   assert.equal(widget.bubble.canTalk, true);
   assert.equal(widget.speech.length, 0);
   await widget.click("Close voice bubble");
+  await widget.click("Open Lofty");
   assert.match(JSON.stringify(widget.view.toJSON()), /Lofty is temporarily unavailable/);
 });
 
@@ -528,6 +555,107 @@ test("Meeting draft previews handle absent dates and save only after confirmatio
   assert.equal(widget.view.root.findByType("a").props.href, "/workspaces/workspace/calendar");
 });
 
+const voiceTask = { id: "voice-task", kind: "task", token: "signed-voice-task", data: { workspaceId: "workspace", title: "Prepare launch", tier: "TIER_2", assigneeId: "tester" }, preview: { workspaceName: "Launch", people: [{ name: "Tester" }] } };
+const priorityDetails = { id: "details-priority", kind: "task", prompt: "Choose a priority for the task.", fields: [{ name: "tier", label: "Priority", type: "select", required: true, options: [{ value: "TIER_2", label: "High" }] }] };
+
+test("Voice confirmations save inside the voice popup, reject duplicate clicks and stay out of chat", async (t) => {
+  const confirmation = deferred();
+  const overrides = { closed: true, confirmation, reply: { promise: Promise.resolve({ reply: "Review and confirm below.", actions: [voiceTask] }) } };
+  const widget = await mount(t, overrides);
+  await widget.record();
+  assert.equal(widget.view.root.findAllByProps({ id: "loft-assistant" }).length, 0);
+  assert.equal(widget.confirmations.length, 0);
+  const confirmButton = () => widget.view.root.findAllByType("button").find((button) => button.children.includes("Confirm") || button.children.includes("Saving…"));
+  await act(async () => { void confirmButton().props.onClick(); void confirmButton().props.onClick(); });
+  assert.deepEqual(widget.confirmations, ["signed-voice-task"]);
+  assert.equal(confirmButton().props.disabled, true);
+  await act(async () => confirmation.resolve({ id: "saved", workspaceId: "workspace" }));
+  assert.match(JSON.stringify(widget.view.toJSON()), /Task saved/);
+  assert.equal(widget.bubble.active, true);
+  assert.equal(widget.view.root.findAllByProps({ id: "loft-assistant" }).length, 0);
+  await widget.click("Close voice bubble");
+  assert.equal(widget.view.root.findAllByProps({ id: "loft-assistant" }).length, 0);
+  await widget.click("Open Lofty");
+  assert.match(JSON.stringify(widget.view.toJSON()), /Task saved/);
+});
+
+test("Failed voice confirmation shows a retryable error on its preview and Dismiss stays in voice", async (t) => {
+  const overrides = { closed: true, confirmationError: new Error("This action expired. Prepare it again."), reply: { promise: Promise.resolve({ reply: "Confirm below.", actions: [voiceTask] }) } };
+  const widget = await mount(t, overrides);
+  await widget.record();
+  const button = (label) => widget.view.root.findAllByType("button").find((item) => item.children.includes(label));
+  await act(async () => button("Confirm").props.onClick());
+  assert.match(JSON.stringify(widget.view.toJSON()), /This action expired/);
+  assert.equal(widget.bubble.active, true);
+  assert.equal(widget.view.root.findAllByProps({ id: "loft-assistant" }).length, 0);
+  await act(async () => button("Dismiss").props.onClick());
+  assert.match(JSON.stringify(widget.view.toJSON()), /Dismissed/);
+  assert.equal(widget.confirmations.length, 1);
+});
+
+test("Voice reply fields submit details in voice mode and require a separate exact-preview confirmation", async (t) => {
+  const overrides = { closed: true, reply: { promise: Promise.resolve({ reply: "Choose a priority below.", actions: [], detailRequests: [priorityDetails] }) } };
+  const widget = await mount(t, overrides);
+  await widget.record();
+  await act(async () => widget.view.root.findByType("select").props.onChange({ target: { value: "TIER_2" } }));
+  overrides.reply = { promise: Promise.resolve({ reply: "Review your task below.", actions: [voiceTask] }) };
+  await act(async () => widget.view.root.findByProps({ "aria-label": "Details for Lofty" }).props.onSubmit({ preventDefault() {} }));
+  assert.equal(widget.messages.length, 2);
+  assert.equal(widget.messages[1].interactionMode, "voice");
+  assert.match(widget.messages[1].message, /Priority: High/);
+  assert.equal(widget.confirmations.length, 0);
+  assert.equal(widget.speech.length, 2);
+  assert.equal(widget.bubble.active, true);
+  assert.match(JSON.stringify(widget.view.toJSON()), /Details sent to Lofty/);
+  assert.match(JSON.stringify(widget.view.toJSON()), /Create task/);
+  assert.equal(widget.view.root.findAllByProps({ id: "loft-assistant" }).length, 0);
+});
+
+test("Text reply fields stay inline and preserve entered details when a follow-up fails", async (t) => {
+  const nextReply = deferred();
+  const overrides = { reply: { promise: Promise.resolve({ reply: "Choose the priority below.", actions: [], detailRequests: [priorityDetails] }) } };
+  const widget = await mount(t, overrides);
+  await widget.type("Create a task"); await widget.submit();
+  const form = () => widget.view.root.findByProps({ "aria-label": "Details for Lofty" });
+  await act(async () => form().props.onSubmit({ preventDefault() {} }));
+  assert.equal(widget.messages.length, 1);
+  assert.match(JSON.stringify(widget.view.toJSON()), /complete the requested details/);
+  await act(async () => widget.view.root.findByType("select").props.onChange({ target: { value: "TIER_2" } }));
+  overrides.reply = nextReply;
+  await act(async () => { void form().props.onSubmit({ preventDefault() {} }); });
+  assert.equal(widget.messages[1].interactionMode, "text");
+  await act(async () => nextReply.reject(new Error("Network unavailable")));
+  assert.equal(widget.view.root.findByType("select").props.value, "TIER_2");
+  assert.match(JSON.stringify(widget.view.toJSON()), /details could not be sent/);
+  assert.equal(widget.speech.length, 0);
+  assert.equal(widget.confirmations.length, 0);
+});
+
+test("Meeting reply fields validate times, collect attendees and send explicit offset dates", async (t) => {
+  const fields = [
+    { name: "startTime", label: "Start date and time", type: "datetime-local", required: true },
+    { name: "endTime", label: "End date and time", type: "datetime-local", required: true },
+    { name: "attendeeIds", label: "Attendees", type: "multiselect", required: true, options: [{ value: "partner", label: "Partner" }] },
+  ];
+  const overrides = { reply: { promise: Promise.resolve({ reply: "Add the meeting details below.", actions: [], detailRequests: [{ id: "meeting-details", kind: "event", prompt: "When, and with whom?", fields }] }) } };
+  const widget = await mount(t, overrides);
+  await widget.type("Set up a meeting"); await widget.submit();
+  const form = () => widget.view.root.findByProps({ "aria-label": "Details for Lofty" });
+  const date = async (index, value) => { await act(async () => form().findAllByType("input").filter((input) => input.props.type === "datetime-local")[index].props.onChange({ target: { value } })); };
+  await date(0, "2026-10-20T11:00"); await date(1, "2026-10-20T10:00");
+  await act(async () => form().findByProps({ type: "checkbox" }).props.onChange({ target: { checked: true } }));
+  await act(async () => form().props.onSubmit({ preventDefault() {} }));
+  assert.match(JSON.stringify(widget.view.toJSON()), /End time must be after start time/);
+  assert.equal(widget.messages.length, 1);
+  await date(1, "2026-10-20T12:00");
+  overrides.reply = { promise: Promise.resolve({ reply: "Review the meeting preview.", actions: [] }) };
+  await act(async () => form().props.onSubmit({ preventDefault() {} }));
+  assert.equal(widget.messages.length, 2);
+  assert.match(widget.messages[1].message, /Start date and time: \d{4}-\d\d-\d\dT\d\d:\d\d:00.000Z/);
+  assert.match(widget.messages[1].message, /Attendees: Partner \(partner\)/);
+  assert.equal(widget.confirmations.length, 0);
+});
+
 test("Deferred task previews disclose the default priority and unassigned state", async (t) => {
   const reply = deferred();
   const widget = await mount(t, { reply });
@@ -535,7 +663,7 @@ test("Deferred task previews disclose the default priority and unassigned state"
   await widget.submit();
   await act(async () => reply.resolve({ reply: "Confirm below.", actions: [{ id: "proposal", kind: "task", data: { title: "Untitled task", workspaceId: "workspace", tier: "TIER_3", assigneeId: null, deferredFields: ["title", "tier", "assigneeId"] } }] }));
   const content = JSON.stringify(widget.view.toJSON());
-  assert.match(content, /Flexible/);
+  assert.match(content, /Medium/);
   assert.match(content, /default until you edit it/);
   assert.match(content, /Unassigned/);
   assert.equal(widget.confirmations.length, 0);

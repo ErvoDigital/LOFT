@@ -60,6 +60,15 @@ test("Interrupted or failed chat streams cannot become completed replies", async
   }
 });
 
+test("Completed streamed replies preserve detail forms while provisional text cannot add forms", async () => {
+  const { readAssistantReply } = assistantApi();
+  const detailRequests = [{ id: "form", kind: "task", prompt: "Priority?", fields: [{ name: "tier", type: "select" }] }];
+  const events = [];
+  const response = await readAssistantReply(new Response(JSON.stringify({ type: "delta", text: "Fill this in.", detailRequests }) + "\n" + JSON.stringify({ type: "result", reply: "Fill this in.", actions: [], detailRequests }) + "\n").body, (event) => events.push(event));
+  assert.equal(response.detailRequests[0].fields[0].name, "tier");
+  await assert.rejects(readAssistantReply(new Response(JSON.stringify({ type: "result", reply: "Invalid", actions: [], detailRequests: {} })).body, () => {}), /invalid detail fields/);
+});
+
 test("Streaming chat preserves HTTP error details and supports a JSON-only backend", async () => {
   const failure = Object.assign(new Error("Forbidden"), { response: { status: 403, data: Response.json({ error: "You are not a member of this workspace" }).body } });
   const failing = assistantApi(async () => { throw failure; });

@@ -10,7 +10,7 @@ export default function AtRiskPanel({ items }) {
       <div className="mb-2 flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
         <p className="text-sm font-semibold text-red-800 dark:text-red-400">
-          {items.length === 1 ? "1 task won't fit before its due date" : `${items.length} tasks won't fit before their due dates`} at this pace
+          {items.length === 1 ? "1 task needs attention to meet its deadline" : `${items.length} tasks need attention to meet their deadlines`}
         </p>
       </div>
       <div className="space-y-1.5">
@@ -30,11 +30,11 @@ export default function AtRiskPanel({ items }) {
                 </p>
               </div>
             </div>
-            <span className="shrink-0 text-xs font-medium text-red-600 dark:text-red-400">short by {item.shortfallHours}h</span>
+            <span className="shrink-0 text-xs font-medium text-red-600 dark:text-red-400">{item.plannedAfterDeadline ? "Planned after deadline" : `short by ${item.shortfallHours}h`}</span>
           </Link>
         ))}
       </div>
-      <p className="mt-2 text-xs text-red-700/80 dark:text-red-400/80">Raise your daily hours, shrink their estimated duration, or push their due dates.</p>
+      <p className="mt-2 text-xs text-red-700/80 dark:text-red-400/80">Bring planned work forward, review your available hours or effort estimates, or discuss the deadline with your team.</p>
     </div>
   );
 }
