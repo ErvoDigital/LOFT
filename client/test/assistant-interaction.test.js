@@ -20,8 +20,9 @@ const bundled = await build({
   plugins: [{
     name: "widget-dependencies",
     setup(builder) {
-      builder.onResolve({ filter: /.*/ }, ({ path, kind }) => {
-        if (kind === "entry-point" || path === "react" || path === "react/jsx-runtime" || path.endsWith("/assistantAudio.js") || path.endsWith("/VoiceOrb.jsx")) return;
+      builder.onResolve({ filter: /.*/ }, ({ path, kind, resolveDir }) => {
+        if (kind === "entry-point" || path === "react" || path === "react/jsx-runtime" || path.endsWith("/assistantAudio.js") || path.endsWith("/VoiceOrb.jsx")
+          || path.endsWith("/AssistantMessageContent.jsx") || path.endsWith("/useVisualViewport.js") || path === "react-markdown" || path === "remark-gfm" || resolveDir.includes("node_modules")) return;
         return { path, namespace: "mock" };
       });
       builder.onLoad({ filter: /.*/, namespace: "mock" }, ({ path }) => ({
@@ -81,7 +82,11 @@ async function mount(t, overrides = {}) {
       "../../api/client.js": { apiErrorMessage: (err) => err.message },
     },
     document,
-    window: overrides.audioContext ? { AudioContext: class { constructor() { return overrides.audioContext; } } } : {},
+    window: {
+      ...(overrides.audioContext ? { AudioContext: class { constructor() { return overrides.audioContext; } } } : {}),
+      visualViewport: overrides.viewport,
+      matchMedia: () => ({ matches: Boolean(overrides.touch) }),
+    },
     navigator: overrides.unsupported ? {} : { mediaDevices: { getUserMedia: async () => {
       microphoneRequests++;
       if (overrides.microphoneError) throw overrides.microphoneError;
@@ -117,7 +122,10 @@ async function mount(t, overrides = {}) {
     clearTimeout: (id) => { if (id === "recording") recordingTimers.delete(id); else clearTimeout(id); },
   });
   let view;
-  await act(async () => { view = create(React.createElement(exported.exports.default)); });
+  await act(async () => { view = create(React.createElement(exported.exports.default), {
+    createNodeMock: ({ props }) => props.id === "loft-assistant" ? overrides.panel || null
+      : props["aria-label"] === "Message Lofty" ? overrides.input || null : null,
+  }); });
   t.after(() => act(() => view.unmount()));
   const button = (label) => view.root.findAllByType("button").find(({ props }) => props["aria-label"] === label || props.title === label);
   const bubble = () => view.root.findByType(VoiceAssistant).props;
@@ -133,6 +141,39 @@ async function mount(t, overrides = {}) {
   if (!overrides.closed) await click("Open Lofty");
   return { view, messages, speech, audio, revoked, confirmations, recordingTimers, click, type, submit, record, startRecording, hide, get progress() { return progress; }, get bubble() { return bubble(); }, get recorder() { return recorder; }, get stoppedTracks() { return stoppedTracks; }, get microphoneRequests() { return microphoneRequests; } };
 }
+
+test("Mobile chat follows the visible keyboard area and removes viewport listeners on close", async (t) => {
+  const listeners = new Map();
+  const properties = new Map();
+  let panelFocus = 0;
+  let inputFocus = 0;
+  const panel = { style: { setProperty: (key, value) => properties.set(key, value), removeProperty: (key) => properties.delete(key) }, dataset: {}, focus: () => panelFocus++ };
+  const viewport = { height: 740, offsetTop: 0, addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: (name) => listeners.delete(name) };
+  const widget = await mount(t, { touch: true, panel, input: { focus: () => inputFocus++ }, viewport });
+  assert.equal(panelFocus, 1);
+  assert.equal(inputFocus, 0);
+  assert.equal(properties.get("--visible-height"), "740px");
+  assert.equal(panel.dataset.compact, "false");
+  viewport.height = 340;
+  viewport.offsetTop = 45;
+  await act(async () => listeners.get("resize")());
+  assert.equal(properties.get("--visible-height"), "340px");
+  assert.equal(properties.get("--visible-top"), "45px");
+  assert.equal(panel.dataset.compact, "true");
+  viewport.height = 740;
+  viewport.offsetTop = 0;
+  await act(async () => listeners.get("scroll")());
+  assert.equal(panel.dataset.compact, "false");
+  await widget.click("Close Lofty");
+  assert.equal(listeners.size, 0);
+  assert.equal(properties.size, 0);
+});
+
+test("Desktop chat still focuses the text composer", async (t) => {
+  let inputFocus = 0;
+  await mount(t, { input: { focus: () => inputFocus++ } });
+  assert.equal(inputFocus, 1);
+});
 
 test("The touch launcher records with chat closed and Stop sends a voice question", async (t) => {
   const widget = await mount(t, { closed: true });
@@ -264,6 +305,79 @@ test("Chat renders streamed text early and replaces tool preambles with one fina
   assert.equal(replies.length, 1);
   assert.equal(widget.speech.length, 0);
   assert.equal(widget.bubble.onHoldStart(), true);
+});
+
+test("Lofty formats assistant paragraphs, emphasis and nested lists while user messages stay literal", async (t) => {
+  const reply = deferred();
+  const widget = await mount(t, { reply });
+  await widget.type("Keep **this** as typed.");
+  await widget.submit();
+  await act(async () => reply.resolve({
+    reply: "## Today's plan\n\nStart with **priority work** and *take breaks*.\n\n1. Review tasks\n   - Check deadlines\n2. Plan the afternoon\n\nFinish on time.",
+    actions: [],
+  }));
+  assert.ok(widget.view.root.findAllByType("h2").some((heading) => heading.children.join("") === "Today's plan"));
+  assert.equal(widget.view.root.findByType("strong").children.join(""), "priority work");
+  assert.equal(widget.view.root.findByType("em").children.join(""), "take breaks");
+  assert.equal(widget.view.root.findAllByType("ol").length, 1);
+  assert.equal(widget.view.root.findAllByType("ul").length, 1);
+  assert.equal(widget.view.root.findAllByType("li").length, 3);
+  const userMessage = widget.view.root.findAllByType("p").find((p) => p.children.includes("Keep **this** as typed."));
+  assert.ok(userMessage);
+  assert.equal(userMessage.findAllByType("strong").length, 0);
+});
+
+test("Streamed Markdown updates incomplete formatting and renders the final formatted reply once", async (t) => {
+  const reply = deferred();
+  const widget = await mount(t, { reply });
+  await widget.type("What should I do?");
+  await widget.submit();
+  await act(async () => widget.progress({ type: "delta", text: "Start with **priority" }));
+  assert.ok(JSON.stringify(widget.view.toJSON()).includes("**priority"));
+  await act(async () => widget.progress({ type: "delta", text: " work**." }));
+  assert.equal(widget.view.root.findByType("strong").children.join(""), "priority work");
+  await act(async () => reply.resolve({ reply: "Start with **priority work**.\n\nThen rest.", actions: [] }));
+  assert.equal(widget.view.root.findAllByType("strong").length, 1);
+  assert.ok(widget.view.root.findAllByType("p").some((p) => p.children.includes("Then rest.")));
+});
+
+test("Lofty renders tables, checklists and code with keyboard accessible scrolling", async (t) => {
+  const reply = deferred();
+  const widget = await mount(t, { reply });
+  await widget.type("Show a formatted example");
+  await widget.submit();
+  await act(async () => reply.resolve({
+    reply: "| Task | Status |\n| --- | --- |\n| Review | Ready |\n\n- [x] Done\n- [ ] Pending\n\nUse `task_id`.\n\n```js\nconst value = '<safe>';\n// **keep literal**\n```",
+    actions: [],
+  }));
+  assert.equal(widget.view.root.findByProps({ "aria-label": "Table in Lofty's reply" }).props.tabIndex, 0);
+  assert.equal(widget.view.root.findAllByType("th").length, 2);
+  assert.equal(widget.view.root.findAllByType("td").length, 2);
+  const checkboxes = widget.view.root.findAllByType("input").filter((input) => input.props.type === "checkbox");
+  assert.deepEqual(checkboxes.map((input) => input.props.checked), [true, false]);
+  assert.ok(checkboxes.every((input) => input.props.disabled));
+  const pre = widget.view.root.findByType("pre");
+  assert.equal(pre.props.tabIndex, 0);
+  assert.equal(pre.findByType("code").children.join(""), "const value = '<safe>';\n// **keep literal**\n");
+  assert.equal(pre.findAllByType("strong").length, 0);
+});
+
+test("Formatted replies filter unsafe links and raw HTML without loading remote images", async (t) => {
+  const reply = deferred();
+  const widget = await mount(t, { reply });
+  await widget.type("Show links");
+  await widget.submit();
+  await act(async () => reply.resolve({
+    reply: "[Docs](https://example.com/docs) and [unsafe](javascript:alert%281%29).\n\n<script>alert('unsafe')</script>\n\n<img src=x onerror=alert(1)>\n\n![Description](https://example.com/tracker.png)",
+    actions: [],
+  }));
+  const link = widget.view.root.findAllByType("a").find((a) => a.props.href === "https://example.com/docs");
+  assert.equal(link.props.target, "_blank");
+  assert.equal(link.props.rel, "noopener noreferrer");
+  assert.ok(widget.view.root.findAllByType("a").every((a) => !/^javascript:/i.test(a.props.href || "")));
+  assert.equal(widget.view.root.findAllByType("script").length, 0);
+  assert.equal(widget.view.root.findAllByType("img").length, 0);
+  assert.ok(JSON.stringify(widget.view.toJSON()).includes("Description"));
 });
 
 test("A failed stream removes provisional text and restores the question for retry", async (t) => {

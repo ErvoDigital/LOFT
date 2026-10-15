@@ -5,8 +5,10 @@ import { AlertTriangle, Layers, Mic, Sparkles, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useWorkspaces } from "../../context/WorkspaceContext.jsx";
 import WorkspaceMark from "../common/WorkspaceMark.jsx";
+import AssistantMessageContent from "./AssistantMessageContent.jsx";
 import VoiceAssistant from "./VoiceAssistant.jsx";
 import VoiceOrb from "./VoiceOrb.jsx";
+import useVisualViewport from "../../hooks/useVisualViewport.js";
 import { createAssistantAudio } from "../../utils/assistantAudio.js";
 import { assistantStatus, sendAssistantMessage, confirmAssistantAction, speakAssistantReply, transcribeAssistantAudio } from "../../api/assistant.js";
 import { apiErrorMessage } from "../../api/client.js";
@@ -48,6 +50,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
   const [pendingReplyMode, setPendingReplyMode] = useState(null);
   const thinking = pendingReplyMode !== null;
   const launcherRef = useRef(null);
+  const panelRef = useRef(null);
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const requestRef = useRef(null);
@@ -77,6 +80,8 @@ export default function AssistantWidget({ launcherContainer = null }) {
 
   const workspace = workspaces.find((w) => w.id === workspaceId);
   const firstName = user?.name?.trim().split(/\s+/)[0];
+
+  useVisualViewport(panelRef, open);
 
   useEffect(() => {
     contextVersion.current++;
@@ -145,7 +150,10 @@ export default function AssistantWidget({ launcherContainer = null }) {
   // Focus goes to the composer on open and back to the launcher on close.
   useEffect(() => {
     if (!open) return;
-    inputRef.current?.focus({ preventScroll: true });
+    // Opening chat on a touch screen should leave the conversation visible
+    // until the user chooses to type and brings up the keyboard.
+    const touch = window.matchMedia?.("(pointer: coarse)")?.matches;
+    (touch ? panelRef : inputRef).current?.focus({ preventScroll: true });
     const onKey = (e) => e.key === "Escape" && setOpen(false);
     document.addEventListener("keydown", onKey);
     return () => {
@@ -490,7 +498,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
           aria-label="Talk to Lofty"
           title="Talk to Lofty"
           disabled={thinking || transcribing || Boolean(confirming)}
-          className="btn-secondary flex h-12 w-12 shrink-0 items-center justify-center rounded-full p-0 shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50 sm:h-14 sm:w-14 lg:h-10 lg:w-10 lg:border-white/10 lg:bg-white/[0.06] lg:text-ink-300 lg:shadow-none lg:hover:bg-white/[0.1] lg:hover:text-white"
+          className="btn-secondary flex h-12 w-12 shrink-0 items-center justify-center rounded-full p-0 shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50 sm:h-14 sm:w-14 lg:hidden"
         >
           <Mic className="h-5 w-5" />
         </button>
@@ -523,23 +531,25 @@ export default function AssistantWidget({ launcherContainer = null }) {
           <div
             onClick={() => setOpen(false)}
             aria-hidden="true"
-            className="absolute inset-0 z-40 animate-fade-in bg-ink-950/50 backdrop-blur-sm dark:bg-ink-950/70 sm:hidden"
+            className="assistant-backdrop fixed inset-0 z-40 animate-fade-in bg-ink-950/50 backdrop-blur-sm dark:bg-ink-950/70 sm:hidden"
           />
           <section
             id="loft-assistant"
+            ref={panelRef}
             role="dialog"
             aria-label="Lofty"
-            className="dropdown-panel assistant-wash absolute inset-x-0 bottom-0 z-40 flex h-[88%] animate-sheet-up flex-col overflow-hidden rounded-b-none sm:inset-x-auto sm:bottom-5 sm:right-5 sm:h-[min(38rem,calc(100%-2.5rem))] sm:w-[24rem] sm:animate-slide-fade-in sm:rounded-b-2xl"
+            tabIndex={-1}
+            className="dropdown-panel assistant-wash assistant-panel z-40 flex min-h-0 min-w-0 animate-slide-fade-in flex-col overflow-hidden focus:outline-none"
           >
-            <header className="flex shrink-0 items-center gap-3 px-4 pb-3 pt-4">
+            <header className="assistant-header flex shrink-0 items-center gap-2 px-3 pb-2 pt-3 sm:gap-3 sm:px-4 sm:pb-3 sm:pt-4">
               <div className="brand-mark flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-glow-sm">
                 <Sparkles className="h-[18px] w-[18px]" />
               </div>
               <div className="min-w-0 flex-1">
                 <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-50">Lofty</h2>
                 <p className="flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
-                  <span className={`h-1.5 w-1.5 rounded-full ${unavailable || configured === false ? "bg-amber-500" : configured === null ? "bg-ink-400" : "bg-accent-500"}`} aria-hidden="true" />
-                  {unavailable ? "Temporarily unavailable" : configured === null ? "Checking setup" : configured ? "Ready to ask" : "Setup needed"}
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${unavailable || configured === false ? "bg-amber-500" : configured === null ? "bg-ink-400" : "bg-accent-500"}`} aria-hidden="true" />
+                  <span className="truncate">{unavailable ? "Temporarily unavailable" : configured === null ? "Checking setup" : configured ? "Ready to ask" : "Setup needed"}</span>
                 </p>
               </div>
               <button
@@ -556,7 +566,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close Lofty"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ink-500 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-900 dark:text-ink-400 dark:hover:bg-white/[0.08] dark:hover:text-ink-50"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-ink-500 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-900 dark:text-ink-400 dark:hover:bg-white/[0.08] dark:hover:text-ink-50"
               >
                 <X className="h-[18px] w-[18px]" />
               </button>
@@ -564,7 +574,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
 
             {/* Which workspace the assistant would work in: the one being
                 viewed, or all of the user's workspaces everywhere else. */}
-            <div className="flex shrink-0 items-center gap-2 border-b border-ink-900/[0.06] px-4 pb-3 dark:border-white/[0.06]">
+            <div className="assistant-context flex shrink-0 items-center gap-2 border-b border-ink-900/[0.06] px-3 pb-2 dark:border-white/[0.06] sm:px-4 sm:pb-3">
               <span className="text-xs text-ink-400 dark:text-ink-500">Context</span>
               <span className="chip min-w-0">
                 {workspace ? (
@@ -581,22 +591,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
               </span>
             </div>
 
-            {unavailable && (
-              <div role="alert" className="mx-4 mt-3 flex shrink-0 gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold">Lofty is temporarily unavailable</p>
-                  <p className="mt-1 text-xs leading-relaxed">{ASSISTANT_UNAVAILABLE_MESSAGE}</p>
-                  {configured && draft.trim() && (
-                    <button type="button" onClick={() => send(draft)} disabled={thinking || Boolean(confirming) || transcribing || recording} className="mt-2 min-h-9 rounded-lg border border-amber-300 px-3 text-xs font-semibold transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/30 dark:hover:bg-amber-500/10">
-                      Try again
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4" aria-live="polite">
+            <div ref={scrollRef} className="min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4 sm:py-4" aria-live="polite">
               <div className="space-y-1.5">
                 <p className="text-sm font-semibold text-ink-900 dark:text-ink-50">
                   Hi{firstName ? ` ${firstName}` : ""}, I'm Lofty, your SyncTayo workspace assistant.
@@ -627,19 +622,23 @@ export default function AssistantWidget({ launcherContainer = null }) {
               {messages.map((m) => (
                 <div key={m.id} className="space-y-2">
                 <div className={`flex ${m.role === "user" ? "justify-end" : ""}`}>
-                  <p
-                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-soft ${
+                  <div
+                    className={`min-w-0 max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-soft [overflow-wrap:anywhere] ${
                       m.role === "user"
                         ? "rounded-br-sm bg-gradient-to-br from-brand-600 to-brand-800 text-white"
                         : "rounded-bl-sm border border-ink-200 bg-white text-ink-800 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-100"
                     }`}
                   >
-                    {m.voice && <Mic className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px opacity-80" aria-hidden="true" />}
-                    {m.content}
-                  </p>
+                    {m.role === "user" ? (
+                      <p className="whitespace-pre-wrap">
+                        {m.voice && <Mic className="mr-1.5 inline h-3.5 w-3.5 -translate-y-px opacity-80" aria-hidden="true" />}
+                        {m.content}
+                      </p>
+                    ) : <AssistantMessageContent content={m.content} />}
+                  </div>
                 </div>
                 {m.actions?.map((action) => (
-                  <div key={action.id} className="rounded-xl border border-ink-200 bg-white p-3 text-sm dark:border-ink-700 dark:bg-ink-800">
+                  <div key={action.id} className="min-w-0 rounded-xl border border-ink-200 bg-white p-3 text-sm [overflow-wrap:anywhere] dark:border-ink-700 dark:bg-ink-800">
                     <p className="font-semibold">{action.kind === "task" ? "Create task" : action.kind === "event_draft" ? "Save meeting draft" : "Create meeting"}: {action.data.title}</p>
                     <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">Workspace: {action.preview?.workspaceName || workspaces.find((w) => w.id === action.data.workspaceId)?.name || action.data.workspaceId}</p>
                     {action.data.description && <p className="mt-1 whitespace-pre-wrap">{action.data.description}</p>}
@@ -656,11 +655,26 @@ export default function AssistantWidget({ launcherContainer = null }) {
                     {action.data.deferredFields?.length > 0 && <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">You can add the remaining details later.</p>}
                     {action.result ? <Link className="mt-2 inline-block text-brand-600 underline dark:text-brand-400" to={`/workspaces/${action.result.workspaceId}/${action.kind === "task" ? "tasks" : "calendar"}`}>Saved — open {action.kind === "task" ? "task board" : "calendar"}</Link>
                       : action.dismissed ? <p className="mt-2 text-xs">Dismissed</p>
-                      : <div className="mt-3 flex gap-2"><button type="button" className="btn-primary" onClick={() => confirm(action)} disabled={Boolean(confirming) || thinking}>{confirming === action.id ? "Saving…" : "Confirm"}</button><button type="button" className="btn-secondary" onClick={() => dismiss(action.id)} disabled={Boolean(confirming)}>Dismiss</button></div>}
+                      : <div className="mt-3 flex flex-wrap gap-2"><button type="button" className="btn-primary min-h-11" onClick={() => confirm(action)} disabled={Boolean(confirming) || thinking}>{confirming === action.id ? "Saving…" : "Confirm"}</button><button type="button" className="btn-secondary min-h-11" onClick={() => dismiss(action.id)} disabled={Boolean(confirming)}>Dismiss</button></div>}
                   </div>
                 ))}
                 </div>
               ))}
+
+              {unavailable && (
+                <div role="alert" className="flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">Lofty is temporarily unavailable</p>
+                    <p className="mt-1 text-xs leading-relaxed">{ASSISTANT_UNAVAILABLE_MESSAGE}</p>
+                    {configured && draft.trim() && (
+                      <button type="button" onClick={() => send(draft)} disabled={thinking || Boolean(confirming) || transcribing || recording} className="mt-2 min-h-11 rounded-lg border border-amber-300 px-3 text-xs font-semibold transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/30 dark:hover:bg-amber-500/10">
+                        Try again
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {error && !(unavailable && error === ASSISTANT_UNAVAILABLE_MESSAGE) && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</p>}
 
@@ -686,26 +700,27 @@ export default function AssistantWidget({ launcherContainer = null }) {
                 e.preventDefault();
                 send(draft);
               }}
-              className="shrink-0 border-t border-ink-900/[0.06] px-3 pb-3 pt-3 dark:border-white/[0.06]"
+              className="assistant-composer shrink-0 border-t border-ink-900/[0.06] px-3 pt-3 dark:border-white/[0.06]"
             >
               <div className="flex items-center gap-2">
                 <input
                   ref={inputRef}
-                  className="input min-w-0"
+                  className="input min-h-11 min-w-0 flex-1 !text-base sm:!text-sm"
                   placeholder="Ask Lofty anything…"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   aria-label="Message Lofty"
                   maxLength={4000}
                 />
-                <button type="submit" className="btn-primary shrink-0" disabled={!draft.trim() || thinking || Boolean(confirming) || transcribing || recording || !configured}>
+                <button type="submit" className="btn-primary min-h-11 shrink-0" disabled={!draft.trim() || thinking || Boolean(confirming) || transcribing || recording || !configured}>
                   Send
                 </button>
               </div>
-              <p className="mt-2 text-[11px] text-ink-400 dark:text-ink-500">
-                Type for text replies. Tap Talk for voice, then Stop and send when you're done.<span className="hidden sm:inline"> On a keyboard, hold M outside a text field.</span>
+              <p className="assistant-help mt-2 text-[11px] text-ink-400 dark:text-ink-500">
+                <span className="sm:hidden">Tap Talk for voice replies.</span>
+                <span className="hidden sm:inline">Type for text replies. Tap Talk for voice, then Stop and send when you're done. On a keyboard, hold M outside a text field.</span>
               </p>
-              <p className="mt-2 text-center text-[11px] text-ink-400 dark:text-ink-500">
+              <p className="assistant-help mt-2 text-center text-[11px] text-ink-400 dark:text-ink-500">
                 {configured ? "Check suggestions before confirming. Chat clears when you change workspace or reload." : "Your team needs to finish assistant setup before you can send messages."}
               </p>
             </form>

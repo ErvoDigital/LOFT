@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Mic, Minus, Square, Volume2, VolumeX, X } from "lucide-react";
 import { spokenReplyAt } from "../../utils/assistantTranscript.js";
 import VoiceOrb from "./VoiceOrb.jsx";
+import useVisualViewport from "../../hooks/useVisualViewport.js";
 
 // How long M has to be held before Lofty starts listening, so an accidental
 // tap does nothing.
@@ -185,6 +186,8 @@ export default function VoiceAssistant({
 
   const overlayOpen = active && !minimized;
 
+  useVisualViewport(overlayRef, overlayOpen);
+
   // Read the media clock so buffering, background tabs and replay do not let
   // the transcript run ahead of the voice. Keep tracking while minimized.
   useEffect(() => {
@@ -333,12 +336,12 @@ export default function VoiceAssistant({
       aria-modal="true"
       aria-label="Lofty voice"
       tabIndex={-1}
-      className="fixed inset-0 z-[65] flex animate-fade-in flex-col items-center overflow-y-auto overscroll-contain px-4 py-28 focus:outline-none print:hidden"
+      className="voice-overlay fixed inset-x-0 z-[65] flex animate-fade-in flex-col items-center overflow-hidden px-4 focus:outline-none print:hidden"
     >
       {/* Clicking away tucks the turn into the pill rather than ending it. */}
-      <div className="voice-scrim fixed inset-0" onClick={() => setMinimized(true)} aria-hidden="true" />
+      <div className="voice-scrim absolute inset-0" onClick={() => setMinimized(true)} aria-hidden="true" />
 
-      <div className="fixed right-3 top-3 z-10 flex items-center gap-1.5 sm:right-5 sm:top-5">
+      <div className="relative z-10 flex shrink-0 items-center gap-1.5 self-end">
         <CornerButton label="Minimize" onClick={() => setMinimized(true)}>
           <Minus className="h-[18px] w-[18px]" />
         </CornerButton>
@@ -351,12 +354,12 @@ export default function VoiceAssistant({
         {announcement}
       </p>
 
-      {/* Clicks fall through to the scrim except on the transcript and controls.
-          The reply scrolls within its own viewport, keeping the orb in place. */}
-      <div className="pointer-events-none relative my-auto flex w-full max-w-xl flex-col items-center text-center">
+      {/* Long questions and replies scroll between the controls, which stay
+          visible even in landscape or on a short phone screen. */}
+      <div className="voice-content relative my-4 flex min-h-0 w-full max-w-xl flex-1 flex-col items-center overflow-y-auto overscroll-contain py-4 text-center [overflow-wrap:anywhere]">
         <VoiceOrb state={phase} />
 
-        <div className="mt-12 flex w-full flex-col items-center gap-3">
+        <div className="voice-details mt-8 flex w-full shrink-0 flex-col items-center gap-3 sm:mt-12">
           {status && (
             <p role="status" className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">
               {status}
@@ -419,7 +422,7 @@ export default function VoiceAssistant({
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-[max(1.5rem,env(safe-area-inset-bottom))] flex flex-col items-center gap-3 px-4 text-center">
+      <div className="relative flex w-full shrink-0 flex-col items-center gap-2 text-center">
         {phase === "listening" ? (
           <button
             type="button"

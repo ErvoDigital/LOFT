@@ -430,10 +430,10 @@ export default function Sidebar({ assistantControlsRef }) {
         <NavLink to="/plan" title="My Plan" className={({ isActive }) => navItemClass({ isActive }) + " !px-0 !py-0 h-10 w-10 justify-center"}>
           <CalendarCheck className="h-[18px] w-[18px]" />
         </NavLink>
-        <div ref={assistantControlsRef} className="shrink-0" />
         <NavLink to="/chat" title="Messages" className={({ isActive }) => navItemClass({ isActive }) + " !px-0 !py-0 h-10 w-10 justify-center"}>
           <MessageSquare className="h-[18px] w-[18px]" />
         </NavLink>
+        <div ref={assistantControlsRef} className="shrink-0" />
 
         <div className="my-1 h-px w-8 bg-white/10" />
 
