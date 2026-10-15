@@ -4,7 +4,7 @@ import http from "node:http";
 import { runOpenClaw } from "../src/services/openclaw.service.js";
 
 const config = { url: "http://gateway", token: "private-test-token" };
-const args = { message: "Today?", history: [], instructions: "LOFT", tools: [], config };
+const args = { message: "Today?", history: [], instructions: "SyncTayo", tools: [], config };
 const messageOutput = (text) => ({ id: "final", status: "completed", output: [{ type: "message", content: [{ type: "output_text", text }] }] });
 const encodeEvent = (event) => `event: ${event.type}\r\ndata: ${JSON.stringify(event)}\r\n\r\n`;
 function deferred() {

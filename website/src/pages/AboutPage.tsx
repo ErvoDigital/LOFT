@@ -9,14 +9,14 @@ export function AboutPage() {
   return (
     <>
       <section className="container page-hero">
-        <p className="eyebrow">Why LOFT exists</p>
+        <p className="eyebrow">Why SyncTayo exists</p>
         <h1>
           You belong to more
           <br />
           <span className="text-brand">than one team.</span>
         </h1>
         <p className="hero-description">
-          Your tools should make room for that. LOFT is a productivity and
+          Your tools should make room for that. SyncTayo is a productivity and
           collaboration platform built for people balancing school, work,
           organizations, and community in one life.
         </p>
@@ -32,13 +32,13 @@ export function AboutPage() {
             from every team you’re part of.
           </SectionHeading>
           <p className="muted leading-relaxed">
-            LOFT gives each group its own workspace for tasks, events, chat,
+            SyncTayo gives each group its own workspace for tasks, events, chat,
             meetings, documents, and files. Your personal dashboard connects the
             work you can access, so you can plan with your whole workload in
             view.
           </p>
           <p className="muted leading-relaxed mt-4">
-            The idea at the center of LOFT is simple: catch the conflicts that
+            The idea at the center of SyncTayo is simple: catch the conflicts that
             only appear when you bring independent teams together.
           </p>
         </div>
@@ -76,7 +76,7 @@ export function AboutPage() {
           ))}
           <div className="personal-view">
             <Layers size={20} aria-hidden="true" />
-            <span>Your personal LOFT dashboard</span>
+            <span>Your personal SyncTayo dashboard</span>
           </div>
         </div>
       </section>
@@ -120,7 +120,7 @@ export function AboutPage() {
       <section className="container section">
         <div className="about-disclosure">
           <p>
-            <strong>Project Disclosure:</strong> LOFT is a student-developed academic project currently in beta testing. The business concept is being developed for educational purposes.
+            <strong>Project Disclosure:</strong> SyncTayo is a student-developed academic project currently in beta testing. The business concept is being developed for educational purposes.
           </p>
         </div>
       </section>
@@ -133,7 +133,7 @@ export function AboutPage() {
             <span className="text-brand">One place to find your footing.</span>
           </h2>
           <p>
-            LOFT helps you work with each team while keeping sight of everything
+            SyncTayo helps you work with each team while keeping sight of everything
             that needs your attention.
           </p>
         </div>

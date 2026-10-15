@@ -30,7 +30,7 @@ function speechProviderError(response, action) {
   if (response.status === 402) {
     return new ApiError(402, `Voice ${action} is blocked by insufficient OpenRouter credits. Add credits to the account used by the OpenClaw gateway's API key and try again.`);
   }
-  if (response.status === 404) return new ApiError(503, "OpenClaw audio is not installed. Deploy the LOFT speech plugin and restart the gateway.");
+  if (response.status === 404) return new ApiError(503, "OpenClaw audio is not installed. Deploy the SyncTayo speech plugin and restart the gateway.");
   return new ApiError(502, `Voice ${action} failed. Check the OpenClaw speech configuration, model access and credits.`);
 }
 

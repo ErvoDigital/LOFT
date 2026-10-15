@@ -40,7 +40,7 @@ export function HomePage() {
         </h1>
         <p className="hero-description">
           School, work, organizations, and community. Currently in open beta,
-          LOFT brings your tasks, calendars, conversations, meetings, documents,
+          SyncTayo brings your tasks, calendars, conversations, meetings, documents,
           files, and Lofty, our AI assistant, together so you can see what
           matters across every team.
         </p>
@@ -58,7 +58,7 @@ export function HomePage() {
               })
             }
           >
-            Explore LOFT
+            Explore SyncTayo
             <ArrowRight size={16} aria-hidden="true" />
           </button>
         </div>
@@ -103,7 +103,7 @@ export function HomePage() {
             title="See the clashes your teams can’t."
           >
             A deadline for school. A meeting at work. Another commitment with
-            your organization. LOFT brings them into your personal view and
+            your organization. SyncTayo brings them into your personal view and
             flags the overlaps.
           </SectionHeading>
           <p className="muted leading-relaxed">
@@ -112,7 +112,7 @@ export function HomePage() {
             needs to change.
           </p>
           <a className="text-link" href="#/features">
-            Explore planning in LOFT
+            Explore planning in SyncTayo
             <ArrowRight size={16} aria-hidden="true" />
           </a>
         </div>
@@ -137,7 +137,7 @@ export function HomePage() {
             <span>Due Friday · 5:00 PM</span>
           </div>
           <p className="conflict-caption">
-            LOFT spots the clash across your workspaces.
+            SyncTayo spots the clash across your workspaces.
           </p>
         </div>
       </section>
@@ -160,7 +160,7 @@ export function HomePage() {
         </div>
         <div className="text-center mt-8">
           <a className="text-link" href="#/features">
-            See all LOFT features
+            See all SyncTayo features
             <ArrowRight size={16} aria-hidden="true" />
           </a>
         </div>
@@ -227,7 +227,7 @@ export function HomePage() {
             {
               title: "Create your account",
               description:
-                "Open LOFT, create your account on the registration page, and verify your sign-in with the code sent to your email.",
+                "Open SyncTayo, create your account on the registration page, and verify your sign-in with the code sent to your email.",
             },
             {
               title: "Bring in your people",

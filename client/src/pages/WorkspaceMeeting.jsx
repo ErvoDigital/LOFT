@@ -115,7 +115,7 @@ function useElementSize() {
 }
 
 // Google Meet-style circular icon buttons for the call bar — same layout/format,
-// LOFT's own brand color for the "active" state instead of Meet's blue.
+// SyncTayo's own brand color for the "active" state instead of Meet's blue.
 // Phone and tablet browsers have no screen capture, so the share button only
 // appears where it can work.
 const CAN_SHARE_SCREEN = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;

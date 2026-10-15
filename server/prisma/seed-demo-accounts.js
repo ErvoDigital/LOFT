@@ -124,7 +124,7 @@ export async function seedDemoAccounts() {
     };
     console.log(JSON.stringify(counts));
     console.log("Credentials: server/.seed-accounts/accounts.csv (gitignored)");
-    if (uploadedFiles < fixtures.files.length) console.log("24 real sample files are staged locally. Configure object storage and rerun to publish them in LOFT.");
+    if (uploadedFiles < fixtures.files.length) console.log("24 real sample files are staged locally. Configure object storage and rerun to publish them in SyncTayo.");
     return counts;
   } finally { await prisma.$disconnect(); }
 }

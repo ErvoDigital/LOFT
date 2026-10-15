@@ -15,7 +15,7 @@ initSockets(httpServer, clientOrigins());
 startReminderJob();
 
 httpServer.listen(PORT, () => {
-  console.log(`LOFT API listening on http://localhost:${PORT}`);
+  console.log(`SyncTayo API listening on http://localhost:${PORT}`);
   verifyMailConnection()
     .then(() => console.log("Email provider and credentials verified"))
     .catch((error) => console.error(error.message));

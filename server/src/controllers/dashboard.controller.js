@@ -4,7 +4,7 @@ import { isFolderVisible } from "../services/folderAccess.js";
 
 // The single aggregated view across every workspace the user belongs to —
 // upcoming events, pending tasks, recent activity, notifications, and any
-// cross-workspace conflicts between them. This endpoint is the reason LOFT
+// cross-workspace conflicts between them. This endpoint is the reason SyncTayo
 // exists: nothing here required the user to check multiple tools.
 export async function getDashboard(req, res) {
   const userId = req.userId;

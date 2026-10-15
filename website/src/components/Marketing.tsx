@@ -7,9 +7,9 @@ export function Brand() {
   return (
     <span className="brand">
       <span className="brand-mark" aria-hidden="true">
-        L
+        S
       </span>
-      <span>LOFT</span>
+      <span>SyncTayo</span>
       <span className="beta-badge">Beta</span>
     </span>
   );
@@ -82,10 +82,10 @@ export function StartSection() {
       <div className="start-panel">
         <div>
           <p className="eyebrow">Make room for what matters</p>
-          <h2>Bring your teams into LOFT.</h2>
+          <h2>Bring your teams into SyncTayo.</h2>
           <p>
             Experience the open beta today with all features and Lofty, our AI
-            assistant. LOFT will feature a freemium model upon official release.
+            assistant. SyncTayo will feature a freemium model upon official release.
           </p>
         </div>
         <GetStartedLink className="shrink-0">

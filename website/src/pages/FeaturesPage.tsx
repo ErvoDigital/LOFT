@@ -27,7 +27,7 @@ const groups = [
     eyebrow: "03 / Stay in control",
     title: "Keep your work close. Share with intention.",
     description:
-      "Stay informed, personalize LOFT, and manage access within each team.",
+      "Stay informed, personalize SyncTayo, and manage access within each team.",
   },
 ] as const;
 
@@ -35,7 +35,7 @@ export function FeaturesPage() {
   return (
     <>
       <section className="container page-hero">
-        <p className="eyebrow">The LOFT service · Open Beta</p>
+        <p className="eyebrow">The SyncTayo service · Open Beta</p>
         <h1>
           Everything your teams need.
           <br />
@@ -44,7 +44,7 @@ export function FeaturesPage() {
         <p className="hero-description">
           Shared workspaces for your people. A personal dashboard for your whole
           day. Explore the tools that bring planning, collaboration,
-          organization, and Lofty, our AI assistant, into LOFT.
+          organization, and Lofty, our AI assistant, into SyncTayo.
         </p>
         <GetStartedLink />
       </section>
@@ -75,7 +75,7 @@ export function FeaturesPage() {
               Stay in charge.
             </h2>
             <p>
-              Lofty, our AI assistant, works with the LOFT tasks and events you’re allowed
+              Lofty, our AI assistant, works with the SyncTayo tasks and events you’re allowed
               to access. Ask what’s due, what to focus on, or why your schedule
               has a conflict.
             </p>

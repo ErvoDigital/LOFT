@@ -112,8 +112,8 @@ export function senderIdentity() {
   const address = configured.match(/<([^<>]+)>/)?.[1]?.trim() || configured;
   const reply = process.env.MAIL_REPLY_TO?.trim();
   return {
-    from: { name: "Loft", address },
-    ...(reply ? { replyTo: { name: "Loft", address: reply.match(/<([^<>]+)>/)?.[1]?.trim() || reply } } : {}),
+    from: { name: "SyncTayo", address },
+    ...(reply ? { replyTo: { name: "SyncTayo", address: reply.match(/<([^<>]+)>/)?.[1]?.trim() || reply } } : {}),
   };
 }
 

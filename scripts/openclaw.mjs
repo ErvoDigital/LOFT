@@ -53,7 +53,7 @@ async function setup() {
   await writeFile(envPath, source, { mode: 0o600 });
   console.log(lightsail
     ? "Lightsail gateway settings prepared. Set OPENCLAW_DOMAIN and OPENROUTER_API_KEY in the gateway env file, then run npm run ai:lightsail:config and npm run ai:lightsail:start. See docs/ai/LIGHTSAIL.md for backend settings."
-    : "Assistant settings prepared. Add your OPENROUTER_API_KEY to the env file, start Docker, then run npm run ai:start. Restart the LOFT server afterward.");
+    : "Assistant settings prepared. Add your OPENROUTER_API_KEY to the env file, start Docker, then run npm run ai:start. Restart the SyncTayo server afterward.");
   return dotenv.parse(source);
 }
 
@@ -71,7 +71,7 @@ else {
     if (!response.ok) throw new Error(`Gateway check failed (HTTP ${response.status}). Check the gateway URL, token and logs.`);
     const data = await response.json();
     if (!Array.isArray(data.data) || !data.data.some((model) => model.id === "openclaw" || model.id === "openclaw/default")) throw new Error("Gateway check returned an unexpected model list. Check the gateway URL and reverse proxy.");
-    console.log("OpenClaw gateway is reachable and authenticated. This does not test paid inference; send a message in LOFT to test OpenRouter.");
+    console.log("OpenClaw gateway is reachable and authenticated. This does not test paid inference; send a message in SyncTayo to test OpenRouter.");
   } else {
     if (["start", "config"].includes(command)) {
       if (!env.OPENROUTER_API_KEY || !env.OPENCLAW_GATEWAY_TOKEN) throw new Error("Run the appropriate ai:setup command and add OPENROUTER_API_KEY to its env file first.");

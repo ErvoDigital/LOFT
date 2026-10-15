@@ -51,7 +51,7 @@ export async function listInvites(req, res) {
 
 // Inviting an address that already has an invite refreshes it: a new expiry
 // and a fresh email, but the same token, so the link in an earlier email
-// keeps working. Someone who already has a LOFT account is also told in-app,
+// keeps working. Someone who already has a SyncTayo account is also told in-app,
 // which is the only delivery there is while email isn't set up.
 export async function sendInvites(req, res) {
   const { workspaceId } = req.params;

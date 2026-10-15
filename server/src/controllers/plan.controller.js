@@ -9,7 +9,7 @@ import { detectConflicts } from "../services/conflict.service.js";
 // each task's estimated effort and due date. Also runs the same
 // cross-workspace conflict detection the dashboard uses, scoped down to just
 // this user's own tasks and the events they're attending — this is meant to
-// be the one place prioritization and LOFT's "chain reaction" conflicts show
+// be the one place prioritization and SyncTayo's "chain reaction" conflicts show
 // up together, instead of split across two pages.
 export async function getPlan(req, res) {
   const userId = req.userId;

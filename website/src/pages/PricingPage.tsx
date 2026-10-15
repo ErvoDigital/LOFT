@@ -30,7 +30,7 @@ export function PricingPage() {
           <span className="text-brand">Free during open beta.</span>
         </h1>
         <p className="hero-description">
-          LOFT is currently in open beta with all workspace features, conflict
+          SyncTayo is currently in open beta with all workspace features, conflict
           detection, and Lofty, our AI assistant, available at no cost. Official
           release will feature a freemium model.
         </p>
@@ -42,14 +42,14 @@ export function PricingPage() {
               <Layers size={24} aria-hidden="true" />
             </span>
             <p className="eyebrow mt-6">Current access</p>
-            <h2>LOFT</h2>
+            <h2>SyncTayo</h2>
             <p className="price-label">Open Beta</p>
             <div className="pricing-beta-tag">
               <span>Freemium model at official release</span>
             </div>
             <p>
-              Explore all features without cost while LOFT is in beta. When officially
-              released, LOFT will adopt a freemium model with a free tier for everyday
+              Explore all features without cost while SyncTayo is in beta. When officially
+              released, SyncTayo will adopt a freemium model with a free tier for everyday
               use alongside premium plans for larger teams and organizations.
             </p>
             <GetStartedLink>Try the open beta</GetStartedLink>
@@ -69,7 +69,7 @@ export function PricingPage() {
             </ul>
             <p className="pricing-note">
               Lofty, our AI assistant, and voice features are available when enabled for
-              your LOFT deployment. All beta users receive full access during this preview period.
+              your SyncTayo deployment. All beta users receive full access during this preview period.
             </p>
           </div>
         </div>
@@ -82,30 +82,30 @@ export function PricingPage() {
         <div className="faq-list">
           <details>
             <summary>
-              What is LOFT’s current project status?<span aria-hidden="true">+</span>
+              What is SyncTayo’s current project status?<span aria-hidden="true">+</span>
             </summary>
             <p>
-              LOFT is a student-developed academic project currently in beta
+              SyncTayo is a student-developed academic project currently in beta
               testing. The business concept is being developed for educational
               purposes.
             </p>
           </details>
           <details>
             <summary>
-              Is LOFT currently free to use?<span aria-hidden="true">+</span>
+              Is SyncTayo currently free to use?<span aria-hidden="true">+</span>
             </summary>
             <p>
-              Yes! LOFT is currently in open beta. You can explore all
+              Yes! SyncTayo is currently in open beta. You can explore all
               features — including multi-workspace collaboration and Lofty,
               our AI assistant — completely free of charge.
             </p>
           </details>
           <details>
             <summary>
-              What pricing model will LOFT use at official release?<span aria-hidden="true">+</span>
+              What pricing model will SyncTayo use at official release?<span aria-hidden="true">+</span>
             </summary>
             <p>
-              LOFT will feature a freemium model in its official release. A generous
+              SyncTayo will feature a freemium model in its official release. A generous
               free tier will always remain available for individuals and small groups
               coordinating across workspaces. Paid tiers will be introduced for teams
               requiring advanced administration, expanded storage, and enhanced tooling.
@@ -113,7 +113,7 @@ export function PricingPage() {
           </details>
           <details>
             <summary>
-              Will I keep my workspaces when LOFT officially launches?<span aria-hidden="true">+</span>
+              Will I keep my workspaces when SyncTayo officially launches?<span aria-hidden="true">+</span>
             </summary>
             <p>
               Yes. Your workspaces, members, tasks, documents, and calendar data
@@ -126,7 +126,7 @@ export function PricingPage() {
               How do I create an account?<span aria-hidden="true">+</span>
             </summary>
             <p>
-              Choose “Try the open beta” to open the LOFT registration page and
+              Choose “Try the open beta” to open the SyncTayo registration page and
               create your account. You can sign in with a password or Google and
               complete email verification.
             </p>

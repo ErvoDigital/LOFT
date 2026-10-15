@@ -1,4 +1,4 @@
-// LOFT's brand is deep emerald now, but avatar, workspace, conversation and
+// SyncTayo's brand is deep emerald now, but avatar, workspace, conversation and
 // status colors saved under earlier palettes (blue, then a brighter mint) are
 // still in the database. Swap those for palette counterparts at render time
 // so every identity color stays on-brand, without rewriting stored rows.

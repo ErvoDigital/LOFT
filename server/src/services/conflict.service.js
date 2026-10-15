@@ -1,4 +1,4 @@
-// Detects cross-workspace scheduling conflicts for a user — LOFT's core
+// Detects cross-workspace scheduling conflicts for a user — SyncTayo's core
 // differentiator: surfacing collisions that only exist because a person
 // belongs to several independent workspaces that can't see each other.
 

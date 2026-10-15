@@ -1,17 +1,17 @@
 # Email setup
 
-LOFT uses Brevo's transactional email API for welcome emails (including new Google accounts), password resets, workspace invitations, sign-in verification and password-change verification. All five email types share the backend mail service and the existing HTML/plain-text templates.
+SyncTayo uses Brevo's transactional email API for welcome emails (including new Google accounts), password resets, workspace invitations, sign-in verification and password-change verification. All five email types share the backend mail service and the existing HTML/plain-text templates.
 
 ## Configure Brevo
 
-1. Add and verify **ervodigital@gmail.com** as a sender in [Brevo's sender settings](https://app.brevo.com/senders). Messages use the display name **Loft**.
+1. Add and verify **ervodigital@gmail.com** as a sender in [Brevo's sender settings](https://app.brevo.com/senders). Messages use the display name **SyncTayo**.
 2. Create an **API key** in [Brevo's SMTP & API settings](https://app.brevo.com/settings/keys/api). An SMTP key does not authenticate API requests.
 3. Set these variables in `server/.env` for local use, or in the **loft-server backend deployment's environment** for production:
 
 ```dotenv
 MAIL_PROVIDER=brevo
 BREVO_API_KEY=your-brevo-api-key
-MAIL_FROM="Loft <ervodigital@gmail.com>"
+MAIL_FROM="SyncTayo <ervodigital@gmail.com>"
 MAIL_TEST_TO=ervodigital@gmail.com
 CLIENT_URL=https://app.loft-client.site
 ```
@@ -26,7 +26,7 @@ Messages are sent over HTTPS to Brevo's [`POST /v3/smtp/email`](https://develope
 
 ## Sender and replies
 
-All outgoing messages explicitly use the display name **Loft**. `MAIL_FROM` selects the sender address; an embedded display name does not override Loft. `MAIL_REPLY_TO` optionally selects a different reply address. Leave it unset to receive replies at the sender mailbox.
+All outgoing messages explicitly use the display name **SyncTayo**. `MAIL_FROM` selects the sender address; an embedded display name does not override SyncTayo. `MAIL_REPLY_TO` optionally selects a different reply address. Leave it unset to receive replies at the sender mailbox.
 
 To switch to `support@loft-client.site`, add the sender in Brevo and [authenticate the domain](https://help.brevo.com/hc/en-us/articles/12163873383186-Authenticate-your-domain-with-Brevo-Brevo-code-DKIM-DMARC) using the DNS records Brevo provides, then update `MAIL_FROM`. Configure a mailbox or forwarding rule separately to receive replies. Preserve website and existing receiving/MX records when adding authentication records.
 
@@ -68,7 +68,7 @@ SMTP_HOST=smtp-relay.brevo.com
 SMTP_PORT=587
 SMTP_USER=your-brevo-smtp-login
 SMTP_PASS=your-brevo-smtp-key
-MAIL_FROM="Loft <ervodigital@gmail.com>"
+MAIL_FROM="SyncTayo <ervodigital@gmail.com>"
 ```
 
 Brevo [SMTP authentication](https://developers.brevo.com/docs/smtp-integration) requires the SMTP login and SMTP key from its dashboard, rather than the API key. Port 587 uses STARTTLS; port 465 uses TLS. TLS certificates are checked. `mail:check` verifies the SMTP connection and authentication for this provider.

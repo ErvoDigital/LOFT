@@ -1,16 +1,16 @@
-# LOFT V1 AI Integration Update
+# SyncTayo V1 AI Integration Update
 
-> This document records the V1 AI architecture decisions that must be reflected in `LOFT_Development_Plan_Integrated_OpenClaw.md`.
+> This document records the V1 AI architecture decisions reflected in the [consolidated integration plan](AI-Workspace-Assistant-Integration-OpenClaw.md).
 
 ## 1. V1 AI Stack
 
 Use a deliberately simple architecture:
 
-**LOFT Web App → OpenClaw → GPT-5.6 → LOFT backend tools → Supabase**
+**SyncTayo Web App → OpenClaw → GPT-5.6 → SyncTayo backend tools → Supabase**
 
 - OpenClaw is the agent harness/orchestration layer.
 - GPT-5.6 is the single V1 reasoning model.
-- LOFT backend remains the source of truth.
+- SyncTayo backend remains the source of truth.
 - Smart Priority remains deterministic and backend-controlled.
 
 Do not add multiple LLM providers, model routing, or multiple specialist agents to the V1 critical path.
@@ -57,7 +57,7 @@ The flow is:
 ```text
 Active tasks
     ↓
-LOFT Smart Priority engine
+SyncTayo Smart Priority engine
     ↓
 Deterministic scores
     ↓
@@ -92,7 +92,7 @@ Simple user prompt
       ↓
 GPT-5.6 identifies intent
       ↓
-Approved LOFT tool
+Approved SyncTayo tool
       ↓
 Backend retrieves/writes only required data
       ↓
@@ -217,4 +217,4 @@ The model should work harder internally so the user can keep prompts simple.
 
 ## 10. Product Statement
 
-> **LOFT AI is a workspace agent that lets users naturally ask, plan, create, communicate, summarize, and reprioritize across their permitted teams, while LOFT remains responsible for the actual data, permissions, workflow logic, and final actions.**
+> **SyncTayo AI is a workspace agent that lets users naturally ask, plan, create, communicate, summarize, and reprioritize across their permitted teams, while SyncTayo remains responsible for the actual data, permissions, workflow logic, and final actions.**

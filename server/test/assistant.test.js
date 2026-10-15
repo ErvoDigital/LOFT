@@ -66,7 +66,7 @@ test("OpenClaw continuation uses server-only auth and an isolated session", asyn
     messageOutput("Here are your tasks."),
   ];
   const fetchImpl = async (url, init) => { requests.push({ url, init, body: JSON.parse(init.body) }); return { ok: true, json: async () => results.shift() }; };
-  const reply = await runOpenClaw({ message: "Today?", history: [], instructions: "LOFT", tools: [], executeTool: async (name) => { assert.equal(name, "list_my_tasks"); return { tasks: [] }; }, fetchImpl });
+  const reply = await runOpenClaw({ message: "Today?", history: [], instructions: "SyncTayo", tools: [], executeTool: async (name) => { assert.equal(name, "list_my_tasks"); return { tasks: [] }; }, fetchImpl });
   assert.equal(reply, "Here are your tasks.");
   assert.equal(requests[0].init.headers.Authorization, "Bearer private-test-gateway-token");
   assert.equal(requests[0].body.previous_response_id, undefined);
@@ -201,7 +201,7 @@ test("Explicitly deferred task fields use visible defaults and preserve supplied
 
 test("Deferred meeting details produce a caller-bound draft with no fabricated schedule", async () => {
   const fake = fakeDatabase();
-  const data = { workspaceId, title: "Team planning", location: "LOFT meeting room", description: "Discuss the next release", deferredFields: ["startTime", "endTime", "attendeeIds"] };
+  const data = { workspaceId, title: "Team planning", location: "SyncTayo meeting room", description: "Discuss the next release", deferredFields: ["startTime", "endTime", "attendeeIds"] };
   assert.equal(eventDraftAction.safeParse({ ...data, deferredFields: ["description"] }).success, false);
   assert.equal(eventDraftAction.safeParse({ ...data, workspaceId: undefined }).success, false);
   const result = await answerAssistant({ userId, workspaceId, message: "Make a team planning meeting; I'll add the times and attendees later." }, fake.db, async ({ executeTool }) => {

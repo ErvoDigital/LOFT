@@ -1,14 +1,14 @@
 # OpenClaw on AWS Lightsail
 
-This deployment runs the assistant's Docker container on a persistent Linux VPS. The website and LOFT API can remain on their current hosts. The connection is:
+This deployment runs the assistant's Docker container on a persistent Linux VPS. The website and SyncTayo API can remain on their current hosts. The connection is:
 
-`Browser -> authenticated LOFT API -> HTTPS on Lightsail -> OpenClaw -> OpenRouter`
+`Browser -> authenticated SyncTayo API -> HTTPS on Lightsail -> OpenClaw -> OpenRouter`
 
-The website calls the gateway through the LOFT backend. It does not access the Docker Engine API. No AWS access key, Docker socket, database credentials or LOFT JWT secret is needed on the gateway host.
+The website calls the gateway through the SyncTayo backend. It does not access the Docker Engine API. No AWS access key, Docker socket, database credentials or SyncTayo JWT secret is needed on the gateway host.
 
 ## Files and commands
 
-- `infra/openclaw/compose.yml`: pinned OpenClaw image, restart policy, persistent state and mounted LOFT speech plugin.
+- `infra/openclaw/compose.yml`: pinned OpenClaw image, restart policy, persistent state and mounted SyncTayo speech plugin.
 - `infra/openclaw/compose.lightsail.yml`: adds Caddy with persistent TLS certificate storage.
 - `infra/openclaw/Caddyfile`: exposes only `POST /v1/responses`, `POST /v1/audio/transcriptions`, `POST /v1/audio/speech` and `GET /v1/models`; other HTTPS paths return 404. OpenClaw checks bearer authentication on all endpoints. No gateway UI or WebSocket control endpoint is exposed.
 - `infra/openclaw/plugins/loft-speech`: native OpenClaw plugin that handles bounded audio uploads and speech playback using the same host-side OpenRouter key as reasoning.
@@ -20,7 +20,7 @@ Run the `ai:lightsail:*` commands **on the VPS**, from this repository's root. T
 
 1. Create a Linux Lightsail instance with a supported Ubuntu LTS image. Use an x86_64 instance for the initial deployment; the pinned gateway image must support the host architecture. Choose memory/disk capacity based on gateway usage and monitor it.
 2. Attach a [Lightsail static IPv4 address](https://docs.aws.amazon.com/lightsail/latest/userguide/lightsail-create-static-ip.html). Point an `A` record such as `ai.example.com` to it. Only add an `AAAA` record if IPv6 routing and firewall rules are also configured.
-3. Configure the [Lightsail firewall](https://docs.aws.amazon.com/lightsail/latest/userguide/understanding-firewall-and-port-mappings-in-amazon-lightsail.html): SSH TCP 22 from your administrative IP, HTTP TCP 80 for certificate issuance/redirects, HTTPS TCP 443 for the LOFT API. If the API has stable outbound IPs, restrict 443 to those IPs. Port 80 allows certificate issuance with the HTTP challenge; Caddy also supports the TLS challenge on 443. Do not allow public TCP 18789 or Docker API ports 2375/2376. Review IPv6 rules separately if enabled. Lightsail's public firewall does not filter private-IP traffic.
+3. Configure the [Lightsail firewall](https://docs.aws.amazon.com/lightsail/latest/userguide/understanding-firewall-and-port-mappings-in-amazon-lightsail.html): SSH TCP 22 from your administrative IP, HTTP TCP 80 for certificate issuance/redirects, HTTPS TCP 443 for the SyncTayo API. If the API has stable outbound IPs, restrict 443 to those IPs. Port 80 allows certificate issuance with the HTTP challenge; Caddy also supports the TLS challenge on 443. Do not allow public TCP 18789 or Docker API ports 2375/2376. Review IPv6 rules separately if enabled. Lightsail's public firewall does not filter private-IP traffic.
 4. Install [Docker Engine and its Compose plugin](https://docs.docker.com/engine/install/ubuntu/), plus Node.js 22.16+ and npm for the helper scripts. Give the deployment user permission to use Docker.
 5. Check out this repository on the VPS. The helper only needs its `dotenv` dependency; you can install it without running Prisma's install hook using `npm ci --workspace server --include-workspace-root --ignore-scripts`. No server database configuration is needed to run the gateway helpers.
 
@@ -44,7 +44,7 @@ OPENROUTER_TTS_MODEL="google/gemini-3.1-flash-tts-preview"
 OPENROUTER_TTS_VOICE="Kore"
 ```
 
-`OPENCLAW_DOMAIN` is a hostname only, with no `https://`, port or path. Setup preserves existing values and never prints tokens. The key belongs on this host, and the gateway token must also be configured on the LOFT backend.
+`OPENCLAW_DOMAIN` is a hostname only, with no `https://`, port or path. Setup preserves existing values and never prints tokens. The key belongs on this host, and the gateway token must also be configured on the SyncTayo backend.
 
 ```bash
 npm run ai:lightsail:config   # Compose validation; does not print resolved secrets
@@ -71,20 +71,20 @@ docker compose --env-file infra/openclaw/.env.lightsail -f infra/openclaw/compos
 npm run ai:lightsail:check
 ```
 
-OpenClaw rejects world-writable plugin directories or entry files; the permission command also handles files transferred from Windows. Restarting OpenClaw loads the updated plugin code even when the existing container did not need recreation. Reloading Caddy activates the new speech routes on existing proxy containers. If a custom `--settings-file` is used, substitute that file for `.env.lightsail` in all commands. Deploy/restart the LOFT backend with the speech service change, then test a short microphone clip and assistant playback. Text and both speech operations now use the VPS's `OPENROUTER_API_KEY`. Provider credits are still required.
+OpenClaw rejects world-writable plugin directories or entry files; the permission command also handles files transferred from Windows. Restarting OpenClaw loads the updated plugin code even when the existing container did not need recreation. Reloading Caddy activates the new speech routes on existing proxy containers. If a custom `--settings-file` is used, substitute that file for `.env.lightsail` in all commands. Deploy/restart the SyncTayo backend with the speech service change, then test a short microphone clip and assistant playback. Text and both speech operations now use the VPS's `OPENROUTER_API_KEY`. Provider credits are still required.
 
 The plugin manifest declares `activation.onStartup: true` so the running gateway registers its HTTP routes. The startup script applies the template's plugin settings through OpenClaw's configuration CLI because existing installations read active authored configuration from SQLite. Runtime inspection alone does not prove live activation. Compose gives OpenClaw six minutes to stop gracefully; killing an older container before cleanup can leave its gateway owner lease active for up to five minutes on the pinned image. Allow that lease to expire and check startup logs instead of deleting gateway state.
 
-## Connect the LOFT backend
+## Connect the SyncTayo backend
 
-Set these **server-side** environment variables on the host running the LOFT API:
+Set these **server-side** environment variables on the host running the SyncTayo API:
 
 ```dotenv
 OPENCLAW_GATEWAY_URL="https://ai.example.com"
 OPENCLAW_GATEWAY_TOKEN="<same token as the VPS>"
 ```
 
-Do not append `/v1` to the URL. Do not put either value in a `VITE_` variable. A remote backend does not need `OPENROUTER_API_KEY`; remove that key there after moving it to the gateway. Restart/redeploy the LOFT API to load these settings. No frontend URL or CORS change is needed because the browser continues calling the authenticated LOFT API.
+Do not append `/v1` to the URL. Do not put either value in a `VITE_` variable. A remote backend does not need `OPENROUTER_API_KEY`; remove that key there after moving it to the gateway. Restart/redeploy the SyncTayo API to load these settings. No frontend URL or CORS change is needed because the browser continues calling the authenticated SyncTayo API.
 
 Run `npm run ai:check` from the backend environment to verify the actual route from that host. It reads `server/.env` when present, with exported environment variables taking precedence. It also works with exported variables and no `.env` file. Configure the backend/proxy's request timeout to accommodate the assistant's existing 90-second gateway budget plus database/tool work; serverless host limits may require a different API host.
 

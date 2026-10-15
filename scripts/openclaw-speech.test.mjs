@@ -126,9 +126,9 @@ test("Provider failures keep credit status while hiding provider secrets", async
   }
 });
 
-test("LOFT reports missing gateway audio without falling back to its own OpenRouter key", async () => {
+test("SyncTayo reports missing gateway audio without falling back to its own OpenRouter key", async () => {
   const options = { config: { token: "gateway-token", baseUrl: "https://gateway.example" }, fetchImpl: async () => new Response("private gateway details", { status: 404 }) };
   for (const call of [() => transcribeAssistantAudio({ audioBuffer: Buffer.from("voice"), mimeType: "audio/webm" }, options), () => synthesizeAssistantSpeech({ text: "hello" }, options)]) {
-    await assert.rejects(call(), (err) => err.statusCode === 503 && /Deploy the LOFT speech plugin/.test(err.message) && !err.message.includes("private gateway details"));
+    await assert.rejects(call(), (err) => err.statusCode === 503 && /Deploy the SyncTayo speech plugin/.test(err.message) && !err.message.includes("private gateway details"));
   }
 });

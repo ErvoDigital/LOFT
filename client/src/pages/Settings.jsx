@@ -2,7 +2,7 @@ import { CreditCard, Receipt, Mail, Sparkles } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useWorkspaces } from "../context/WorkspaceContext.jsx";
 
-// Account-level settings. Billing is the only section for now; LOFT has no
+// Account-level settings. Billing is the only section for now; SyncTayo has no
 // payment backend yet, so everything here is either derived from data the
 // app already has (workspaces, members, email) or an honest empty state.
 

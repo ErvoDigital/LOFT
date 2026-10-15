@@ -38,8 +38,8 @@ export function emailLayout({ title, preheader, category, body, actionLabel, act
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="width:100%;max-width:560px;background:#FFFFFF;border:1px solid #DCE5E2;border-radius:16px;">
         <tr><td style="padding:28px 32px;border-bottom:1px solid #E8EEEB;">
           <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-            <td width="40" height="40" align="center" bgcolor="#134A3C" style="width:40px;height:40px;background:#134A3C;border-radius:10px;color:#FFFFFF;font-size:22px;font-weight:700;">L</td>
-            <td style="padding-left:12px;"><a href="${escapeHtml(home)}" style="font-size:24px;font-weight:700;letter-spacing:-0.5px;color:#134A3C;text-decoration:none;">Loft</a><br><span style="font-size:11px;line-height:18px;color:#6B7D77;">Your workspace, in sync.</span></td>
+            <td width="40" height="40" align="center" bgcolor="#134A3C" style="width:40px;height:40px;background:#134A3C;border-radius:10px;color:#FFFFFF;font-size:22px;font-weight:700;">S</td>
+            <td style="padding-left:12px;"><a href="${escapeHtml(home)}" style="font-size:24px;font-weight:700;letter-spacing:-0.5px;color:#134A3C;text-decoration:none;">SyncTayo</a><br><span style="font-size:11px;line-height:18px;color:#6B7D77;">Your workspace, in sync.</span></td>
           </tr></table>
         </td></tr>
         <tr><td style="padding:28px 32px 0;">
@@ -53,11 +53,11 @@ export function emailLayout({ title, preheader, category, body, actionLabel, act
         </td></tr>
         <tr><td style="padding:20px 32px;border-top:1px solid #E8EEEB;font-size:12px;line-height:20px;color:#6B7D77;">
           <p style="margin:0;">Sent to ${escapeHtml(email)}.</p>
-          <p style="margin:8px 0 0;">Need help? Reply to this email to reach the Loft team.</p>
+          <p style="margin:8px 0 0;">Need help? Reply to this email to reach the SyncTayo team.</p>
         </td></tr>
       </table>
       <!--[if mso]></td></tr></table><![endif]-->
-      <p style="margin:18px 0 0;font-size:11px;line-height:18px;color:#87968F;">Loft &middot; A little more organized, together.</p>
+      <p style="margin:18px 0 0;font-size:11px;line-height:18px;color:#87968F;">SyncTayo &middot; A little more organized, together.</p>
     </td></tr>
   </table>
 </body>
@@ -65,5 +65,5 @@ export function emailLayout({ title, preheader, category, body, actionLabel, act
 }
 
 export function emailText(lines, email) {
-  return [...lines, "", `Sent to ${email}.`, "Need help? Reply to this email to reach the Loft team.", "", "Loft — Your workspace, in sync."].join("\n");
+  return [...lines, "", `Sent to ${email}.`, "Need help? Reply to this email to reach the SyncTayo team.", "", "SyncTayo — Your workspace, in sync."].join("\n");
 }

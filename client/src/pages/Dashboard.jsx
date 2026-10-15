@@ -326,13 +326,13 @@ export default function Dashboard() {
     return (
       <div className="p-4 sm:p-6">
         <section className="hero-panel px-6 py-10 sm:px-10 sm:py-14">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-100">Welcome to LOFT</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-100">Welcome to SyncTayo</p>
           <div className="mt-3">
             <Greeting firstName={firstName} />
           </div>
           <p className="mt-2 max-w-lg text-sm text-brand-100 sm:text-[15px]">
             Add a class, a job, an org or a team, or join one with an invite code. Everything from each one lands
-            here, and LOFT flags the places where they clash.
+            here, and SyncTayo flags the places where they clash.
           </p>
           <button
             className="btn mt-6 bg-white text-brand-800 shadow-glass hover:bg-brand-50"

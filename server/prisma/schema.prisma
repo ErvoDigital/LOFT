@@ -1,4 +1,4 @@
-// LOFT data model.
+// SyncTayo data model.
 //
 // Runs on PostgreSQL (Neon). Every field uses types available on SQLite,
 // PostgreSQL and MySQL (String/Int/DateTime/Boolean, no native enums, no

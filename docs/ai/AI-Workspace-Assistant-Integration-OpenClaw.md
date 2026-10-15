@@ -1,16 +1,16 @@
-# LOFT V1 AI Workspace Assistant — Consolidated Integration Plan
+# SyncTayo V1 AI Workspace Assistant — Consolidated Integration Plan
 
-Updated: October 5, 2026. This canonical plan combines the engineering blueprint and `LOFT_V1_AI_Integration_Update.md` against the current repository. See [AI setup](README.md) for operational commands, [Lightsail deployment](LIGHTSAIL.md) for gateway hosting, and the [roadmap](../ROADMAP.md) for project sequencing.
+Updated: October 5, 2026. This canonical plan combines the engineering blueprint and [V1 integration update](v1-integration-update.md) against the current repository. See [AI setup](README.md) for operational commands, [Lightsail deployment](LIGHTSAIL.md) for gateway hosting, and the [roadmap](../ROADMAP.md) for project sequencing.
 
 ## 1. Product intent
 
 The assistant's name is **Lofty**. Use this name in the interface and when the assistant introduces or identifies itself, in both text and voice modes.
 
-> LOFT AI is a workspace agent that lets users naturally ask, plan, create, communicate, summarize, and reprioritize across their permitted teams, while LOFT remains responsible for the actual data, permissions, workflow logic, and final actions.
+> SyncTayo AI is a workspace agent that lets users naturally ask, plan, create, communicate, summarize, and reprioritize across their permitted teams, while SyncTayo remains responsible for the actual data, permissions, workflow logic, and final actions.
 
-The assistant belongs in the normal LOFT experience. Users should be able to say “What's on my schedule today?”, “Add a task to finish the presentation tomorrow”, “Move the development meeting to 3 PM”, or “What should I work on first?” without learning command syntax or constructing detailed prompts.
+The assistant belongs in the normal SyncTayo experience. Users should be able to say “What's on my schedule today?”, “Add a task to finish the presentation tomorrow”, “Move the development meeting to 3 PM”, or “What should I work on first?” without learning command syntax or constructing detailed prompts.
 
-Preserve the original differentiator: independent teams share a user's limited time, so My Plan helps that user understand conflicts and the effects of changing priorities across permitted workspaces. The assistant explains and operates that workflow; LOFT computes the plan and enforces its rules.
+Preserve the original differentiator: independent teams share a user's limited time, so My Plan helps that user understand conflicts and the effects of changing priorities across permitted workspaces. The assistant explains and operates that workflow; SyncTayo computes the plan and enforces its rules.
 
 V1 aims for a reliable, repeatable end-to-end demonstration. Natural conversation, task/meeting creation and supported updates, message drafts, summaries, cross-team agenda queries, deterministic Auto-Reprioritization, and accurate priority explanations are core. Voice interaction is a separate premium feature with its own release criteria; it does not block core text acceptance.
 
@@ -45,12 +45,12 @@ Both source documents agree on OpenClaw orchestration, narrow backend tools, eff
 | Local/Lightsail gateway helpers | `infra/openclaw/`, `scripts/openclaw.mjs` | Real hosting and backend connectivity. Helpers do not provision AWS. |
 | Updates, content search/summaries, message drafts, meeting action items | Not exposed by current assistant tools | Implement and verify before declaring V1 complete. |
 
-Conversations currently clear on reload and workspace/account changes. Gateway transcripts can remain in the Docker state volume; browser clearing does not erase them. Persistent LOFT conversation history is deferred.
+Conversations currently clear on reload and workspace/account changes. Gateway transcripts can remain in the Docker state volume; browser clearing does not erase them. Persistent SyncTayo conversation history is deferred.
 
 ## 4. Architecture and responsibility boundaries
 
 ```text
-User -> LOFT Assistant UI -> authenticated LOFT API
+User -> SyncTayo Assistant UI -> authenticated SyncTayo API
                                 |
                          private OpenClaw gateway
                                 |
@@ -58,7 +58,7 @@ User -> LOFT Assistant UI -> authenticated LOFT API
                                 |
                       structured tool requests
                                 |
-                 LOFT validates and executes allowed tools
+                 SyncTayo validates and executes allowed tools
                      |                         |
              existing controllers       Smart Priority / My Plan
                      |                         |
@@ -70,18 +70,18 @@ User -> LOFT Assistant UI -> authenticated LOFT API
 ```
 
 - **Model:** interpret intent, extract arguments, request approved tools, summarize authorized sources, and explain calculated priority factors. Never invent IDs, records, rankings, or successful actions.
-- **OpenClaw:** orchestrate sessions and model/tool continuation. Only LOFT-supplied tools are available; built-in shell, filesystem, messaging, memory, and other agent tools stay disabled.
-- **LOFT backend:** authenticate, authorize, validate inputs/results, retrieve data, compute priorities/conflicts, prepare confirmations, and execute final changes through existing workflows.
-- **LOFT UI:** show context and progress, clarify ambiguity, preview actions, collect approval, and refresh affected views after backend success.
+- **OpenClaw:** orchestrate sessions and model/tool continuation. Only SyncTayo-supplied tools are available; built-in shell, filesystem, messaging, memory, and other agent tools stay disabled.
+- **SyncTayo backend:** authenticate, authorize, validate inputs/results, retrieve data, compute priorities/conflicts, prepare confirmations, and execute final changes through existing workflows.
+- **SyncTayo UI:** show context and progress, clarify ambiguity, preview actions, collect approval, and refresh affected views after backend success.
 
 ### Separate premium voice interaction
 
 Text chat and premium voice are separate features with shared conversation history. Tapping the **Talk to Lofty** microphone beside the chat launcher or **Talk** in the chat starts the voice bubble; **Stop and send** submits the recording. **Ask again** starts another turn, including from the minimized view. Holding **M** outside a text field also starts the voice bubble; releasing it submits the recording. Clips stop after 30 seconds, and hiding the page ends tap recordings and releases the microphone. The bubble owns microphone input, audio generation, automatic playback after generation completes, and Play/Skip/Retry controls in both the full and minimized views. Text chat must not invoke transcription or speech synthesis, and a typed submission receives a text reply without canceling bubble audio. Voice questions and answers synchronize into the text chat as transcripts, with normal confirmation previews. Closing the text chat does not end voice interaction; closing the bubble stops its capture and pending playback. Speech failures offer a retry directly in the bubble while preserving the shared response.
 
 ```text
-Premium voice UI -> authenticated LOFT API -> entitlement + usage check
+Premium voice UI -> authenticated SyncTayo API -> entitlement + usage check
     -> OpenClaw speech plugin -> OpenRouter speech recognition -> transcript
-    -> shared assistant / OpenClaw reasoning and LOFT tools
+    -> shared assistant / OpenClaw reasoning and SyncTayo tools
     -> final user-facing response -> OpenClaw speech plugin -> OpenRouter TTS -> audio playback
 ```
 
@@ -103,13 +103,13 @@ The assistant is request-driven. Act only on what the interacting user explicitl
 
 Resolve workspace, target, assignee, priority, requested deadline, meeting times/duration and attendees from explicit instructions or unambiguous active context. "Me" resolves to the authenticated caller; a clearly selected workspace resolves workspace context. Do not silently choose an assignee, priority, duration or recipients. Optional descriptions and unrequested deadlines may be omitted. If a requested date lacks a needed time, ask. A conversational "yes" cannot bypass the exact preview and Confirm control.
 
-The assistant acts **as the interacting member**, using their verified session identity and current workspace membership, role, delegated abilities and resource access. Never use a master admin key, admin impersonation or a shared privileged LOFT account for tool execution. An admin role in one team never grants access in another. Gateway/provider credentials authenticate infrastructure only; they grant no LOFT data authority. Database access remains inside LOFT's backend with caller-scoped authorization on every operation.
+The assistant acts **as the interacting member**, using their verified session identity and current workspace membership, role, delegated abilities and resource access. Never use a master admin key, admin impersonation or a shared privileged SyncTayo account for tool execution. An admin role in one team never grants access in another. Gateway/provider credentials authenticate infrastructure only; they grant no SyncTayo data authority. Database access remains inside SyncTayo's backend with caller-scoped authorization on every operation.
 
 The runtime supplies a server-generated context envelope with active workspace role and effective permissions. Workspace discovery returns current roles/abilities for each team. Each active-context tool call reloads membership; global reads use live membership predicates; proposals and confirmation revalidate the caller and affected people. Current task/event creation is available to any member, matching normal routes. Future tools must reproduce all route middleware permission and resource checks before calling controllers, and repeat them at confirmation. Model claims, browser fields, history or an old signed proposal cannot establish current authority.
 
 Intent interpretation and clarification are model instructions, not a deterministic proof that every proposed field was requested. Required task assignee/priority (or explicit deferred-field declarations), strict schemas, scoped queries, backend authorization and explicit confirmation enforce the runtime boundary. Meeting drafts are editable by their creator or members with `events.manage`; scheduling revalidates membership and attendees, and scheduled events retain normal edit/cancel permissions. Verify clarification and resistance to unsolicited proposals with live adversarial tests before release.
 
-The browser talks only to LOFT. The OpenRouter key stays on the OpenClaw host for reasoning, transcription and speech synthesis. The LOFT backend uses the gateway URL and token for all three operations. The gateway token stays server-side. Neither the model nor gateway receives database credentials or LOFT login tokens. Keep existing local Docker and separate Lightsail deployment options described in the operational guides.
+The browser talks only to SyncTayo. The OpenRouter key stays on the OpenClaw host for reasoning, transcription and speech synthesis. The SyncTayo backend uses the gateway URL and token for all three operations. The gateway token stays server-side. Neither the model nor gateway receives database credentials or SyncTayo login tokens. Keep existing local Docker and separate Lightsail deployment options described in the operational guides.
 
 ## 5. V1 tool contract
 
@@ -169,7 +169,7 @@ Authorized active tasks + server time + capacity
     -> model explanation -> UI refresh
 ```
 
-Return score components and reason codes from the backend. Preserve manual pin/snooze intent, make weights configurable/testable, and define deterministic tie handling. Document and test new factors before including them in explanations. Do not claim “blocks deployment” unless LOFT actually represents and scores that relationship.
+Return score components and reason codes from the backend. Preserve manual pin/snooze intent, make weights configurable/testable, and define deterministic tie handling. Document and test new factors before including them in explanations. Do not claim “blocks deployment” unless SyncTayo actually represents and scores that relationship.
 
 Auto-Reprioritization means the derived order/plan updates after meaningful approved task changes or time changes. It does not silently rewrite deadlines, tiers, or assignments; those require separate approved proposals. Recompute through the same services for normal UI and assistant changes, refresh My Plan, and show accurate before/after reasons.
 
@@ -194,7 +194,7 @@ Permitted notes or approved transcript
     -> summary + decisions + draft action items
     -> Zod validation + source references
     -> review / edit / reject / approve
-    -> confirmed LOFT task creation
+    -> confirmed SyncTayo task creation
 ```
 
 Start V1 with user-supplied notes or an approved text transcript. Live WebRTC calls currently provide no transcript to the assistant; capture/transcription is optional and does not block the demo. If storing notes/results, define a workspace-scoped record and access rules, optionally linked to an existing calendar event. Do not claim live-call history exists.
@@ -276,4 +276,4 @@ Defer direct provider integrations outside OpenRouter, specialist agents, self-l
 
 Remaining readiness decisions are verified per-role model identifiers/access and routing policy, actual gateway hosting/credentials, measured budget, premium entitlement source and voice allowance, exact update allowlists, and any meeting-note storage model. These do not require redesigning the assistant or migrating databases.
 
-V1 is complete when the core behaviors work through the normal LOFT UI, preserve permissions, and can be demonstrated repeatedly. Preserve simple natural requests, cross-team awareness, backend-owned actions/priorities, and visible human control.
+V1 is complete when the core behaviors work through the normal SyncTayo UI, preserve permissions, and can be demonstrated repeatedly. Preserve simple natural requests, cross-team awareness, backend-owned actions/priorities, and visible human control.

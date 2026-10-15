@@ -82,8 +82,8 @@ export const getVersionDownloadUrl = (workspaceId, assetId, version, signal) => 
     });
 };
 
-// Authorization happens at the LOFT API first. The returned presigned URL is
-// then fetched directly so the browser sends the app's Origin to S3. LOFT's
+// Authorization happens at the SyncTayo API first. The returned presigned URL is
+// then fetched directly so the browser sends the app's Origin to S3. SyncTayo's
 // bearer token is never forwarded to object storage.
 export async function fetchVersionBlob(workspaceId, assetId, version, signal) {
   const signedUrl = await getVersionDownloadUrl(workspaceId, assetId, version, signal);

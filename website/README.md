@@ -1,6 +1,6 @@
-﻿# LOFT marketing website
+﻿# SyncTayo marketing website
 
-The public SaaS marketing site for LOFT. This is separate from the authenticated React app in `client/` and does not require an API server or an AI key.
+The public SaaS marketing site for SyncTayo. This is separate from the authenticated React app in `client/` and does not require an API server or an AI key.
 
 ## Run locally
 
@@ -11,7 +11,7 @@ npm --prefix website install
 npm run dev:website
 ```
 
-Open http://localhost:3000. To link to a local LOFT app, copy `website/.env.example` to `website/.env.local`, set `VITE_LOFT_APP_URL=http://localhost:5173`, and run the client separately with `npm run dev:client`.
+Open http://localhost:3000. To link to a local SyncTayo app, copy `website/.env.example` to `website/.env.local`, set `VITE_LOFT_APP_URL=http://localhost:5173`, and run the client separately with `npm run dev:client`.
 
 ## Verify and build
 
@@ -32,4 +32,4 @@ Shared feature descriptions, frequently asked questions, and page metadata live 
 
 Sandbox changes and uploaded files exist only in memory for the current page session. Reset demo restores the sample workspaces. The sandbox never reads or writes real workspace data and needs no backend. Its implementation lives in `src/components/ProductPreview.tsx` and `src/components/sandbox/`.
 
-Copy describes implemented LOFT features. Assistant and speech features are described as conditional on deployment configuration. The pricing page describes current free access, since billing and paid-tier limits have not been implemented.
+Copy describes implemented SyncTayo features. Assistant and speech features are described as conditional on deployment configuration. The pricing page describes current free access, since billing and paid-tier limits have not been implemented.

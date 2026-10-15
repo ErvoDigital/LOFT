@@ -7,7 +7,7 @@ export function Footer() {
       <div className="container">
         <div className="footer-grid">
           <div>
-            <a href="#/" aria-label="LOFT home">
+            <a href="#/" aria-label="SyncTayo home">
               <Brand />
             </a>
             <p className="footer-description">
@@ -22,19 +22,19 @@ export function Footer() {
             <a href={REGISTER_URL}>Try open beta</a>
           </nav>
           <nav aria-label="About links">
-            <h2>LOFT</h2>
-            <a href="#/about">About LOFT</a>
+            <h2>SyncTayo</h2>
+            <a href="#/about">About SyncTayo</a>
             <a href="#/features">Workspaces & collaboration</a>
             <a href={REGISTER_URL}>Create your account</a>
           </nav>
         </div>
         <div className="footer-notice">
           <p>
-            <strong>Academic Project Notice:</strong> LOFT is a student-developed academic project currently in beta testing. The business concept is being developed for educational purposes.
+            <strong>Academic Project Notice:</strong> SyncTayo is a student-developed academic project currently in beta testing. The business concept is being developed for educational purposes.
           </p>
         </div>
         <div className="footer-bottom">
-          <p>© {new Date().getFullYear()} LOFT. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} SyncTayo. All rights reserved.</p>
           <p>Built for life across teams.</p>
         </div>
       </div>

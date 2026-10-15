@@ -158,7 +158,7 @@ export default function ConflictsPanel({ conflicts, title = "Clashes across work
         <CheckCircle2 className="h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" />
         <div>
           <p className="text-sm font-medium text-brand-800 dark:text-brand-300">No conflicts across your workspaces</p>
-          <p className="text-xs text-brand-700/80 dark:text-brand-300/80">LOFT is watching every deadline and meeting for overlaps — you're clear for the next two weeks.</p>
+          <p className="text-xs text-brand-700/80 dark:text-brand-300/80">SyncTayo is watching every deadline and meeting for overlaps — you're clear for the next two weeks.</p>
         </div>
       </div>
     );

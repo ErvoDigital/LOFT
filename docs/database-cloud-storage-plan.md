@@ -1,15 +1,15 @@
-# LOFT Database & Cloud Storage Plan
+# SyncTayo Database & Cloud Storage Plan
 
 **Author:** Backend Infrastructure Engineer (Database & Cloud Storage)
 **Status:** Audit & Implementation Proposal
-**Target Platform:** LOFT Multi-Team Collaboration System
+**Target Platform:** SyncTayo Multi-Team Collaboration System
 **Tracking Context:** PostgreSQL (Neon) & S3-Compatible Object Storage
 
 ---
 
 ## 1. Purpose
 
-This document provides a comprehensive technical audit, architectural evaluation, and step-by-step implementation plan for the two backend infrastructure pillars of the LOFT multi-team collaboration system:
+This document provides a comprehensive technical audit, architectural evaluation, and step-by-step implementation plan for the two backend infrastructure pillars of the SyncTayo multi-team collaboration system:
 1. **Database Infrastructure:** PostgreSQL hosted on Neon, managed through Prisma ORM (`@prisma/client` and `prisma`).
 2. **Cloud/Object Storage Infrastructure:** Transitioning file and asset management from an incomplete/unconfigured S3 client to an authenticated, production-grade, S3-compatible cloud storage architecture.
 
@@ -19,7 +19,7 @@ The Neon PostgreSQL connection (`DATABASE_URL` and `DIRECT_URL`) was previously 
 
 ## 2. Current Architecture
 
-LOFT is a multi-team workspace and collaboration platform consisting of four top-level components:
+SyncTayo is a multi-team workspace and collaboration platform consisting of four top-level components:
 - `client/`: React 18 SPA (Vite, Tailwind CSS, Lucide icons, Tiptap, Socket.io client).
 - `server/`: Node.js / Express REST API and Socket.io server with Prisma ORM.
 - `realtime/`: Standalone serverless WebSocket engine running on Neon Functions with direct PostgreSQL pooling via `pg.Pool` for pub/sub message synchronization across distributed isolates.
@@ -228,7 +228,7 @@ The lifecycle of files through the application is structured as follows:
 
 ## 8. Global Search Database Plan
 
-The LOFT Roadmap (`docs/ROADMAP.md`) specifies a Global Search feature enabling users to search across tasks, messages, files, and teammates from a single query.
+The SyncTayo Roadmap (`docs/ROADMAP.md`) specifies a Global Search feature enabling users to search across tasks, messages, files, and teammates from a single query.
 
 ### Architectural Review & Migration Statement
 > **No database schema migration is required for the initial Global Search implementation.**
@@ -292,7 +292,7 @@ The search controller will accept query parameter `q` (minimum 2 characters) and
 
 ## 9. Cloud Storage Requirements
 
-LOFT requires a reliable, secure, cost-effective object storage system satisfying these criteria:
+SyncTayo requires a reliable, secure, cost-effective object storage system satisfying these criteria:
 - **Persistent Object Storage:** Durable storage independent of transient server compute instances or local disk.
 - **Private Objects by Default:** Buckets must reject public anonymous reads. All access must be mediated via signed URLs or authenticated proxying.
 - **S3 API Compatibility:** Standard S3 protocol compatibility (`PutObject`, `GetObject`, `DeleteObject`, presigned URLs) to prevent vendor lock-in.
@@ -305,13 +305,13 @@ LOFT requires a reliable, secure, cost-effective object storage system satisfyin
 
 ## 10. Cloud Storage Provider Options
 
-| Provider | S3 API Compatibility | Free Tier / Student Viability | Egress Bandwidth Pricing | Architectural Fit for LOFT |
+| Provider | S3 API Compatibility | Free Tier / Student Viability | Egress Bandwidth Pricing | Architectural Fit for SyncTayo |
 | :--- | :--- | :--- | :--- | :--- |
 | **Cloudflare R2** | High (Path-style & virtual-host S3 compatible) | 10 GB storage free/mo; 10M Class B read ops/mo | **$0.00 / GB (Free Egress)** | **Optimal.** Eliminates egress fees completely for file downloads and media streaming. Seamless S3 SDK compatibility. |
 | **Backblaze B2** | High (Dedicated S3-compatible API endpoint) | 10 GB storage free; low API call costs | Free egress up to 3x stored data (Bandwidth Alliance) | **Excellent.** Highly cost-effective; drop-in S3 compatibility via custom endpoint URL. |
 | **Neon Object Storage** | High (Early access / experimental S3 gateway) | Integrated with Neon Postgres management | Dependent on Neon underlying cloud partner | **Promising long-term**, but currently less mature than dedicated object storage providers. |
 | **AWS S3** | Native standard | 5 GB free for 12 months (standard tier) | ~$0.09 / GB egress after free tier | **Standard Reference.** Works out-of-the-box with current `@aws-sdk/client-s3`, but carries ongoing egress risk if files are downloaded frequently. |
-| **Supabase Storage** | S3-compatible gateway over Postgres/Go | 1 GB free storage tier | Limited egress on free tier | Less suitable because LOFT already uses Neon as its primary Postgres database. |
+| **Supabase Storage** | S3-compatible gateway over Postgres/Go | 1 GB free storage tier | Limited egress on free tier | Less suitable because SyncTayo already uses Neon as its primary Postgres database. |
 
 ---
 

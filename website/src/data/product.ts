@@ -24,30 +24,30 @@ export const PAGES: {
   {
     id: "home",
     label: "Home",
-    title: "LOFT — One home for all your teams",
+    title: "SyncTayo — One home for all your teams",
     description:
-      "Bring your teams, tasks, calendars, chat, meetings, documents, and files into LOFT. See your whole workload and catch conflicts across workspaces.",
+      "Bring your teams, tasks, calendars, chat, meetings, documents, and files into SyncTayo. See your whole workload and catch conflicts across workspaces.",
   },
   {
     id: "features",
     label: "Features",
-    title: "LOFT features — Plan, collaborate, and stay organized",
+    title: "SyncTayo features — Plan, collaborate, and stay organized",
     description:
-      "Explore LOFT’s shared workspaces, My Plan, task boards, conflict alerts, real-time chat, video meetings, collaborative documents, storage, and Lofty, our AI assistant.",
+      "Explore SyncTayo’s shared workspaces, My Plan, task boards, conflict alerts, real-time chat, video meetings, collaborative documents, storage, and Lofty, our AI assistant.",
   },
   {
     id: "pricing",
     label: "Pricing",
-    title: "LOFT pricing — Open Beta & Upcoming Freemium Release",
+    title: "SyncTayo pricing — Open Beta & Upcoming Freemium Release",
     description:
-      "LOFT is currently in open beta with all workspace features unlocked. Experience the platform now ahead of our freemium official release.",
+      "SyncTayo is currently in open beta with all workspace features unlocked. Experience the platform now ahead of our freemium official release.",
   },
   {
     id: "about",
     label: "About",
-    title: "About LOFT — Built for life across teams",
+    title: "About SyncTayo — Built for life across teams",
     description:
-      "LOFT helps people coordinate school, work, organizations, and community commitments in one place, with a personal view across independent teams.",
+      "SyncTayo helps people coordinate school, work, organizations, and community commitments in one place, with a personal view across independent teams.",
   },
 ];
 
@@ -84,7 +84,7 @@ export const FEATURES = [
     Icon: CalendarRange,
     title: "Catch conflicts across teams",
     description:
-      "LOFT flags overlapping events, same-day task deadlines, and tasks due on meeting days across different workspaces, with links to the items involved.",
+      "SyncTayo flags overlapping events, same-day task deadlines, and tasks due on meeting days across different workspaces, with links to the items involved.",
     details: [
       "Cross-workspace meeting overlaps",
       "Deadline clashes between independent teams",
@@ -147,7 +147,7 @@ export const FEATURES = [
     id: "meetings",
     group: "collaborate",
     Icon: Video,
-    title: "Meet without leaving LOFT",
+    title: "Meet without leaving SyncTayo",
     description:
       "Start a workspace video call, share your screen, and annotate together. A floating mini-player keeps the call close while you visit other pages.",
     details: [
@@ -186,7 +186,7 @@ export const FEATURES = [
     id: "personalization",
     group: "access",
     Icon: Palette,
-    title: "Make LOFT feel like yours",
+    title: "Make SyncTayo feel like yours",
     description:
       "Update your profile and avatar, choose light or dark mode, and personalize your accent colors. Appearance preferences are saved on your device.",
     details: [
@@ -238,24 +238,24 @@ export const FEATURES = [
 
 export const FAQS = [
   {
-    question: "Who is LOFT for?",
+    question: "Who is SyncTayo for?",
     answer:
-      "LOFT is for people who belong to more than one team: students, professionals, project groups, organizations, and community groups. Each team gets its own workspace, while you get a personal view across your memberships.",
+      "SyncTayo is for people who belong to more than one team: students, professionals, project groups, organizations, and community groups. Each team gets its own workspace, while you get a personal view across your memberships.",
   },
   {
-    question: "What is LOFT’s current project status?",
+    question: "What is SyncTayo’s current project status?",
     answer:
-      "LOFT is a student-developed academic project currently in beta testing. The business concept is being developed for educational purposes.",
+      "SyncTayo is a student-developed academic project currently in beta testing. The business concept is being developed for educational purposes.",
   },
   {
-    question: "Is LOFT free to use?",
+    question: "Is SyncTayo free to use?",
     answer:
-      "Yes. LOFT is currently in open beta with all workspace features unlocked. When officially released, LOFT will feature a freemium model with a generous free tier alongside premium plans for advanced team and organizational needs.",
+      "Yes. SyncTayo is currently in open beta with all workspace features unlocked. When officially released, SyncTayo will feature a freemium model with a generous free tier alongside premium plans for advanced team and organizational needs.",
   },
   {
     question: "What does “Try for free” open?",
     answer:
-      "It opens the LOFT registration page to create an account and access the open beta. If you already have an account, use Log in in the navigation bar. LOFT verifies sign-in with an emailed code.",
+      "It opens the SyncTayo registration page to create an account and access the open beta. If you already have an account, use Log in in the navigation bar. SyncTayo verifies sign-in with an emailed code.",
   },
   {
     question: "Do my teams see each other’s work?",
@@ -263,14 +263,14 @@ export const FAQS = [
       "Workspace access is based on membership, roles, and feature permissions. Your personal dashboard combines work you can access; it does not grant one team access to another team’s workspace. Folders and documents can have additional member restrictions.",
   },
   {
-    question: "How does LOFT spot schedule conflicts?",
+    question: "How does SyncTayo spot schedule conflicts?",
     answer:
-      "LOFT compares events and unfinished tasks across your workspaces. It flags overlapping events, tasks from different teams due on the same day, and tasks due on days with another team’s meeting. You can review the linked items and decide what to change.",
+      "SyncTayo compares events and unfinished tasks across your workspaces. It flags overlapping events, tasks from different teams due on the same day, and tasks due on days with another team’s meeting. You can review the linked items and decide what to change.",
   },
   {
-    question: "Does LOFT connect to other collaboration tools?",
+    question: "Does SyncTayo connect to other collaboration tools?",
     answer:
-      "LOFT provides its own tasks, calendars, chat, meetings, documents, and storage. Google sign-in is supported; syncing Slack, Notion, Jira, or other external workspaces is not currently part of the service.",
+      "SyncTayo provides its own tasks, calendars, chat, meetings, documents, and storage. Google sign-in is supported; syncing Slack, Notion, Jira, or other external workspaces is not currently part of the service.",
   },
   {
     question: "What can Lofty, our AI assistant, do?",

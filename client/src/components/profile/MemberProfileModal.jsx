@@ -276,7 +276,7 @@ export default function MemberProfileModal({ open, onClose, userId, workspaceId 
           )}
 
           <p className="border-t border-ink-200/70 pt-3 text-[11px] text-ink-400 dark:border-white/[0.08]">
-            On LOFT since {monthYear(profile.user.createdAt)}
+            On SyncTayo since {monthYear(profile.user.createdAt)}
           </p>
         </div>
       )}

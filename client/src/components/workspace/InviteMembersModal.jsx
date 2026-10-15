@@ -24,12 +24,12 @@ function Outcome({ result }) {
     );
   }
   if (result.emailError) return <span className="text-amber-700 dark:text-amber-300">Email failed. Try sending the invite again.</span>;
-  if (result.notified) return <span className="text-ink-500 dark:text-ink-300">Not emailed, but notified in LOFT</span>;
+  if (result.notified) return <span className="text-ink-500 dark:text-ink-300">Not emailed, but notified in SyncTayo</span>;
   return <span className="text-amber-700 dark:text-amber-300">Not emailed. Copy their link from Pending invites</span>;
 }
 
 // Settings → Invite people. Type or paste any email address, or search for
-// someone who already has a LOFT account; each one becomes a chip. Sending
+// someone who already has a SyncTayo account; each one becomes a chip. Sending
 // emails everyone a link that joins them to the workspace, and the dialog
 // then reports what happened to each address before closing.
 export default function InviteMembersModal({ open, onClose, workspace, invites, emailEnabled, onSent }) {
@@ -61,7 +61,7 @@ export default function InviteMembersModal({ open, onClose, workspace, invites, 
     setOutcome(null);
   }, [open]);
 
-  // Searches LOFT accounts as the admin types, ignoring replies that arrive
+  // Searches SyncTayo accounts as the admin types, ignoring replies that arrive
   // after a newer keystroke has already started its own search.
   useEffect(() => {
     const q = query.trim();
@@ -251,14 +251,14 @@ export default function InviteMembersModal({ open, onClose, workspace, invites, 
       }
     >
       <p className="text-sm text-ink-500 dark:text-ink-400">
-        Search for someone on LOFT or enter any email address. Each person gets an email with a link to join{" "}
+        Search for someone on SyncTayo or enter any email address. Each person gets an email with a link to join{" "}
         <span className="font-medium text-ink-700 dark:text-ink-200">{workspace.name}</span>.
       </p>
 
       {!emailEnabled && (
         <p className="mt-4 flex gap-2 rounded-xl bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
           <Info className="mt-px h-4 w-4 shrink-0" />
-          Email isn't set up on the server yet, so nothing goes out by email. People who already use LOFT get a
+          Email isn't set up on the server yet, so nothing goes out by email. People who already use SyncTayo get a
           notification, and you can copy anyone's invite link from Pending invites.
         </p>
       )}
@@ -372,7 +372,7 @@ export default function InviteMembersModal({ open, onClose, workspace, invites, 
           })}
           {!searching && !typedIsNew && results.length === 0 && (
             <p className="px-2 py-2 text-sm text-ink-400">
-              No one on LOFT matches. Type their full email address to invite them.
+              No one on SyncTayo matches. Type their full email address to invite them.
             </p>
           )}
           {searching && results.length === 0 && <p className="px-2 py-2 text-sm text-ink-400">Searching…</p>}

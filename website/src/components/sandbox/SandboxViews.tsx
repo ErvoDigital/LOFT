@@ -1294,7 +1294,7 @@ function MeetingView({ workspaceId, navigate }: ViewProps) {
               </button>
             </div>
             <small className="ls-meeting-disclaimer">
-              This sample room simulates the controls in LOFT.
+              This sample room simulates the controls in SyncTayo.
             </small>
           </>
         )}
@@ -1368,7 +1368,7 @@ function DocsView({ workspaceId, data, setData, announce }: ViewProps) {
               />
             </div>
             <p className="ls-editor-note">
-              Edit this sample draft. In LOFT, your team co-edits rich-text
+              Edit this sample draft. In SyncTayo, your team co-edits rich-text
               documents with live sync.
             </p>
           </div>
@@ -1518,7 +1518,7 @@ function SettingsView({ workspaceId }: ViewProps) {
         subtitle={
           workspace
             ? "Workspace details and member access."
-            : "Your LOFT account preferences."
+            : "Your SyncTayo account preferences."
         }
       />
       <Card title={workspace ? "Workspace" : "Appearance"}>
@@ -1535,7 +1535,7 @@ function SettingsView({ workspaceId }: ViewProps) {
           </div>
         ) : (
           <p className="ls-settings-note">
-            Use the theme control in the top bar to explore LOFT in light or
+            Use the theme control in the top bar to explore SyncTayo in light or
             dark mode.
           </p>
         )}
@@ -1554,7 +1554,7 @@ function SettingsView({ workspaceId }: ViewProps) {
       </Card>
       <p className="ls-settings-note">
         Workspace invitations and account changes are available after signing in
-        to LOFT.
+        to SyncTayo.
       </p>
     </>
   );

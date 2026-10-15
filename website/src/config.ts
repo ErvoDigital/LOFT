@@ -1,4 +1,4 @@
-// The marketing site and the authenticated LOFT app are separate deployments.
+// The marketing site and the authenticated SyncTayo app are separate deployments.
 // Override this at build time to use a local or staging app.
 const appUrl =
   import.meta.env.VITE_LOFT_APP_URL?.trim() || "https://app.loft-client.site";

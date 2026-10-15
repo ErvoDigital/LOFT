@@ -71,7 +71,7 @@ describe("Account email and verification over HTTP (in-memory)", () => {
     Object.assign(process.env, {
       MAIL_PROVIDER: "smtp",
       JWT_SECRET: "auth-email-test-secret", SMTP_HOST: "smtp.test", SMTP_PORT: "587",
-      SMTP_USER: "sender@loft.test", SMTP_PASS: "test-password", MAIL_FROM: "LOFT <sender@loft.test>",
+      SMTP_USER: "sender@loft.test", SMTP_PASS: "test-password", MAIL_FROM: "SyncTayo <sender@loft.test>",
       CLIENT_URL: "https://loft.test/", GOOGLE_CLIENT_ID: "test-google-client", NODE_ENV: "development",
     });
     googleVerify = OAuth2Client.prototype.verifyIdToken;
@@ -139,7 +139,7 @@ describe("Account email and verification over HTTP (in-memory)", () => {
     assert.equal(res.body.token, undefined);
     assert.equal(res.body.user, undefined);
     assert.equal(res.body.code, undefined);
-    assert.deepEqual(sent.map((m) => m.subject).sort(), ["Welcome to Loft", "Your Loft sign-in verification code"]);
+    assert.deepEqual(sent.map((m) => m.subject).sort(), ["Welcome to SyncTayo", "Your SyncTayo sign-in verification code"]);
     assert.ok(sent.every((m) => m.to === "new@loft.test"));
     const emailCode = codeIn(sent.find((m) => /sign-in/.test(m.subject)));
     assert.ok(emailCode);
@@ -280,7 +280,7 @@ describe("Account email and verification over HTTP (in-memory)", () => {
       assert.equal(retried.body.twoFactorRequired, true);
       assert.equal(retried.body.token, undefined);
       const delivery = deliveries.at(-1);
-      assert.deepEqual(delivery.sender, { name: "Loft", email: "sender@loft.test" });
+      assert.deepEqual(delivery.sender, { name: "SyncTayo", email: "sender@loft.test" });
       assert.deepEqual(delivery.to, [{ email: "ada@loft.test" }]);
       const code = delivery.textContent.match(/^\d{6}$/m)?.[0];
       assert.ok(code);
@@ -313,7 +313,7 @@ describe("Account email and verification over HTTP (in-memory)", () => {
     const result = await call("/auth/forgot-password", { email: "ada@loft.test" });
     assert.equal(result.status, 200);
     assert.equal(result.body.resetToken, undefined);
-    assert.equal(sent[0].subject, "Reset your Loft password");
+    assert.equal(sent[0].subject, "Reset your SyncTayo password");
     const token = sent[0].text.match(/https:\/\/loft.test\/reset-password\?token=([a-f0-9]+)/)[1];
     assert.notEqual(users[0].resetToken, token);
     assert.equal((await call("/auth/reset-password", { token, password: "new-password" })).status, 200);
@@ -338,7 +338,7 @@ describe("Account email and verification over HTTP (in-memory)", () => {
     const sentResponse = await call("/users/me/password-change/send-code", {}, authToken);
     assert.equal(sentResponse.status, 200);
     assert.equal(sentResponse.body.code, undefined);
-    assert.equal(sent[0].subject, "Your Loft password change verification code");
+    assert.equal(sent[0].subject, "Your SyncTayo password change verification code");
     const code = latestCode();
     assert.equal((await call("/users/me/password-change/verify-code", { code }, authToken)).status, 200);
     assert.equal(challenges[0].attempts, 0);
@@ -383,7 +383,7 @@ describe("Account email and verification over HTTP (in-memory)", () => {
   });
 
   it("surfaces a welcome-email failure after signup without losing the verification challenge", async () => {
-    transportFailure = (m) => m.subject === "Welcome to Loft";
+    transportFailure = (m) => m.subject === "Welcome to SyncTayo";
     const result = await call("/auth/register", { firstName: "New", email: "new@loft.test", password: "correct-password" });
     assert.equal(result.status, 201);
     assert.equal(result.body.welcomeEmailSent, false);

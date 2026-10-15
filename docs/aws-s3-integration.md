@@ -2,7 +2,7 @@
 
 ## Evidence and verification scope
 
-This document describes the implementation present in the LOFT repository as inspected on 2026-10-04. Its primary code sources are:
+This document describes the implementation present in the SyncTayo repository as inspected on 2026-10-04. Its primary code sources are:
 
 - `server/src/utils/uploads.js`, `server/src/utils/uploadValidation.js`, and `server/src/middleware/storageUpload.js`
 - `server/src/controllers/assets.controller.js`, `server/src/services/uploadCompensation.js`, `server/src/services/assetStorage.js`, and `server/src/services/conversationPurge.js`
@@ -15,7 +15,7 @@ No AWS or Vercel console was accessed for this review. The bucket, region, servi
 
 ## 1. Overview
 
-LOFT uses object storage for file bytes. The browser sends uploads to the LOFT server, the server stores the bytes in S3, and PostgreSQL stores the logical asset and version metadata. The currently implemented object-storage use cases are:
+SyncTayo uses object storage for file bytes. The browser sends uploads to the SyncTayo server, the server stores the bytes in S3, and PostgreSQL stores the logical asset and version metadata. The currently implemented object-storage use cases are:
 
 - workspace assets in the Storage UI;
 - additional versions of an existing asset;
@@ -28,8 +28,8 @@ Rich-text document image uploads are not part of this integration: `client/src/l
 
 | Service | Role | Configuration status |
 | --- | --- | --- |
-| LOFT client — `https://loft-client.vercel.app` | Upload UI; requests download authorization; fetches an authorized object directly from S3 for preview or download | Team-provided URL; **requires cloud-console confirmation** |
-| LOFT server — `https://loft-server-delta.vercel.app` | Authenticates and authorizes users, validates uploads, performs S3 writes/deletes, and creates presigned reads | Team-provided URL; **requires cloud-console confirmation** |
+| SyncTayo client — `https://loft-client.vercel.app` | Upload UI; requests download authorization; fetches an authorized object directly from S3 for preview or download | Team-provided URL; **requires cloud-console confirmation** |
+| SyncTayo server — `https://loft-server-delta.vercel.app` | Authenticates and authorizes users, validates uploads, performs S3 writes/deletes, and creates presigned reads | Team-provided URL; **requires cloud-console confirmation** |
 | Neon PostgreSQL | Stores `Asset`, `AssetVersion`, `Folder`, task, conversation, and message relationships; file bytes are not stored here | The code uses Prisma/PostgreSQL via `DATABASE_URL`, and the repository identifies Neon for its database workflow; the deployed connection **requires cloud-console confirmation** |
 | AWS S3 | Stores physical file objects | Team-provided service and bucket settings; **requires cloud-console confirmation** |
 
@@ -55,7 +55,7 @@ The repository does not contain infrastructure-as-code that defines this bucket,
 | Client | Sends `multipart/form-data` uploads to the server; asks the server for download authorization; validates that the returned URL uses HTTP(S); fetches the object from S3 with `credentials: "omit"`; creates a browser blob URL for preview/download. |
 | Server | Requires authentication and workspace membership; enforces task, conversation, folder, uploader, and `files.manage` rules; validates the upload; generates the physical name; calls S3; writes metadata; presigns authorized reads; coordinates deletion and compensation. |
 | PostgreSQL | Holds logical asset/folder/task/chat relationships and version metadata: original filename, server-generated stored name, MIME type, byte size, uploader, version number, and timestamps. |
-| S3 | Holds bytes at a workspace-prefixed object key. It does not decide LOFT workspace or restricted-folder authorization. |
+| S3 | Holds bytes at a workspace-prefixed object key. It does not decide SyncTayo workspace or restricted-folder authorization. |
 
 ### Upload flow
 
@@ -78,7 +78,7 @@ Workspace, task, chat, and version uploads all use this compensation service. Ve
 
 ### Download flow
 
-Download uses the same authorization endpoint and direct S3 `GET` as preview. After receiving the blob, the client creates a temporary object URL, clicks an `<a download>` element using `AssetVersion.originalName`, and revokes the object URL. The LOFT bearer token is sent only to the LOFT API and is not forwarded to S3.
+Download uses the same authorization endpoint and direct S3 `GET` as preview. After receiving the blob, the client creates a temporary object URL, clicks an `<a download>` element using `AssetVersion.originalName`, and revokes the object URL. The SyncTayo bearer token is sent only to the SyncTayo API and is not forwarded to S3.
 
 ### Delete flow
 
@@ -105,7 +105,7 @@ Deleting a task deletes all attachment objects before deleting the task. Convers
 
 ## 7. Environment variables
 
-Only the LOFT server should receive these variables.
+Only the SyncTayo server should receive these variables.
 
 | Variable | Secret? | Description |
 | --- | --- | --- |
@@ -163,7 +163,7 @@ The browser performs only a credential-omitted `GET` to S3. Upload and delete ca
 ]
 ```
 
-Do not replace the origins with `*`. This S3 policy is separate from the Express CORS configuration in `server/src/app.js`, which allows the single origin in `CLIENT_URL` and enables credentials for LOFT API requests.
+Do not replace the origins with `*`. This S3 policy is separate from the Express CORS configuration in `server/src/app.js`, which allows the single origin in `CLIENT_URL` and enables credentials for SyncTayo API requests.
 
 ## 10. Upload security
 
@@ -206,7 +206,7 @@ These controls reduce inconsistency but are not durable across process terminati
 
 ## 11. Deployment
 
-Configure all five AWS variable names in the Vercel project that deploys the LOFT server, not the client project. At minimum, region, bucket, access-key ID, and secret access key must be present for storage endpoints to work. Leave the endpoint override blank for native AWS S3.
+Configure all five AWS variable names in the Vercel project that deploys the SyncTayo server, not the client project. At minimum, region, bucket, access-key ID, and secret access key must be present for storage endpoints to work. Leave the endpoint override blank for native AWS S3.
 
 Vercel Production and Preview are separate configuration scopes. Configure and validate each scope intentionally:
 
@@ -240,7 +240,7 @@ Result: **44 passed, 0 failed** across 9 suites. These are offline implementatio
 1. Use non-production AWS credentials and a test workspace. Confirm the server has its AWS variables and that the client targets the local server.
 2. Upload one accepted file. Confirm the API returns 201, an asset/version row exists, and S3 contains exactly one object at `<workspaceId>/<storedName>`.
 3. Try an oversized, forbidden, signature-mismatched, and path-bearing filename; confirm each fails and creates neither an S3 object nor metadata.
-4. Preview an image, PDF, and DOCX. In browser developer tools, confirm the LOFT API first returns `{ url }`, followed by a direct S3 `GET` without the LOFT Authorization header.
+4. Preview an image, PDF, and DOCX. In browser developer tools, confirm the SyncTayo API first returns `{ url }`, followed by a direct S3 `GET` without the SyncTayo Authorization header.
 5. Download a file and confirm the saved filename matches `originalName`.
 6. Verify an unauthorized workspace user or restricted-folder outsider cannot obtain a URL.
 7. Delete the asset and verify all version keys disappear from S3 and the metadata is removed. Repeat for a task with attachments and a conversation with chat attachments.
@@ -250,16 +250,16 @@ Result: **44 passed, 0 failed** across 9 suites. These are offline implementatio
 1. In authorized consoles, confirm the server Production variables, exact region/bucket, credential identity, bucket public-access block/private policy, encryption expectations, and the two non-wildcard CORS origins.
 2. Confirm the deployed client API base, server `CLIENT_URL`, health endpoint, and client/server release compatibility.
 3. With a non-sensitive test file and a least-privileged test account, exercise workspace upload, version upload, task attachment, and chat attachment.
-4. Verify preview and download in browser network tools: API authorization succeeds, direct S3 `GET` succeeds, no LOFT bearer token reaches S3, and the URL expires after approximately five minutes.
+4. Verify preview and download in browser network tools: API authorization succeeds, direct S3 `GET` succeeds, no SyncTayo bearer token reaches S3, and the URL expires after approximately five minutes.
 5. Verify restricted-folder and conversation access with a second user who should be denied.
-6. Delete the test records through LOFT and confirm the physical objects are absent from S3.
+6. Delete the test records through SyncTayo and confirm the physical objects are absent from S3.
 7. Review server logs for safe error summaries only; do not copy or log presigned URLs or credentials.
 
 Successful completion of this checklist—not code presence or offline tests—is the basis for declaring a deployment verified.
 
 ### Confirming deletion from S3
 
-Before deletion, obtain the `AssetVersion.storedName` through authorized database administration and construct `<workspaceId>/<storedName>`. After deleting through LOFT, inspect that exact key in the S3 console or use an authorized `HeadObject`/equivalent check. The expected outcome is not-found. Also confirm the corresponding `Asset`/`AssetVersion` metadata is gone. Do not infer physical deletion only from the UI, and do not expose the database connection or any signed URL while collecting evidence.
+Before deletion, obtain the `AssetVersion.storedName` through authorized database administration and construct `<workspaceId>/<storedName>`. After deleting through SyncTayo, inspect that exact key in the S3 console or use an authorized `HeadObject`/equivalent check. The expected outcome is not-found. Also confirm the corresponding `Asset`/`AssetVersion` metadata is gone. Do not infer physical deletion only from the UI, and do not expose the database connection or any signed URL while collecting evidence.
 
 ### Common failures
 
@@ -271,7 +271,7 @@ Before deletion, obtain the `AssetVersion.storedName` through authorized databas
 | `Invalid filename` / `Filename must be at most 255 UTF-8 bytes` | Empty/path-bearing/control-character/encoded-separator name or excessive UTF-8 length. |
 | `File type is not allowed` (415) | Extension and declared MIME pair is not on the allowlist. |
 | `File content does not match its declared type` (415) | Signature/OOXML structure/text safety checks failed. |
-| Membership, folder, conversation, uploader, or permission 403 | LOFT authorization rejected the request before signing or mutation. |
+| Membership, folder, conversation, uploader, or permission 403 | SyncTayo authorization rejected the request before signing or mutation. |
 | `Failed to delete stored object` (502) | S3 deletion failed for a reason other than not-found; check IAM, bucket/region/key configuration, and AWS availability. Metadata is intentionally retained. |
 | `File upload could not be completed` (500) | Metadata persistence failed after upload and the compensating S3 delete also failed. An orphan is possible and logs contain the workspace/object identifiers for controlled reconciliation. |
 | `File download link is unavailable` | Server response omitted a parseable HTTP(S) URL or client/server contracts do not match. |

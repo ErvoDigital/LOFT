@@ -1,4 +1,4 @@
-# LOFT — Roadmap
+# SyncTayo — Roadmap
 
 Status snapshot and a detailed plan for what's left. See the [README](../README.md) for setup and a summary of what's already built and verified.
 
@@ -69,7 +69,7 @@ As part of the same pass, the call itself was also made to survive navigation: t
 
 The [consolidated AI integration plan](ai/AI-Workspace-Assistant-Integration-OpenClaw.md) is the source of truth for AI architecture, tool contracts, workstreams A–E, and acceptance tests. It combines both new AI documents with the current code. [AI setup](ai/README.md) describes the implemented integration; [Lightsail deployment](ai/LIGHTSAIL.md) describes gateway hosting.
 
-Keep the product intent: ordinary language lets users understand and operate work across their permitted teams, while LOFT owns data, permissions, workflow logic, final actions, and deterministic priorities. The assistant is embedded in LOFT and uses its existing backend.
+Keep the product intent: ordinary language lets users understand and operate work across their permitted teams, while SyncTayo owns data, permissions, workflow logic, final actions, and deterministic priorities. The assistant is embedded in SyncTayo and uses its existing backend.
 
 ### 7. Assistant foundation and V1 tools
 

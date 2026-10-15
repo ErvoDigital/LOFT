@@ -260,7 +260,7 @@ describe("Workspace invites (in-memory)", () => {
 
     assert.equal(sentMail.length, 2);
     const toNew = sentMail.find((m) => m.to === "new@x.test");
-    assert.equal(toNew.subject, "Ada Admin invited you to join Studio <b>One</b> on Loft");
+    assert.equal(toNew.subject, "Ada Admin invited you to join Studio <b>One</b> on SyncTayo");
     assert.ok(toNew.html.includes("Studio &lt;b&gt;One&lt;/b&gt;"), "workspace name is escaped in the HTML");
     assert.ok(!toNew.html.includes("<b>One</b>"));
 

@@ -4,7 +4,7 @@ import { Building2, FolderOpen, ListChecks, Users } from "lucide-react";
 // member from Settings → Members → Access. The keys mirror the server's
 // services/permissions.js, which is what actually enforces them; this file
 // only describes them and decides what the UI shows. Grouped by the part of
-// LOFT each one unlocks.
+// SyncTayo each one unlocks.
 export const ABILITY_GROUPS = [
   {
     key: "work",

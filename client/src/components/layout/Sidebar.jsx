@@ -421,7 +421,7 @@ export default function Sidebar({ assistantControlsRef }) {
             </div>
           </div>
           <div className="brand-mark mb-1 flex h-9 w-9 items-center justify-center rounded-xl font-bold text-white shadow-glow-sm">
-            L
+            S
           </div>
         </div>
         <NavLink to="/" end title="Dashboard" className={({ isActive }) => navItemClass({ isActive }) + " !px-0 !py-0 h-10 w-10 justify-center"}>

@@ -35,7 +35,7 @@ function messages(name = "Ada", link = "https://www.loft-client.site/?a=1&b=2") 
   ];
 }
 
-test("all five email types serialize Loft sender identity and real HTML/text MIME alternatives", async () => {
+test("all five email types serialize SyncTayo sender identity and real HTML/text MIME alternatives", async () => {
   const stream = nodemailer.createTransport({ streamTransport: true, buffer: true, newline: "unix" });
   const captured = [];
   setMailTransport({ sendMail: async (options) => {
@@ -46,8 +46,8 @@ test("all five email types serialize Loft sender identity and real HTML/text MIM
   for (const message of messages()) await sendMail({ to: "recipient@example.com", ...message });
   assert.equal(captured.length, 5);
   for (const mime of captured) {
-    assert.match(mime, /^From: Loft <sender@example\.com>$/m);
-    assert.match(mime, /^Reply-To: Loft <support@loft-client\.site>$/m);
+    assert.match(mime, /^From: SyncTayo <sender@example\.com>$/m);
+    assert.match(mime, /^Reply-To: SyncTayo <support@loft-client\.site>$/m);
     assert.match(mime, /Content-Type: multipart\/alternative/);
     assert.match(mime, /Content-Type: text\/plain; charset=utf-8/);
     assert.match(mime, /Content-Type: text\/html; charset=utf-8/);

@@ -685,7 +685,7 @@ function corsOk(request) {
 export default {
   async fetch(request) {
     if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") {
-      return new Response("Loft realtime service", { status: 200 });
+      return new Response("SyncTayo realtime service", { status: 200 });
     }
     if (!corsOk(request)) return new Response("forbidden", { status: 403 });
 

@@ -1,4 +1,4 @@
-// LOFT's color system as data, shared by tailwind.config.js (which turns it
+// SyncTayo's color system as data, shared by tailwind.config.js (which turns it
 // into CSS variables with these values as the defaults) and the runtime theme
 // switcher (which overwrites those variables with a palette derived from the
 // user's chosen color). Keep this file free of browser APIs — Tailwind

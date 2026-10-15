@@ -25,7 +25,7 @@ export function Navbar({ currentPage }: { currentPage: PageType }) {
   return (
     <header className="site-header">
       <div className="container header-inner">
-        <a href="#/" aria-label="LOFT home">
+        <a href="#/" aria-label="SyncTayo home">
           <Brand />
         </a>
         <nav className="desktop-nav" aria-label="Main navigation">

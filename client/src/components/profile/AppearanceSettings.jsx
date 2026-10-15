@@ -62,7 +62,7 @@ export default function AppearanceSettings() {
 
       <p className="mb-0.5 mt-6 text-sm font-medium text-ink-600 dark:text-ink-200">Theme color</p>
       <p className="mb-3 text-xs text-ink-500 dark:text-ink-400">
-        Colors buttons, highlights, icons and the background glow across LOFT.
+        Colors buttons, highlights, icons and the background glow across SyncTayo.
       </p>
       <div role="radiogroup" aria-label="Theme color" className="flex flex-wrap gap-x-3 gap-y-4">
         {PRESETS.map((p) => {
@@ -124,7 +124,7 @@ export default function AppearanceSettings() {
 
       {isCustom && (
         <p className="mt-4 text-xs text-ink-500 dark:text-ink-400">
-          Built from <span className="font-mono font-medium text-ink-700 dark:text-ink-200">{accent}</span>. LOFT
+          Built from <span className="font-mono font-medium text-ink-700 dark:text-ink-200">{accent}</span>. SyncTayo
           adjusts how light or dark each shade is so text on it stays readable.
         </p>
       )}

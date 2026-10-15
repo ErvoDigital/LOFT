@@ -18,7 +18,7 @@ export function fileFailure(error, action = "download") {
   }
   if (status === 429) return failure("Please try again in a moment", "Too many file requests were made at once. Wait a moment, then try again.");
   if (status >= 500 || error?.code === "FILE_LINK_UNAVAILABLE") {
-    return failure("The file is temporarily unavailable", "LOFT couldn't retrieve this file right now. Please try again in a moment.");
+    return failure("The file is temporarily unavailable", "SyncTayo couldn't retrieve this file right now. Please try again in a moment.");
   }
   return action === "preview"
     ? failure("Preview unavailable", "We couldn't display this file here. Try the preview again, or download it to open it in another app.")

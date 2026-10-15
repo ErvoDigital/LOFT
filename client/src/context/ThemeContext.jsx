@@ -40,7 +40,7 @@ function applyFavicon(accent, palette) {
     `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>` +
     `<stop offset='0' stop-color='${rgb("brand-500")}'/><stop offset='1' stop-color='${rgb("brand-800")}'/></linearGradient></defs>` +
     `<rect width='32' height='32' rx='7' fill='url(#g)'/><text x='16' y='22' font-family='Arial, sans-serif' font-size='17' ` +
-    `font-weight='700' fill='#F4F7F6' text-anchor='middle'>L</text></svg>`;
+    `font-weight='700' fill='#F4F7F6' text-anchor='middle'>S</text></svg>`;
   link.setAttribute("href", `data:image/svg+xml,${encodeURIComponent(svg)}`);
 }
 

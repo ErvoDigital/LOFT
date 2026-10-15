@@ -15,7 +15,7 @@ function formatDuration(minutes) {
   return `${h}h ${rest}m`;
 }
 
-// True for an event whose location is a LOFT meeting link (what
+// True for an event whose location is a SyncTayo meeting link (what
 // ScheduleMeetingModal fills in), vs. a plain calendar event/appointment.
 function isMeetingEvent(event) {
   return typeof event.location === "string" && event.location.includes("/meeting");

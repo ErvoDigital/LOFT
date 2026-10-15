@@ -48,7 +48,7 @@ export function meetingCalendarFile(event, now = new Date()) {
     }
     return result;
   };
-  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//LOFT//Meetings//EN", "CALSCALE:GREGORIAN", "BEGIN:VEVENT", `UID:${escape(event.id)}@loft`, `DTSTAMP:${utc(now)}`, `DTSTART:${utc(event.startTime)}`, `DTEND:${utc(event.endTime)}`, `SUMMARY:${escape(event.title)}`, `DESCRIPTION:${escape(event.description)}`, `LOCATION:${escape(event.location)}`, "END:VEVENT", "END:VCALENDAR"].map(fold).join("\r\n") + "\r\n";
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//SyncTayo//Meetings//EN", "CALSCALE:GREGORIAN", "BEGIN:VEVENT", `UID:${escape(event.id)}@loft`, `DTSTAMP:${utc(now)}`, `DTSTART:${utc(event.startTime)}`, `DTEND:${utc(event.endTime)}`, `SUMMARY:${escape(event.title)}`, `DESCRIPTION:${escape(event.description)}`, `LOCATION:${escape(event.location)}`, "END:VEVENT", "END:VCALENDAR"].map(fold).join("\r\n") + "\r\n";
 }
 
 export function downloadMeetingCalendar(event) {

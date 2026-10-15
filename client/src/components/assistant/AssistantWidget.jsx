@@ -11,7 +11,7 @@ import { createAssistantAudio } from "../../utils/assistantAudio.js";
 import { assistantStatus, sendAssistantMessage, confirmAssistantAction, speakAssistantReply, transcribeAssistantAudio } from "../../api/assistant.js";
 import { apiErrorMessage } from "../../api/client.js";
 
-// Supported by the LOFT tools exposed to the OpenClaw gateway.
+// Supported by the SyncTayo tools exposed to the OpenClaw gateway.
 const SUGGESTIONS = [
   "What do I need to do today?",
   "What should I work on first?",
@@ -599,7 +599,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
             <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4" aria-live="polite">
               <div className="space-y-1.5">
                 <p className="text-sm font-semibold text-ink-900 dark:text-ink-50">
-                  Hi{firstName ? ` ${firstName}` : ""}, I'm Lofty, your LOFT workspace assistant.
+                  Hi{firstName ? ` ${firstName}` : ""}, I'm Lofty, your SyncTayo workspace assistant.
                 </p>
                 <p className="text-sm leading-relaxed text-ink-600 dark:text-ink-300">
                   I can help you plan from your tasks and events, and prepare tasks and meetings for you to confirm.

@@ -152,7 +152,7 @@ export function createSpeechHandler(action, { config = gatewaySpeechConfig(), fe
 
 export default {
   id: "loft-speech",
-  name: "LOFT speech",
+  name: "SyncTayo speech",
   register(api) {
     api.registerHttpRoute({ path: "/v1/audio/transcriptions", auth: "gateway", match: "exact", handler: createSpeechHandler("transcribe") });
     api.registerHttpRoute({ path: "/v1/audio/speech", auth: "gateway", match: "exact", handler: createSpeechHandler("speak") });

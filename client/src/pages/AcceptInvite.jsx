@@ -61,7 +61,7 @@ export default function AcceptInvite() {
           Ask the person who invited you to send a new invite, or to share the workspace code.
         </p>
         <Link to="/" className="btn-secondary mt-5 w-full">
-          Go to LOFT
+          Go to SyncTayo
         </Link>
       </AuthLayout>
     );
@@ -97,7 +97,7 @@ export default function AcceptInvite() {
           one.
         </p>
         <Link to="/" className="btn-secondary mt-4 w-full">
-          Go to LOFT
+          Go to SyncTayo
         </Link>
       </>
     );
@@ -155,7 +155,7 @@ export default function AcceptInvite() {
   }
 
   return (
-    <AuthLayout title="You're invited" subtitle={`${invitedBy.name} invited you to a workspace on LOFT`}>
+    <AuthLayout title="You're invited" subtitle={`${invitedBy.name} invited you to a workspace on SyncTayo`}>
       <div className="flex items-center gap-3">
         <WorkspaceMark
           name={workspace.name}

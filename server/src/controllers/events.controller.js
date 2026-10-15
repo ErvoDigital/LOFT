@@ -40,7 +40,7 @@ export async function listWorkspaceEvents(req, res) {
 }
 
 // Merges events across every workspace the caller belongs to — the "one
-// calendar" view that is the point of LOFT.
+// calendar" view that is the point of SyncTayo.
 export async function listMyEvents(req, res) {
   const { from, to } = req.query;
   const where = {

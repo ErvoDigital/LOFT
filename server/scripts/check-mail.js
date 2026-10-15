@@ -15,7 +15,7 @@ try {
   await verifyMailConnection();
   console.log(`${mailProvider() === "brevo" ? "Brevo credentials and verified sender" : "SMTP connection, TLS and authentication"} verified.`);
   if (sending) {
-    const name = "Loft email test";
+    const name = "SyncTayo email test";
     const messages = [
       buildWelcomeEmail({ name, email }),
       buildPasswordResetEmail({ name, email, link: clientUrl("/") }),
@@ -26,7 +26,7 @@ try {
     for (const message of messages) {
       await sendMail({
         to: email,
-        subject: `[Loft email test] ${message.subject}`,
+        subject: `[SyncTayo email test] ${message.subject}`,
         text: `DELIVERY TEST ONLY. Links and codes in this email do not perform any account action.\n\n${message.text}`,
         html: message.html.replace(/(<body[^>]*>)/, '$1<p style="text-align:center;">DELIVERY TEST ONLY. Links and codes do not perform any account action.</p>'),
       });

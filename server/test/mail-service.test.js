@@ -74,7 +74,7 @@ test("missing configuration stops delivery before making a request", async () =>
   assert.equal(requests.length, 0);
 });
 
-test("all five email types retain Loft identity, HTML, text and recipients through Brevo", async () => {
+test("all five email types retain SyncTayo identity, HTML, text and recipients through Brevo", async () => {
   process.env.MAIL_REPLY_TO = "Support <replies@example.com>";
   const sample = { name: "Ada", email: "user@example.com", link: "https://app.loft-client.site/" };
   const messages = [
@@ -97,10 +97,10 @@ test("all five email types retain Loft identity, HTML, text and recipients throu
     assert.equal(options.headers["api-key"], "test-api-secret");
     assert.ok(options.signal instanceof AbortSignal);
     assert.deepEqual(JSON.parse(options.body), {
-      sender: { name: "Loft", email: "sender@example.com" },
+      sender: { name: "SyncTayo", email: "sender@example.com" },
       to: [{ email: sample.email }], subject: messages[index].subject,
       htmlContent: messages[index].html, textContent: messages[index].text,
-      replyTo: { name: "Loft", email: "replies@example.com" },
+      replyTo: { name: "SyncTayo", email: "replies@example.com" },
     });
     assert.ok(!options.body.includes("test-api-secret"));
   });

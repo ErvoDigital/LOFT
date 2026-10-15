@@ -34,7 +34,7 @@ function useTitle() {
     if (location.pathname.includes("/docs")) return { context, title: "Docs" };
     return { title: workspace.name };
   }
-  return { title: "LOFT" };
+  return { title: "SyncTayo" };
 }
 
 export default function AppShell() {

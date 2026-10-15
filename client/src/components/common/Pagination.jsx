@@ -1,5 +1,5 @@
 // Previous, page numbers, Next. Worded rather than arrowed, like every other
-// control in LOFT. Long runs keep the first and last page and the ones either
+// control in SyncTayo. Long runs keep the first and last page and the ones either
 // side of the current page, so the control stays seven slots wide; phones get
 // "2 of 5" in place of the numbers.
 function pageList(page, count) {

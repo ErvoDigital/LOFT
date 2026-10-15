@@ -102,9 +102,9 @@ export default function MobileNav({ open, onClose }) {
       >
         <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-ink-900/[0.06] px-4 pt-[env(safe-area-inset-top)] dark:border-white/[0.06]">
           <div className="brand-mark flex h-8 w-8 items-center justify-center rounded-xl text-sm font-bold text-white shadow-glow-sm">
-            L
+            S
           </div>
-          <span className="flex-1 text-sm font-bold tracking-[0.18em] text-ink-900 dark:text-ink-50">LOFT</span>
+          <span className="flex-1 text-sm font-bold tracking-[0.18em] text-ink-900 dark:text-ink-50">SyncTayo</span>
           <button
             ref={closeRef}
             onClick={onClose}

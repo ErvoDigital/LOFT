@@ -1,10 +1,10 @@
-# Engineering Blueprint: LOFT AI Workspace Assistant Integration (OpenClaw)
+# Engineering Blueprint: SyncTayo AI Workspace Assistant Integration (OpenClaw)
 
-> **V1 decision:** Keep the AI architecture simple for the presentation prototype: **OpenClaw + GPT-5.6 + LOFT backend tools**.
+> **V1 decision:** Keep the AI architecture simple for the presentation prototype: **OpenClaw + GPT-5.6 + SyncTayo backend tools**.
 
 ## 1. Project Objective
 
-LOFT needs an embedded AI Workspace Assistant that lets users naturally speak or type requests and have LOFT help them understand and operate their work across the independent teams they belong to.
+SyncTayo needs an embedded AI Workspace Assistant that lets users naturally speak or type requests and have SyncTayo help them understand and operate their work across the independent teams they belong to.
 
 The V1 assistant should demonstrate:
 
@@ -14,10 +14,10 @@ The V1 assistant should demonstrate:
 - Message drafting and, if implemented, controlled message sending
 - Summaries of workspace content
 - Cross-team agenda/workload queries
-- Auto-Reprioritization using LOFT's deterministic Smart Priority engine
+- Auto-Reprioritization using SyncTayo's deterministic Smart Priority engine
 - Optional voice interaction if time permits
 
-The assistant is an interaction layer over LOFT, not a separate chatbot or replacement for the normal UI.
+The assistant is an interaction layer over SyncTayo, not a separate chatbot or replacement for the normal UI.
 
 ## 2. V1 Technology Decision
 
@@ -25,8 +25,8 @@ The assistant is an interaction layer over LOFT, not a separate chatbot or repla
 
 - **Agent harness:** OpenClaw
 - **V1 reasoning model:** GPT-5.6
-- **Application:** LOFT web application
-- **Backend:** LOFT server/API
+- **Application:** SyncTayo web application
+- **Backend:** SyncTayo server/API
 - **Database:** Supabase Postgres with RLS
 - **Validation:** Zod
 - **Optional semantic retrieval:** PostgreSQL `pgvector`
@@ -52,7 +52,7 @@ DeepSeek, Gemini, Claude, and other providers may be evaluated later after the V
 User
   |
   v
-LOFT AI Assistant UI
+SyncTayo AI Assistant UI
   |
   v
 OpenClaw
@@ -65,12 +65,12 @@ Natural-language reasoning
   +-----------------------------+
   |                             |
   v                             v
-Approved LOFT Tools       Smart Priority Engine
+Approved SyncTayo Tools       Smart Priority Engine
   |                             |
   +-------------+---------------+
                 |
                 v
-          LOFT Server/API
+          SyncTayo Server/API
                 |
                 v
        Supabase Postgres + RLS
@@ -95,7 +95,7 @@ Approved LOFT Tools       Smart Priority Engine
 - Conversation handling
 - Streaming agent responses
 
-**LOFT backend**
+**SyncTayo backend**
 
 - Authentication
 - Authorization
@@ -194,7 +194,7 @@ V1 should prefer normal database queries for structured information. `pgvector` 
 
 ### `summarize_content`
 
-Summarizes content already retrieved and authorized by LOFT.
+Summarizes content already retrieved and authorized by SyncTayo.
 
 ### `draft_message`
 
@@ -217,7 +217,7 @@ The user should be able to use simple wording without causing large model reques
 5. Use structured tool arguments.
 6. Keep tool results minimal.
 7. Limit conversation history and use a compact summary when needed.
-8. Calculate deterministic values in LOFT instead of asking the model to calculate them.
+8. Calculate deterministic values in SyncTayo instead of asking the model to calculate them.
 9. Keep successful assistant responses concise.
 10. Resolve relative dates using the server-generated current timestamp.
 
@@ -230,7 +230,7 @@ User:
         |
         v
 
-LOFT backend queries only tomorrow's permitted tasks
+SyncTayo backend queries only tomorrow's permitted tasks
         |
         v
 
@@ -252,7 +252,7 @@ User:
 "Reprioritize my tasks."
         |
         v
-LOFT retrieves active tasks
+SyncTayo retrieves active tasks
         |
         v
 Smart Priority engine
@@ -304,7 +304,7 @@ User review
         +--> Approve
                  |
                  v
-              LOFT Tasks
+              SyncTayo Tasks
 ```
 
 AI-generated action items are drafts and must not automatically become tasks without approval.
@@ -401,13 +401,13 @@ Validated result
 ## 12. V1 Demo Flow
 
 ```text
-1. User opens LOFT.
+1. User opens SyncTayo.
 2. User asks: "What do I need to do today?"
 3. Assistant retrieves the user's permitted agenda.
 4. GPT-5.6 summarizes it.
 5. User says: "Add a task to finish the presentation tomorrow."
 6. Assistant calls create_task.
-7. Task appears in LOFT.
+7. Task appears in SyncTayo.
 8. User asks: "What should I work on first?"
 9. Smart Priority calculates the ranking.
 10. GPT-5.6 explains the ranking.
@@ -430,7 +430,7 @@ Validated result
 - [ ] Meetings can be prepared and created after confirmation.
 - [ ] Workspace content can be summarized.
 - [ ] My Plan data can be queried across permitted teams.
-- [ ] Auto-Reprioritization uses LOFT's deterministic priority engine.
+- [ ] Auto-Reprioritization uses SyncTayo's deterministic priority engine.
 - [ ] Priority explanations are grounded in actual factors.
 - [ ] Tool calls are server-side and authorized.
 - [ ] Large unrelated workspace datasets are not sent to the model.

@@ -34,12 +34,12 @@ export default function TermsModal({ open, onClose, onAgree }) {
       >
         <h3 className="font-semibold text-ink-800 dark:text-ink-100">Terms of Service</h3>
         <p>
-          By creating a LOFT account, you agree to use the workspace for lawful purposes and to keep your
+          By creating a SyncTayo account, you agree to use the workspace for lawful purposes and to keep your
           login credentials confidential. You're responsible for the content you post, upload, or share
           within your workspaces, and for anyone you invite into them.
         </p>
         <p>
-          LOFT is provided "as is" without warranties of any kind. We may update, suspend, or discontinue
+          SyncTayo is provided "as is" without warranties of any kind. We may update, suspend, or discontinue
           features at any time, and we'll do our best to give notice of any change that meaningfully affects
           how you use the product.
         </p>

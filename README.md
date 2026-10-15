@@ -1,6 +1,8 @@
-# LOFT
+# SyncTayo
 
-A unified productivity and collaboration platform for people juggling multiple independent teams — school, work, orgs, church — in one synchronized workspace. LOFT's core differentiator: it actively surfaces **cross-workspace conflicts** (two deadlines from unrelated groups landing on the same day, overlapping meetings) instead of leaving you to notice them yourself.
+A unified productivity and collaboration platform for people juggling multiple independent teams — school, work, orgs, church — in one synchronized workspace. SyncTayo's core differentiator: it actively surfaces **cross-workspace conflicts** (two deadlines from unrelated groups landing on the same day, overlapping meetings) instead of leaving you to notice them yourself.
+
+The AI workspace assistant is **Lofty**. Existing deployment names, domains, and internal identifiers retain their current values for compatibility.
 
 ## Tech stack
 
@@ -11,7 +13,7 @@ A unified productivity and collaboration platform for people juggling multiple i
 ## Project structure
 
 ```
-Loft/
+SyncTayo/
   server/           Express API + Socket.io
     prisma/         schema.prisma, migrations, dev.db
     src/

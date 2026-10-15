@@ -223,12 +223,12 @@ export function ProductPreview() {
     <figure
       className="loft-sandbox"
       data-theme={theme}
-      aria-label="Interactive LOFT sandbox"
+      aria-label="Interactive SyncTayo sandbox"
     >
       <div className="ls-preview-toolbar">
         <div>
-          <span className="ls-sandbox-brand">L</span>
-          <strong>LOFT</strong>
+          <span className="ls-sandbox-brand">S</span>
+          <strong>SyncTayo</strong>
           <span className="ls-sandbox-badge">
             <FlaskConical size={12} aria-hidden="true" />
             Interactive sandbox
@@ -257,7 +257,7 @@ export function ProductPreview() {
         <aside
           id="ls-navigation"
           className={`ls-navigation ${mobileNavOpen ? "is-open" : ""}`}
-          aria-label="LOFT navigation"
+          aria-label="SyncTayo navigation"
           onKeyDown={(key) => {
             if (key.key === "Escape") {
               setMobileNavOpen(false);
@@ -266,7 +266,7 @@ export function ProductPreview() {
           }}
         >
           <nav className="ls-rail" aria-label="Personal views and workspaces">
-            <span className="ls-rail-brand">L</span>
+            <span className="ls-rail-brand">S</span>
             {GLOBAL_NAV.map(({ id, label, Icon }) => (
               <button
                 type="button"
@@ -484,7 +484,7 @@ export function ProductPreview() {
         <span>
           Explore with sample data. Sign in to bring your own teams together.
         </span>
-        <a href={REGISTER_URL}>Open LOFT</a>
+        <a href={REGISTER_URL}>Open SyncTayo</a>
       </figcaption>
       <span
         className="ls-sr-only"

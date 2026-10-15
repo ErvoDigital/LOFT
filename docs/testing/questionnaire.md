@@ -1,18 +1,18 @@
 # Form Title
 
-**LOFT Website Usability Test**
+**SyncTayo Website Usability Test**
 
 ## Form Description
 
-Thank you for testing LOFT!
+Thank you for testing SyncTayo!
 
-During this session, you will use LOFT while a developer observes how you interact with the website. The developer may help if you get stuck, but please try each activity on your own first.
+During this session, you will use SyncTayo while a developer observes how you interact with the website. The developer may help if you get stuck, but please try each activity on your own first.
 
-We are testing **LOFT, not you**. There are no right or wrong answers.
+We are testing **SyncTayo, not you**. There are no right or wrong answers.
 
 As you explore the website, please tell us whenever something is confusing, difficult to find, useful, unnecessary, or different from what you expected.
 
-Your feedback will help us determine which features are useful, what needs improvement, and what you would like to see in future versions of LOFT.
+Your feedback will help us determine which features are useful, what needs improvement, and what you would like to see in future versions of SyncTayo.
 
 ---
 
@@ -20,7 +20,7 @@ Your feedback will help us determine which features are useful, what needs impro
 
 **Section description:**
 
-You will be given a test account. Sign in and spend a few minutes exploring LOFT before starting the activities.
+You will be given a test account. Sign in and spend a few minutes exploring SyncTayo before starting the activities.
 
 ---
 
@@ -36,7 +36,7 @@ You will be given a test account. Sign in and spend a few minutes exploring LOFT
 
 ---
 
-### Q2. What was the first feature or part of LOFT that caught your attention?
+### Q2. What was the first feature or part of SyncTayo that caught your attention?
 
 **Question type:** Paragraph  
 **Required:** Yes
@@ -91,7 +91,7 @@ Complete the workspace activity given to you by the facilitator before answering
 
 ---
 
-### Q7. Would you use separate LOFT workspaces for different teams, classes, organizations, or projects?
+### Q7. Would you use separate SyncTayo workspaces for different teams, classes, organizations, or projects?
 
 **Question type:** Multiple choice  
 **Required:** Yes
@@ -129,7 +129,7 @@ Complete the task management activity before answering.
 
 ---
 
-### Q10. Would you use LOFT's task system to keep track of your actual work?
+### Q10. Would you use SyncTayo's task system to keep track of your actual work?
 
 **Question type:** Multiple choice  
 **Required:** Yes
@@ -177,7 +177,7 @@ Complete the calendar and event activity before answering.
 
 ---
 
-### Q14. Would you use LOFT's calendar for your actual team schedules?
+### Q14. Would you use SyncTayo's calendar for your actual team schedules?
 
 **Question type:** Multiple choice  
 **Required:** Yes
@@ -197,7 +197,7 @@ Complete the calendar and event activity before answering.
 
 ---
 
-### Q16. What would you want LOFT's calendar to do that it currently does not?
+### Q16. What would you want SyncTayo's calendar to do that it currently does not?
 
 **Question type:** Paragraph  
 **Required:** No
@@ -208,7 +208,7 @@ Complete the calendar and event activity before answering.
 
 **Section description:**
 
-Use LOFT to find your upcoming work, deadlines, and events from the different workspaces provided to you.
+Use SyncTayo to find your upcoming work, deadlines, and events from the different workspaces provided to you.
 
 ---
 
@@ -270,7 +270,7 @@ Complete the meeting conflict and task conflict activities before answering.
 
 ---
 
-### Q22. What would you want LOFT to do after detecting a meeting conflict?
+### Q22. What would you want SyncTayo to do after detecting a meeting conflict?
 
 **Question type:** Paragraph  
 **Required:** No
@@ -287,7 +287,7 @@ Complete the meeting conflict and task conflict activities before answering.
 
 ---
 
-### Q24. What would you want LOFT to do when it notices that you have too much work due at the same time?
+### Q24. What would you want SyncTayo to do when it notices that you have too much work due at the same time?
 
 **Question type:** Paragraph  
 **Required:** No
@@ -315,7 +315,7 @@ Complete the notification activity before answering.
 
 ---
 
-### Q26. What kinds of notifications would you want LOFT to send you?
+### Q26. What kinds of notifications would you want SyncTayo to send you?
 
 **Question type:** Checkboxes  
 **Required:** No
@@ -353,7 +353,7 @@ Complete the team and private messaging activities before answering.
 
 ---
 
-### Q28. How easy was it to communicate with another person using LOFT?
+### Q28. How easy was it to communicate with another person using SyncTayo?
 
 **Question type:** Linear scale  
 **Required:** Yes
@@ -363,7 +363,7 @@ Complete the team and private messaging activities before answering.
 
 ---
 
-### Q29. Would you use LOFT's messaging for your team or group projects?
+### Q29. Would you use SyncTayo's messaging for your team or group projects?
 
 **Question type:** Multiple choice  
 **Required:** Yes
@@ -376,7 +376,7 @@ Complete the team and private messaging activities before answering.
 
 ---
 
-### Q30. What would LOFT's messaging need for you to use it regularly?
+### Q30. What would SyncTayo's messaging need for you to use it regularly?
 
 **Question type:** Paragraph  
 **Required:** No
@@ -401,7 +401,7 @@ Complete the file management and collaborative document activities before answer
 
 ---
 
-### Q32. Would keeping your team's files inside LOFT be useful to you?
+### Q32. Would keeping your team's files inside SyncTayo be useful to you?
 
 **Question type:** Multiple choice  
 **Required:** Yes
@@ -427,7 +427,7 @@ Complete the file management and collaborative document activities before answer
 
 ---
 
-### Q34. Would you use LOFT's collaborative documents to work with your team?
+### Q34. Would you use SyncTayo's collaborative documents to work with your team?
 
 **Question type:** Multiple choice  
 **Required:** Yes
@@ -440,7 +440,7 @@ Complete the file management and collaborative document activities before answer
 
 ---
 
-### Q35. What features would you want LOFT's files or document editor to have?
+### Q35. What features would you want SyncTayo's files or document editor to have?
 
 **Question type:** Paragraph  
 **Required:** No
@@ -465,7 +465,7 @@ Complete the video call activity before answering.
 
 ---
 
-### Q37. Would having video calls directly inside LOFT be useful to you?
+### Q37. Would having video calls directly inside SyncTayo be useful to you?
 
 **Question type:** Multiple choice  
 **Required:** Yes
@@ -478,7 +478,7 @@ Complete the video call activity before answering.
 
 ---
 
-### Q38. What would you want LOFT's video calls to have in the future?
+### Q38. What would you want SyncTayo's video calls to have in the future?
 
 **Question type:** Paragraph  
 **Required:** No
@@ -493,7 +493,7 @@ Think about everything you tried today. We want to know which features you would
 
 ---
 
-### Q39. Which LOFT features would you actually use?
+### Q39. Which SyncTayo features would you actually use?
 
 **Question type:** Checkboxes  
 **Required:** Yes
@@ -567,19 +567,19 @@ Select at most 3.
 
 ---
 
-# SECTION 12 — What Do You Want LOFT to Have?
+# SECTION 12 — What Do You Want SyncTayo to Have?
 
 **Section description:**
 
-Now forget about what LOFT currently has for a moment.
+Now forget about what SyncTayo currently has for a moment.
 
-Think about what would genuinely make LOFT more useful for your schoolwork, organizations, projects, or teams.
+Think about what would genuinely make SyncTayo more useful for your schoolwork, organizations, projects, or teams.
 
-There are no wrong or unrealistic answers. We want to know what you would want LOFT to become.
+There are no wrong or unrealistic answers. We want to know what you would want SyncTayo to become.
 
 ---
 
-### Q43. While using LOFT, was there anything you expected to be able to do but could not?
+### Q43. While using SyncTayo, was there anything you expected to be able to do but could not?
 
 **Question type:** Paragraph  
 **Required:** Yes
@@ -589,41 +589,41 @@ Write "None" if nothing comes to mind.
 
 ---
 
-### Q44. What feature do you wish LOFT had?
+### Q44. What feature do you wish SyncTayo had?
 
 **Question type:** Paragraph  
 **Required:** Yes
 
 **Description:**  
-Do not worry about whether it would be difficult for us to build. Tell us what would genuinely make LOFT more useful to you.
+Do not worry about whether it would be difficult for us to build. Tell us what would genuinely make SyncTayo more useful to you.
 
 ---
 
-### Q45. Is there something you currently use another app or website for that you wish you could do directly inside LOFT?
+### Q45. Is there something you currently use another app or website for that you wish you could do directly inside SyncTayo?
 
 **Question type:** Paragraph  
 **Required:** Yes
 
 **Description:**  
-If yes, tell us what you currently use and what you would want LOFT to do. Write "None" if nothing comes to mind.
+If yes, tell us what you currently use and what you would want SyncTayo to do. Write "None" if nothing comes to mind.
 
 ---
 
-### Q46. What would make you choose LOFT instead of switching between several different apps?
+### Q46. What would make you choose SyncTayo instead of switching between several different apps?
 
 **Question type:** Paragraph  
 **Required:** Yes
 
 ---
 
-### Q47. Is there anything currently in LOFT that you think you would rarely or never use?
+### Q47. Is there anything currently in SyncTayo that you think you would rarely or never use?
 
 **Question type:** Paragraph  
 **Required:** No
 
 ---
 
-### Q48. Is there anything you think LOFT should do automatically for you?
+### Q48. Is there anything you think SyncTayo should do automatically for you?
 
 **Question type:** Paragraph  
 **Required:** No
@@ -635,7 +635,7 @@ Think about repetitive work, scheduling, reminders, organizing tasks, prioritizi
 
 # SECTION 13 — Final Thoughts
 
-### Q49. Based on what you tried today, would you use LOFT for a real team, school project, organization, or group?
+### Q49. Based on what you tried today, would you use SyncTayo for a real team, school project, organization, or group?
 
 **Question type:** Multiple choice  
 **Required:** Yes
@@ -655,7 +655,7 @@ Think about repetitive work, scheduling, reminders, organizing tasks, prioritizi
 
 ---
 
-### Q51. What is the best thing about LOFT right now?
+### Q51. What is the best thing about SyncTayo right now?
 
 **Question type:** Paragraph  
 **Required:** Yes
@@ -676,21 +676,21 @@ Think about repetitive work, scheduling, reminders, organizing tasks, prioritizi
 
 ---
 
-### Q54. If LOFT added the features you need, what would make you keep using it?
+### Q54. If SyncTayo added the features you need, what would make you keep using it?
 
 **Question type:** Paragraph  
 **Required:** No
 
 ---
 
-### Q55. Is there anything else you wish LOFT could do for you?
+### Q55. Is there anything else you wish SyncTayo could do for you?
 
 **Question type:** Paragraph  
 **Required:** No
 
 ---
 
-### Q56. Is there anything else you would like to tell us about your experience using LOFT?
+### Q56. Is there anything else you would like to tell us about your experience using SyncTayo?
 
 **Question type:** Paragraph  
 **Required:** No
@@ -699,7 +699,7 @@ Think about repetitive work, scheduling, reminders, organizing tasks, prioritizi
 
 # CONFIRMATION MESSAGE
 
-Thank you for testing LOFT!
+Thank you for testing SyncTayo!
 
 Your feedback will help us understand which features are most useful, what needs improvement, and what we should consider adding in future versions.
 

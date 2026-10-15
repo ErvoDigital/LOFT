@@ -18,6 +18,6 @@ if (template.plugins) {
     env: process.env,
     stdio: "inherit",
   });
-  if (configured.error || configured.status !== 0) throw new Error("Could not apply LOFT's OpenClaw plugin settings.");
+  if (configured.error || configured.status !== 0) throw new Error("Could not apply SyncTayo's OpenClaw plugin settings.");
 }
 process.execve(process.execPath, [process.execPath, "/app/docker-entrypoint.mjs", "node", "/app/dist/index.js", "gateway", "--bind", "lan", "--port", "18789"], process.env);

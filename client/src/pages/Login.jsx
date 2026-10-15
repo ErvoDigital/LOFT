@@ -50,7 +50,7 @@ export default function Login() {
   );
 
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to your LOFT workspace">
+    <AuthLayout title="Welcome back" subtitle="Sign in to your SyncTayo workspace">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>}
         <div>

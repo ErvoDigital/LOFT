@@ -1,29 +1,29 @@
 /**
- * LOFT Website Usability Test
+ * SyncTayo Website Usability Test
  * Google Forms Generator
  *
- * Run: createLOFTUsabilityTestForm()
+ * Run: createSyncTayoUsabilityTestForm()
  */
 
-function createLOFTUsabilityTestForm() {
-  const form = FormApp.create("LOFT Website Usability Test");
+function createSyncTayoUsabilityTestForm() {
+  const form = FormApp.create("SyncTayo Website Usability Test");
 
   form.setDescription(
-    "Thank you for testing LOFT!\n\n" +
-    "During this session, you will use LOFT while a developer observes " +
+    "Thank you for testing SyncTayo!\n\n" +
+    "During this session, you will use SyncTayo while a developer observes " +
     "how you interact with the website. The developer may help if you get " +
     "stuck, but please try each activity on your own first.\n\n" +
-    "We are testing LOFT, not you. There are no right or wrong answers.\n\n" +
+    "We are testing SyncTayo, not you. There are no right or wrong answers.\n\n" +
     "As you explore the website, please tell us whenever something is " +
     "confusing, difficult to find, useful, unnecessary, or different from " +
     "what you expected.\n\n" +
     "Your feedback will help us determine which features are useful, what " +
     "needs improvement, and what you would like to see in future versions " +
-    "of LOFT."
+    "of SyncTayo."
   );
 
   form.setConfirmationMessage(
-    "Thank you for testing LOFT!\n\n" +
+    "Thank you for testing SyncTayo!\n\n" +
     "Your feedback will help us understand which features are most useful, " +
     "what needs improvement, and what we should consider adding in future " +
     "versions.\n\n" +
@@ -42,7 +42,7 @@ function createLOFTUsabilityTestForm() {
     form,
     "1. First Impressions",
     "Sign in using the test account provided to you. Spend a few minutes " +
-    "exploring LOFT before answering these questions."
+    "exploring SyncTayo before answering these questions."
   );
 
   addScale(
@@ -55,7 +55,7 @@ function createLOFTUsabilityTestForm() {
 
   addParagraph(
     form,
-    "What was the first feature or part of LOFT that caught your attention?",
+    "What was the first feature or part of SyncTayo that caught your attention?",
     true
   );
 
@@ -106,7 +106,7 @@ function createLOFTUsabilityTestForm() {
 
   addMultipleChoice(
     form,
-    "Would you use separate LOFT workspaces for different teams, classes, organizations, or projects?",
+    "Would you use separate SyncTayo workspaces for different teams, classes, organizations, or projects?",
     [
       "Definitely",
       "Probably",
@@ -143,7 +143,7 @@ function createLOFTUsabilityTestForm() {
 
   addMultipleChoice(
     form,
-    "Would you use LOFT's task system to keep track of your actual work?",
+    "Would you use SyncTayo's task system to keep track of your actual work?",
     [
       "Definitely",
       "Probably",
@@ -188,7 +188,7 @@ function createLOFTUsabilityTestForm() {
 
   addMultipleChoice(
     form,
-    "Would you use LOFT's calendar for your actual team schedules?",
+    "Would you use SyncTayo's calendar for your actual team schedules?",
     [
       "Definitely",
       "Probably",
@@ -207,7 +207,7 @@ function createLOFTUsabilityTestForm() {
 
   addParagraph(
     form,
-    "What would you want LOFT's calendar to do that it currently does not?",
+    "What would you want SyncTayo's calendar to do that it currently does not?",
     false
   );
 
@@ -218,7 +218,7 @@ function createLOFTUsabilityTestForm() {
   addSection(
     form,
     "5. Dashboard and My Plan",
-    "Use LOFT to find your upcoming work, deadlines, and events from the " +
+    "Use SyncTayo to find your upcoming work, deadlines, and events from the " +
     "different workspaces provided to you."
   );
 
@@ -277,7 +277,7 @@ function createLOFTUsabilityTestForm() {
 
   addParagraph(
     form,
-    "What would you want LOFT to do after detecting a meeting conflict?",
+    "What would you want SyncTayo to do after detecting a meeting conflict?",
     false
   );
 
@@ -291,7 +291,7 @@ function createLOFTUsabilityTestForm() {
 
   addParagraph(
     form,
-    "What would you want LOFT to do when it notices that you have too much work due at the same time?",
+    "What would you want SyncTayo to do when it notices that you have too much work due at the same time?",
     false
   );
 
@@ -320,7 +320,7 @@ function createLOFTUsabilityTestForm() {
 
   addCheckboxes(
     form,
-    "What kinds of notifications would you want LOFT to send you?",
+    "What kinds of notifications would you want SyncTayo to send you?",
     [
       "New task assigned to me",
       "Upcoming task deadline",
@@ -357,7 +357,7 @@ function createLOFTUsabilityTestForm() {
 
   addScale(
     form,
-    "How easy was it to communicate with another person using LOFT?",
+    "How easy was it to communicate with another person using SyncTayo?",
     "Very difficult",
     "Very easy",
     true
@@ -365,7 +365,7 @@ function createLOFTUsabilityTestForm() {
 
   addMultipleChoice(
     form,
-    "Would you use LOFT's messaging for your team or group projects?",
+    "Would you use SyncTayo's messaging for your team or group projects?",
     [
       "Definitely",
       "Probably",
@@ -378,7 +378,7 @@ function createLOFTUsabilityTestForm() {
 
   addParagraph(
     form,
-    "What would LOFT's messaging need for you to use it regularly?",
+    "What would SyncTayo's messaging need for you to use it regularly?",
     false
   );
 
@@ -403,7 +403,7 @@ function createLOFTUsabilityTestForm() {
 
   addMultipleChoice(
     form,
-    "Would keeping your team's files inside LOFT be useful to you?",
+    "Would keeping your team's files inside SyncTayo be useful to you?",
     [
       "Definitely",
       "Probably",
@@ -429,7 +429,7 @@ function createLOFTUsabilityTestForm() {
 
   addMultipleChoice(
     form,
-    "Would you use LOFT's collaborative documents to work with your team?",
+    "Would you use SyncTayo's collaborative documents to work with your team?",
     [
       "Definitely",
       "Probably",
@@ -442,7 +442,7 @@ function createLOFTUsabilityTestForm() {
 
   addParagraph(
     form,
-    "What features would you want LOFT's files or document editor to have?",
+    "What features would you want SyncTayo's files or document editor to have?",
     false
   );
 
@@ -466,7 +466,7 @@ function createLOFTUsabilityTestForm() {
 
   addMultipleChoice(
     form,
-    "Would having video calls directly inside LOFT be useful to you?",
+    "Would having video calls directly inside SyncTayo be useful to you?",
     [
       "Definitely",
       "Probably",
@@ -479,7 +479,7 @@ function createLOFTUsabilityTestForm() {
 
   addParagraph(
     form,
-    "What would you want LOFT's video calls to have in the future?",
+    "What would you want SyncTayo's video calls to have in the future?",
     false
   );
 
@@ -496,7 +496,7 @@ function createLOFTUsabilityTestForm() {
 
   addCheckboxes(
     form,
-    "Which LOFT features would you actually use?",
+    "Which SyncTayo features would you actually use?",
     [
       "Workspaces",
       "Tasks",
@@ -578,52 +578,52 @@ function createLOFTUsabilityTestForm() {
 
   addSection(
     form,
-    "12. What Do You Want LOFT to Have?",
-    "Now forget about what LOFT currently has for a moment.\n\n" +
-    "Think about what would genuinely make LOFT more useful for your " +
+    "12. What Do You Want SyncTayo to Have?",
+    "Now forget about what SyncTayo currently has for a moment.\n\n" +
+    "Think about what would genuinely make SyncTayo more useful for your " +
     "schoolwork, organizations, projects, or teams.\n\n" +
     "There are no wrong or unrealistic answers. We want to know what you " +
-    "would want LOFT to become."
+    "would want SyncTayo to become."
   );
 
   addParagraph(
     form,
-    "While using LOFT, was there anything you expected to be able to do but could not?",
+    "While using SyncTayo, was there anything you expected to be able to do but could not?",
     true,
     'Write "None" if nothing comes to mind.'
   );
 
   addParagraph(
     form,
-    "What feature do you wish LOFT had?",
+    "What feature do you wish SyncTayo had?",
     true,
     "Do not worry about whether it would be difficult for us to build. " +
-    "Tell us what would genuinely make LOFT more useful to you."
+    "Tell us what would genuinely make SyncTayo more useful to you."
   );
 
   addParagraph(
     form,
-    "Is there something you currently use another app or website for that you wish you could do directly inside LOFT?",
+    "Is there something you currently use another app or website for that you wish you could do directly inside SyncTayo?",
     true,
-    "If yes, tell us what you currently use and what you would want LOFT " +
+    "If yes, tell us what you currently use and what you would want SyncTayo " +
     'to do. Write "None" if nothing comes to mind.'
   );
 
   addParagraph(
     form,
-    "What would make you choose LOFT instead of switching between several different apps?",
+    "What would make you choose SyncTayo instead of switching between several different apps?",
     true
   );
 
   addParagraph(
     form,
-    "Is there anything currently in LOFT that you think you would rarely or never use?",
+    "Is there anything currently in SyncTayo that you think you would rarely or never use?",
     false
   );
 
   addParagraph(
     form,
-    "Is there anything you think LOFT should do automatically for you?",
+    "Is there anything you think SyncTayo should do automatically for you?",
     false,
     "Think about repetitive work, scheduling, reminders, organizing tasks, " +
     "prioritizing work, summaries, or anything else you normally have to do yourself."
@@ -636,12 +636,12 @@ function createLOFTUsabilityTestForm() {
   addSection(
     form,
     "13. Final Thoughts",
-    "Think about your overall experience using LOFT today."
+    "Think about your overall experience using SyncTayo today."
   );
 
   addMultipleChoice(
     form,
-    "Based on what you tried today, would you use LOFT for a real team, school project, organization, or group?",
+    "Based on what you tried today, would you use SyncTayo for a real team, school project, organization, or group?",
     [
       "Definitely",
       "Probably",
@@ -660,7 +660,7 @@ function createLOFTUsabilityTestForm() {
 
   addParagraph(
     form,
-    "What is the best thing about LOFT right now?",
+    "What is the best thing about SyncTayo right now?",
     true
   );
 
@@ -678,19 +678,19 @@ function createLOFTUsabilityTestForm() {
 
   addParagraph(
     form,
-    "If LOFT added the features you need, what would make you keep using it?",
+    "If SyncTayo added the features you need, what would make you keep using it?",
     false
   );
 
   addParagraph(
     form,
-    "Is there anything else you wish LOFT could do for you?",
+    "Is there anything else you wish SyncTayo could do for you?",
     false
   );
 
   addParagraph(
     form,
-    "Is there anything else you would like to tell us about your experience using LOFT?",
+    "Is there anything else you would like to tell us about your experience using SyncTayo?",
     false
   );
 
@@ -699,7 +699,7 @@ function createLOFTUsabilityTestForm() {
   // =========================================================
 
   const spreadsheet = SpreadsheetApp.create(
-    "LOFT Website Usability Test - Responses"
+    "SyncTayo Website Usability Test - Responses"
   );
 
   form.setDestination(
@@ -712,7 +712,7 @@ function createLOFTUsabilityTestForm() {
   // =========================================================
 
   Logger.log("==============================================");
-  Logger.log("LOFT USABILITY TEST CREATED");
+  Logger.log("SyncTayo USABILITY TEST CREATED");
   Logger.log("==============================================");
   Logger.log("EDIT FORM:");
   Logger.log(form.getEditUrl());
