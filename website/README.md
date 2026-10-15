@@ -24,7 +24,7 @@ Deploy the generated `website/dist/` directory to your static hosting provider. 
 
 ## App links
 
-Every “Try for free” and “Log in” link opens `/login` on the origin configured by `VITE_LOFT_APP_URL`. The default is `https://app.loft-client.site/login`. For the production `loft-website` deployment, set `VITE_LOFT_APP_URL=https://app.loft-client.site` or leave it unset to use the default. This is a build-time setting; rebuild after changing it.
+Every “Try for free” and “Log in” link opens `/login` on the origin configured by `VITE_LOFT_APP_URL`. The default is `https://client.synctayo.online/login`. For the production `loft-website` deployment, set `VITE_LOFT_APP_URL=https://client.synctayo.online` or leave it unset to use the default. This is a build-time setting; rebuild after changing it.
 
 ## Product content
 
