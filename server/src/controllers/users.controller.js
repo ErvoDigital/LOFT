@@ -21,14 +21,30 @@ const optionalNamePart = z
 
 const NAME_FIELDS = ["firstName", "lastName"];
 
+const optionalText = (max) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((s) => s || null)
+    .nullable()
+    .optional();
+
 const updateSchema = z.object({
   firstName: z.string().trim().min(1).max(40).optional(),
   lastName: optionalNamePart,
   nickname: optionalNamePart,
-  avatarColor: z.string().min(3).max(20).optional(),
+  phone: optionalText(30),
+  bio: optionalText(300),
+  pronouns: optionalText(40),
+  title: optionalText(100),
+  timezone: z.string().max(100).optional(),
+  aiLanguage: optionalText(50),
+  avatarColor: z.string().min(3).max(25).optional(),
   avatarUrl: imageDataUrlSchema,
   twoFactorEnabled: z.boolean().optional(),
   aiPriorityEnabled: z.boolean().optional(),
+  themePreference: z.string().max(1000).nullable().optional(),
 });
 
 const verifyPasswordCodeSchema = z.object({ code: z.string().regex(/^\d{6}$/) });
@@ -123,7 +139,22 @@ export async function getUserProfile(req, res) {
   const targetId = req.params.userId;
   const target = await prisma.user.findUnique({
     where: { id: targetId },
-    select: { id: true, name: true, email: true, avatarColor: true, avatarUrl: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      firstName: true,
+      lastName: true,
+      nickname: true,
+      email: true,
+      phone: true,
+      avatarColor: true,
+      avatarUrl: true,
+      bio: true,
+      pronouns: true,
+      title: true,
+      timezone: true,
+      createdAt: true,
+    },
   });
   if (!target) throw new ApiError(404, "User not found");
 

@@ -32,8 +32,8 @@ export default function usePlanAnalysis({ userId, enabled, plan, capacity, manua
         setState({ key, data, busy: false, error: "" });
       } catch (err) {
         if (!controller.signal.aborted) setState({ key, data: null, busy: false, error: err?.response?.status === 429
-          ? "Lofty is busy and will retry shortly. Your tasks are still available to edit."
-          : "Lofty couldn't analyze your priorities right now. Your tasks are still available to reorder and edit." });
+          ? "Kas is busy and will retry shortly. Your tasks are still available to edit."
+          : "Kas couldn't analyze your priorities right now. Your tasks are still available to reorder and edit." });
         if (!controller.signal.aborted && err?.response?.status === 429) retryTimer = setTimeout(() => setRetry((value) => value + 1), 30000);
       }
     }, 700);

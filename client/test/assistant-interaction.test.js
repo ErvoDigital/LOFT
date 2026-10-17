@@ -133,7 +133,7 @@ async function mount(t, overrides = {}) {
   let view;
   await act(async () => { view = create(React.createElement(exported.exports.default), {
     createNodeMock: ({ props }) => props.id === "loft-assistant" ? overrides.panel || null
-      : props["aria-label"] === "Message Lofty" ? overrides.input || null : null,
+      : props["aria-label"] === "Message Kas" ? overrides.input || null : null,
   }); });
   t.after(() => act(() => view.unmount()));
   const button = (label) => view.root.findAllByType("button").find(({ props }) => props["aria-label"] === label || props.title === label);
@@ -142,19 +142,19 @@ async function mount(t, overrides = {}) {
     const voiceActions = { "Close voice bubble": "onClose", "Play voice reply": "onPlay", "Retry voice reply": "onPlay", "Stop voice reply": "onSkip" };
     await act(async () => voiceActions[label] ? bubble()[voiceActions[label]]() : button(label).props.onClick());
   };
-  const type = async (value) => { await act(async () => view.root.findByProps({ "aria-label": "Message Lofty" }).props.onChange({ target: { value } })); };
+  const type = async (value) => { await act(async () => view.root.findByProps({ "aria-label": "Message Kas" }).props.onChange({ target: { value } })); };
   const submit = async () => { await act(async () => view.root.findAllByType("form").find((form) => !form.props["aria-label"]).props.onSubmit({ preventDefault() {} })); };
   const startRecording = async () => { await act(async () => { bubble().onPrepareAudio(); return bubble().onHoldStart(); }); };
   const record = async () => { await startRecording(); await act(async () => bubble().onHoldEnd()); };
   const hide = async () => { document.visibilityState = "hidden"; await act(async () => listeners.get("visibilitychange")?.()); };
-  if (!overrides.closed) await click("Open Lofty");
+  if (!overrides.closed) await click("Open Kas");
   return { view, messages, speech, audio, revoked, confirmations, liveCaptions, recordingTimers, click, type, submit, record, startRecording, hide, get progress() { return progress; }, get bubble() { return bubble(); }, get recorder() { return recorder; }, get stoppedTracks() { return stoppedTracks; }, get microphoneRequests() { return microphoneRequests; } };
 }
 
 test("Live captions update while recording and only the final transcript submits a question", async (t) => {
   const transcript = deferred();
   const widget = await mount(t, { transcript, closed: true });
-  await widget.click("Talk to Lofty");
+  await widget.click("Talk to Kas");
   await act(async () => widget.liveCaptions[0].onTranscript("What is due"));
   assert.equal(widget.bubble.heard, "What is due");
   assert.equal(widget.bubble.interimTranscript, true);
@@ -173,7 +173,7 @@ test("Live captions update while recording and only the final transcript submits
 
 test("Caption failures preserve recording and closing voice ignores late caption responses", async (t) => {
   const widget = await mount(t, { closed: true });
-  await widget.click("Talk to Lofty");
+  await widget.click("Talk to Kas");
   const first = widget.liveCaptions[0];
   await act(async () => first.onUnavailable());
   assert.equal(widget.bubble.captionsUnavailable, true);
@@ -181,7 +181,7 @@ test("Caption failures preserve recording and closing voice ignores late caption
   assert.equal(widget.recorder.state, "recording");
   await widget.click("Close voice bubble");
   assert.equal(first.stopped, true);
-  await widget.click("Talk to Lofty");
+  await widget.click("Talk to Kas");
   await act(async () => first.onTranscript("Late previous recording"));
   assert.equal(widget.bubble.heard, "");
   assert.equal(widget.bubble.captionsUnavailable, false);
@@ -210,7 +210,7 @@ test("Mobile chat follows the visible keyboard area and removes viewport listene
   viewport.offsetTop = 0;
   await act(async () => listeners.get("scroll")());
   assert.equal(panel.dataset.compact, "false");
-  await widget.click("Close Lofty");
+  await widget.click("Close Kas");
   assert.equal(listeners.size, 0);
   assert.equal(properties.size, 0);
 });
@@ -240,14 +240,14 @@ test("A focused popup field stays visible after keyboard resize and pending scro
   assert.equal(scrolls[0].block, "nearest");
   elementListeners.get("focusin")();
   assert.equal(frames.size, 1);
-  await widget.click("Close Lofty");
+  await widget.click("Close Kas");
   assert.equal(frames.size, 0);
   assert.equal(elementListeners.size, 0);
 });
 
 test("The touch launcher records with chat closed and Stop sends a voice question", async (t) => {
   const widget = await mount(t, { closed: true });
-  await widget.click("Talk to Lofty");
+  await widget.click("Talk to Kas");
   assert.equal(widget.bubble.inputMode, "tap");
   assert.equal(widget.bubble.phase, "listening");
   assert.equal(widget.recorder.state, "recording");
@@ -261,10 +261,10 @@ test("The touch launcher records with chat closed and Stop sends a voice questio
 
 test("The Talk button in chat starts the same independent tap voice session", async (t) => {
   const widget = await mount(t);
-  await widget.click("Talk to Lofty");
+  await widget.click("Talk to Kas");
   assert.equal(widget.bubble.inputMode, "tap");
   assert.equal(widget.bubble.micReady, true);
-  await widget.click("Close Lofty");
+  await widget.click("Close Kas");
   assert.equal(widget.recorder.state, "recording");
   await act(async () => widget.bubble.onHoldEnd());
   assert.equal(widget.messages[0].interactionMode, "voice");
@@ -273,7 +273,7 @@ test("The Talk button in chat starts the same independent tap voice session", as
 test("Permission delays do not allow duplicate captures and closing cancels the pending microphone", async (t) => {
   const microphone = deferred();
   const widget = await mount(t, { closed: true, microphone });
-  await widget.click("Talk to Lofty");
+  await widget.click("Talk to Kas");
   assert.equal(widget.bubble.micReady, false);
   assert.equal(widget.bubble.onTalkStart(), false);
   assert.equal(widget.microphoneRequests, 1);
@@ -286,7 +286,7 @@ test("Permission delays do not allow duplicate captures and closing cancels the 
 
 test("Tap recording stops and submits at the 30-second limit", async (t) => {
   const widget = await mount(t, { closed: true, captureRecordingTimer: true });
-  await widget.click("Talk to Lofty");
+  await widget.click("Talk to Kas");
   await act(async () => widget.recordingTimers.get("recording")());
   assert.equal(widget.recorder.state, "inactive");
   assert.equal(widget.bubble.phase, "speaking");
@@ -297,7 +297,7 @@ test("Tap recording stops and submits at the 30-second limit", async (t) => {
 
 test("Hiding the page ends a tap recording and releases its microphone", async (t) => {
   const widget = await mount(t, { closed: true });
-  await widget.click("Talk to Lofty");
+  await widget.click("Talk to Kas");
   await widget.hide();
   assert.equal(widget.recorder.state, "inactive");
   assert.ok(widget.stoppedTracks > 0);
@@ -307,7 +307,7 @@ test("Hiding the page ends a tap recording and releases its microphone", async (
 test("Hiding the page during permission does not start recording when permission arrives", async (t) => {
   const microphone = deferred();
   const widget = await mount(t, { closed: true, microphone });
-  await widget.click("Talk to Lofty");
+  await widget.click("Talk to Kas");
   await widget.hide();
   await act(async () => microphone.resolve());
   assert.equal(widget.recorder, undefined);
@@ -318,7 +318,7 @@ test("Hiding the page during permission does not start recording when permission
 
 test("Tap microphone failures clear Listening and allow another attempt", async (t) => {
   const widget = await mount(t, { closed: true, microphoneError: new Error("Permission denied") });
-  await widget.click("Talk to Lofty");
+  await widget.click("Talk to Kas");
   assert.equal(widget.bubble.phase, "error");
   assert.match(widget.bubble.error, /permissions/);
   assert.equal(widget.bubble.canTalk, true);
@@ -328,7 +328,7 @@ test("Tap microphone failures clear Listening and allow another attempt", async 
 
 test("Closing a tap recording cancels the clip and releases the microphone", async (t) => {
   const widget = await mount(t, { closed: true });
-  await widget.click("Talk to Lofty");
+  await widget.click("Talk to Kas");
   await widget.click("Close voice bubble");
   assert.equal(widget.recorder.state, "inactive");
   assert.ok(widget.stoppedTracks > 0);
@@ -351,7 +351,7 @@ test("Releasing M during permission avoids capturing or submitting an empty clip
 test("Unsupported browsers and unfinished setup show errors instead of waiting for a key release", async (t) => {
   for (const overrides of [{ unsupported: true }, { configured: false }]) {
     const widget = await mount(t, { closed: true, ...overrides });
-    await widget.click("Talk to Lofty");
+    await widget.click("Talk to Kas");
     assert.equal(widget.bubble.phase, "error");
     assert.equal(widget.bubble.canTalk, true);
     assert.equal(widget.microphoneRequests, 0);
@@ -377,7 +377,7 @@ test("Chat renders streamed text early and replaces tool preambles with one fina
   assert.equal(widget.bubble.onHoldStart(), true);
 });
 
-test("Lofty formats assistant paragraphs, emphasis and nested lists while user messages stay literal", async (t) => {
+test("Kas formats assistant paragraphs, emphasis and nested lists while user messages stay literal", async (t) => {
   const reply = deferred();
   const widget = await mount(t, { reply });
   await widget.type("Keep **this** as typed.");
@@ -411,7 +411,7 @@ test("Streamed Markdown updates incomplete formatting and renders the final form
   assert.ok(widget.view.root.findAllByType("p").some((p) => p.children.includes("Then rest.")));
 });
 
-test("Lofty renders tables, checklists and code with keyboard accessible scrolling", async (t) => {
+test("Kas renders tables, checklists and code with keyboard accessible scrolling", async (t) => {
   const reply = deferred();
   const widget = await mount(t, { reply });
   await widget.type("Show a formatted example");
@@ -420,7 +420,7 @@ test("Lofty renders tables, checklists and code with keyboard accessible scrolli
     reply: "| Task | Status |\n| --- | --- |\n| Review | Ready |\n\n- [x] Done\n- [ ] Pending\n\nUse `task_id`.\n\n```js\nconst value = '<safe>';\n// **keep literal**\n```",
     actions: [],
   }));
-  assert.equal(widget.view.root.findByProps({ "aria-label": "Table in Lofty's reply" }).props.tabIndex, 0);
+  assert.equal(widget.view.root.findByProps({ "aria-label": "Table in Kas's reply" }).props.tabIndex, 0);
   assert.equal(widget.view.root.findAllByType("th").length, 2);
   assert.equal(widget.view.root.findAllByType("td").length, 2);
   const checkboxes = widget.view.root.findAllByType("input").filter((input) => input.props.type === "checkbox");
@@ -476,15 +476,15 @@ test("Gateway outages show a friendly warning and a successful retry restores av
     await act(async () => reply.reject(Object.assign(new Error("Check the gateway logs and OpenRouter key or credits."), failure)));
 
     const content = JSON.stringify(widget.view.toJSON());
-    assert.match(content, /Lofty is temporarily unavailable/);
+    assert.match(content, /Kas is temporarily unavailable/);
     assert.match(content, /Please try again in a moment/);
     assert.match(content, /You can keep using your workspace/);
     assert.doesNotMatch(content, /gateway logs|OpenRouter|An unfinished answer|Ready to ask/);
     assert.equal(widget.view.root.findAll((node) => node.props.role === "alert").length, 1);
     assert.equal(widget.view.root.findByType("input").props.value, "Plan my day");
 
-    await widget.click("Close Lofty");
-    await widget.click("Open Lofty");
+    await widget.click("Close Kas");
+    await widget.click("Open Kas");
     assert.match(JSON.stringify(widget.view.toJSON()), /Temporarily unavailable/);
     overrides.reply = null;
     await act(async () => widget.view.root.findAllByType("button").find((button) => button.children.includes("Try again")).props.onClick());
@@ -534,8 +534,8 @@ test("Voice questions identify answer generation failures with chat closed", asy
   assert.equal(widget.bubble.canTalk, true);
   assert.equal(widget.speech.length, 0);
   await widget.click("Close voice bubble");
-  await widget.click("Open Lofty");
-  assert.match(JSON.stringify(widget.view.toJSON()), /Lofty is temporarily unavailable/);
+  await widget.click("Open Kas");
+  assert.match(JSON.stringify(widget.view.toJSON()), /Kas is temporarily unavailable/);
 });
 
 test("Meeting draft previews handle absent dates and save only after confirmation", async (t) => {
@@ -575,7 +575,7 @@ test("Voice confirmations save inside the voice popup, reject duplicate clicks a
   assert.equal(widget.view.root.findAllByProps({ id: "loft-assistant" }).length, 0);
   await widget.click("Close voice bubble");
   assert.equal(widget.view.root.findAllByProps({ id: "loft-assistant" }).length, 0);
-  await widget.click("Open Lofty");
+  await widget.click("Open Kas");
   assert.match(JSON.stringify(widget.view.toJSON()), /Task saved/);
 });
 
@@ -599,14 +599,14 @@ test("Voice reply fields submit details in voice mode and require a separate exa
   await widget.record();
   await act(async () => widget.view.root.findByType("select").props.onChange({ target: { value: "TIER_2" } }));
   overrides.reply = { promise: Promise.resolve({ reply: "Review your task below.", actions: [voiceTask] }) };
-  await act(async () => widget.view.root.findByProps({ "aria-label": "Details for Lofty" }).props.onSubmit({ preventDefault() {} }));
+  await act(async () => widget.view.root.findByProps({ "aria-label": "Details for Kas" }).props.onSubmit({ preventDefault() {} }));
   assert.equal(widget.messages.length, 2);
   assert.equal(widget.messages[1].interactionMode, "voice");
   assert.match(widget.messages[1].message, /Priority: High/);
   assert.equal(widget.confirmations.length, 0);
   assert.equal(widget.speech.length, 2);
   assert.equal(widget.bubble.active, true);
-  assert.match(JSON.stringify(widget.view.toJSON()), /Details sent to Lofty/);
+  assert.match(JSON.stringify(widget.view.toJSON()), /Details sent to Kas/);
   assert.match(JSON.stringify(widget.view.toJSON()), /Create task/);
   assert.equal(widget.view.root.findAllByProps({ id: "loft-assistant" }).length, 0);
 });
@@ -616,7 +616,7 @@ test("Text reply fields stay inline and preserve entered details when a follow-u
   const overrides = { reply: { promise: Promise.resolve({ reply: "Choose the priority below.", actions: [], detailRequests: [priorityDetails] }) } };
   const widget = await mount(t, overrides);
   await widget.type("Create a task"); await widget.submit();
-  const form = () => widget.view.root.findByProps({ "aria-label": "Details for Lofty" });
+  const form = () => widget.view.root.findByProps({ "aria-label": "Details for Kas" });
   await act(async () => form().props.onSubmit({ preventDefault() {} }));
   assert.equal(widget.messages.length, 1);
   assert.match(JSON.stringify(widget.view.toJSON()), /complete the requested details/);
@@ -640,7 +640,7 @@ test("Meeting reply fields validate times, collect attendees and send explicit o
   const overrides = { reply: { promise: Promise.resolve({ reply: "Add the meeting details below.", actions: [], detailRequests: [{ id: "meeting-details", kind: "event", prompt: "When, and with whom?", fields }] }) } };
   const widget = await mount(t, overrides);
   await widget.type("Set up a meeting"); await widget.submit();
-  const form = () => widget.view.root.findByProps({ "aria-label": "Details for Lofty" });
+  const form = () => widget.view.root.findByProps({ "aria-label": "Details for Kas" });
   const date = async (index, value) => { await act(async () => form().findAllByType("input").filter((input) => input.props.type === "datetime-local")[index].props.onChange({ target: { value } })); };
   await date(0, "2026-10-20T11:00"); await date(1, "2026-10-20T10:00");
   await act(async () => form().findByProps({ type: "checkbox" }).props.onChange({ target: { checked: true } }));
@@ -763,7 +763,7 @@ test("Closing the text chat keeps independent bubble audio generating and playin
   const speech = deferred();
   const widget = await mount(t, { speech });
   await widget.record();
-  await widget.click("Close Lofty");
+  await widget.click("Close Kas");
   assert.equal(widget.speech[0].signal.aborted, false);
   await act(async () => speech.resolve(new Blob(["audio"])));
   assert.equal(widget.audio[0].played, true);

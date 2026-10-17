@@ -46,7 +46,7 @@ export async function getRecommendations(req, res) {
   if (cached) return res.json(cached.result);
   for (const [id, times] of recent) if (!times.some((time) => time > now - 60000)) recent.delete(id);
   const times = (recent.get(req.userId) || []).filter((time) => time > now - 60000);
-  if (active.has(req.userId) || times.length >= 5) throw new ApiError(429, "Please wait before asking Lofty to review your plan again.");
+  if (active.has(req.userId) || times.length >= 5) throw new ApiError(429, "Please wait before asking Kas to review your plan again.");
   active.add(req.userId);
   recent.set(req.userId, [...times, now]);
   const controller = new AbortController();

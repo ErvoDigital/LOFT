@@ -42,3 +42,27 @@ export function textOn(color) {
   const onLight = (luminance(LIGHT_TEXT) + 0.05) / (l + 0.05);
   return onDark > onLight ? DARK_TEXT : LIGHT_TEXT;
 }
+
+export const AVATAR_PALETTE = [
+  { name: "Emerald", hex: "#134A3C" },
+  { name: "Teal", hex: "#1F9B7D" },
+  { name: "Cyan", hex: "#0D9488" },
+  { name: "Mint", hex: "#5EEAD4" },
+  { name: "Ocean", hex: "#2479C9" },
+  { name: "Sky", hex: "#0284C7" },
+  { name: "Indigo", hex: "#5660D8" },
+  { name: "Purple", hex: "#8B55D6" },
+  { name: "Fuchsia", hex: "#C026D3" },
+  { name: "Rose", hex: "#C44569" },
+  { name: "Crimson", hex: "#E11D48" },
+  { name: "Coral", hex: "#E76F51" },
+  { name: "Amber", hex: "#E9A23B" },
+  { name: "Bronze", hex: "#C17538" },
+  { name: "Sage", hex: "#3F6B52" },
+  { name: "Slate", hex: "#475569" },
+];
+
+export function isValidHex(val) {
+  return typeof val === "string" && /^#[0-9a-f]{6}$/i.test(val);
+}
+

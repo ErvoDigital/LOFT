@@ -14,7 +14,7 @@ const COMPONENTS = {
   },
   table({ children }) {
     return (
-      <div className="assistant-message-table" role="region" aria-label="Table in Lofty's reply" tabIndex={0}>
+      <div className="assistant-message-table" role="region" aria-label="Table in Kas's reply" tabIndex={0}>
         <table>{children}</table>
       </div>
     );

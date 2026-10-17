@@ -56,7 +56,7 @@ test("My Plan excludes finished, foreign-assignee and revoked-workspace tasks an
   assert.doesNotMatch(JSON.stringify(context), /Removed workspace secret|Someone else's task|TIER_/);
 });
 
-test("Lofty explains the verified plan with no tools, honors personal order and cannot return foreign tasks", async () => {
+test("Kas explains the verified plan with no tools, honors personal order and cannot return foreign tasks", async () => {
   const fake = database();
   const plan = await getPlanData({ userId, now }, fake.db);
   const options = { now, timeZone: "Asia/Manila", manual: { order: [mediumId, urgentId], dates: {} } };

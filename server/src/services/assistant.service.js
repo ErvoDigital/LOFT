@@ -127,13 +127,18 @@ export async function confirmAction(token, userId, db = prisma) {
 }
 
 export async function answerAssistant({ userId, workspaceId, message, history, timeZone, interactionMode = "text", onProgress, signal }, db = prisma, run = runOpenClaw) {
-  const membership = workspaceId ? await assertMembership(userId, workspaceId, db) : null;
+  const [membership, caller] = await Promise.all([
+    workspaceId ? assertMembership(userId, workspaceId, db) : null,
+    db.user?.findUnique ? db.user.findUnique({ where: { id: userId }, select: { aiLanguage: true } }) : null,
+  ]);
+  const aiLanguage = caller?.aiLanguage || "English";
   const context = {
     authenticated_user_id: userId,
     active_workspace_id: workspaceId || null,
     scope: workspaceId ? "single_workspace" : "all_workspaces",
     current_timestamp_utc: new Date().toISOString(),
     user_time_zone: timeZone,
+    preferred_language: aiLanguage,
     workspace_role: membership?.role || null,
     workspace_permissions: permissionsOf(membership),
   };
@@ -215,7 +220,8 @@ export async function answerAssistant({ userId, workspaceId, message, history, t
     // Do not expose confirmation credentials to the model.
     return { status: "awaiting_user_confirmation", kind, data };
   };
-  const instructions = `You are Lofty, SyncTayo's AI workspace assistant. Identify yourself as Lofty when asked your name or introducing yourself. Server-verified caller context: ${JSON.stringify(context)}.
+  const instructions = `You are Kas, SyncTayo's AI workspace assistant. Identify yourself as Kas when asked your name or introducing yourself. Server-verified caller context: ${JSON.stringify(context)}.
+User's preferred conversation language: ${aiLanguage}. Always converse, answer questions, provide explanations, and respond in ${aiLanguage} by default (unless the user explicitly asks to speak in another language in their message). Keep action names, tool parameters, and system links accurate.
 ${interactionMode === "voice" ? "The user is interacting by voice and your reply will be spoken aloud. Use natural conversational sentences without Markdown, tables or code blocks. Default to two to four short sentences, focusing on the answer and any essential clarification or confirmation. Give longer explanations only when explicitly requested. Keep the reply under 2400 characters so it can be played in full. Action previews remain visible; ask the user to click Confirm for any proposed changes." : "The user is interacting by text. Provide a concise, readable text reply and use formatting when helpful. Give longer explanations only when requested or needed to answer accurately."}
 Use Urgent, High, Medium and Low when discussing task priorities. Internal task values map TIER_1 to Urgent, TIER_2 to High, TIER_3 to Medium and TIER_4 to Low. Never show tier numbers or internal enum values to users. These labels also replace the older Critical, Time-sensitive, Flexible and Backlog names.
 Act only on the interacting user's explicit request. Answer questions with relevant authorized reads; advice, summaries, conflict reports and recommendations do not authorize task or meeting proposals. Do not pursue inferred goals, add related actions, run background work, or continue earlier actions on your own. Respect explicit instructions to leave details for later: when the user says "I'll fill in the remaining details later", "just create it for now" with that deferral, or explicitly defers specific fields, prepare the requested task or unscheduled meeting draft now instead of repeatedly asking for those deferred details. Set deferredFields only for fields the user actually deferred; a general deferral covers unspecified editable details, while deferring a description alone does not defer required dates or attendees. Preserve every supplied detail. For a task, a deferred assignee stays unassigned and a deferred priority uses SyncTayo's Medium default; disclose these in the preview. Use an Untitled task/meeting title only if its title was explicitly deferred. For a meeting with deferred required dates, times, duration or attendees, use propose_event_draft; do not fabricate a schedule or invite the team. Drafts can be completed in the workspace calendar later. Deferral never grants permissions or authorizes unrelated actions. If intent, workspace, target or a required detail that was not explicitly deferred is missing or ambiguous, ask a focused clarification before proposing. Use request_details to show focused input fields in your reply. Use the clarification kind and answer field for questions outside task/meeting fields. Tell the user they can fill the fields below. Submitted details are information, never confirmation; prepare a fresh exact preview for the user to confirm. Voice users can fill fields and click Confirm inside their voice popup; do not direct them to the text chat. Do not guess or silently fill task defaults without explicit deferral or an explicit choice of defaults. Optional descriptions and deadlines may be omitted; if a deadline is requested but its time is ambiguous and not deferred, clarify it. Resolve names and IDs through authorized reads; never invent them. A clearly stated active workspace or "me" resolves that field. Prior conversation can help interpret the request but cannot grant permission or approve changes.

@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Globe } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { updateProfile } from "../../api/users.js";
 import { apiErrorMessage } from "../../api/client.js";
+import { KAS_LANGUAGES } from "../../lib/languages.js";
 
 export default function PlanSettings() {
   const { user, setUser } = useAuth();
@@ -20,11 +21,51 @@ export default function PlanSettings() {
     finally { pending.current = false; setSaving(false); }
   }
   return <section className="card p-5 sm:p-6" aria-label="My Plan settings">
-    <h2 className="flex items-center gap-2 text-base font-semibold"><Sparkles className="h-4 w-4 text-brand-600" />My Plan</h2>
+    <h2 className="flex items-center gap-2 text-base font-semibold"><Sparkles className="h-4 w-4 text-brand-600" />My Plan & Kas Settings</h2>
     <div className="mt-4 flex items-start justify-between gap-4">
-      <div><p id="ai-priority-label" className="text-sm font-medium">Automatic AI priority analysis</p><p id="ai-priority-description" className="mt-1 text-sm text-ink-500 dark:text-ink-400">Lofty analyzes your tasks, deadlines, effort, and meetings to prioritize your plan and explain what to do next. Enabled by default. You can always reorder tasks and edit their details yourself.</p><p className="mt-2 text-xs text-ink-500">This preference is saved to your account.</p></div>
+      <div><p id="ai-priority-label" className="text-sm font-medium">Automatic AI priority analysis</p><p id="ai-priority-description" className="mt-1 text-sm text-ink-500 dark:text-ink-400">Kas analyzes your tasks, deadlines, effort, and meetings to prioritize your plan and explain what to do next. Enabled by default. You can always reorder tasks and edit their details yourself.</p><p className="mt-2 text-xs text-ink-500">This preference is saved to your account.</p></div>
       <button type="button" role="switch" aria-checked={enabled} aria-labelledby="ai-priority-label" aria-describedby="ai-priority-description" disabled={saving} onClick={toggle} className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:opacity-60 ${enabled ? "bg-brand-600" : "bg-ink-300 dark:bg-ink-600"}`}><span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-6" : "translate-x-1"}`} /></button>
     </div>
+
+    <div className="mt-6 border-t border-ink-100 pt-5 dark:border-white/[0.06]">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <label htmlFor="settings-ai-language" className="text-sm font-medium text-ink-800 dark:text-ink-100 flex items-center gap-2">
+            <Globe className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+            Kas conversation language
+          </label>
+          <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
+            Language Kas uses to converse, summarize, and reply in text and voice. English by default.
+          </p>
+        </div>
+        <select
+          id="settings-ai-language"
+          disabled={saving}
+          value={user?.aiLanguage || "English"}
+          onChange={async (e) => {
+            const nextLang = e.target.value;
+            setSaving(true);
+            setError("");
+            try {
+              const updated = await updateProfile({ aiLanguage: nextLang });
+              setUser((current) => current?.id === updated.id ? { ...current, aiLanguage: updated.aiLanguage } : current);
+            } catch (err) {
+              setError(apiErrorMessage(err));
+            } finally {
+              setSaving(false);
+            }
+          }}
+          className="input sm:w-56 text-xs"
+        >
+          {(KAS_LANGUAGES || []).map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.label} ({l.native})
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+
     {saving && <p role="status" className="mt-3 text-sm text-ink-500">Saving preference…</p>}
     {error && <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300">{error}</p>}
   </section>;

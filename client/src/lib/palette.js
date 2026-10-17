@@ -53,10 +53,16 @@ export const DEFAULT_ACCENT = "emerald";
 // Each preset is the color its brand-500 is built around.
 export const ACCENT_PRESETS = [
   { id: "emerald", name: "Emerald", seed: EMERALD.brand[500] },
+  { id: "teal", name: "Teal", seed: "#0D9488" },
   { id: "ocean", name: "Ocean", seed: "#2479C9" },
+  { id: "sky", name: "Sky", seed: "#0284C7" },
   { id: "indigo", name: "Indigo", seed: "#5660D8" },
   { id: "violet", name: "Violet", seed: "#8B55D6" },
+  { id: "fuchsia", name: "Fuchsia", seed: "#C026D3" },
   { id: "rose", name: "Rose", seed: "#D5487A" },
+  { id: "crimson", name: "Crimson", seed: "#E11D48" },
+  { id: "coral", name: "Coral", seed: "#EA580C" },
+  { id: "amber", name: "Amber", seed: "#D97706" },
   { id: "graphite", name: "Graphite", seed: "#6B7280" },
 ];
 

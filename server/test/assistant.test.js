@@ -95,7 +95,7 @@ test("Inline detail requests expose authorized choices without creating proposal
   assert.equal(result.detailRequests[0].token, undefined);
 });
 
-test("Lofty reads the actual scoped My Plan and exposes only standard priority names in replies", async () => {
+test("Kas reads the actual scoped My Plan and exposes only standard priority names in replies", async () => {
   const fake = fakeDatabase();
   const result = await answerAssistant({ userId, workspaceId, message: "What should I do first in My Plan?", history: [], timeZone: "Asia/Manila" }, fake.db, async ({ executeTool }) => {
     const plan = await executeTool("get_my_plan", { dailyCapacityHours: 4 });
@@ -635,7 +635,7 @@ test("Assistant voice routes require auth, enforce membership and return normali
   }
 });
 
-test("Lofty summarizes permitted documents and conversations with source links and blocks unauthorized or meeting chats", async () => {
+test("Kas summarizes permitted documents and conversations with source links and blocks unauthorized or meeting chats", async () => {
   const Y = await import("yjs");
   const fake = fakeDatabase();
   const docId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";

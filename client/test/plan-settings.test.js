@@ -17,10 +17,11 @@ async function mount(t, options = {}) {
   const writes = [];
   const module = { exports: {} };
   vm.runInNewContext(bundle.outputFiles[0].text, { module, require: createRequire(import.meta.url), mocks: {
-    "lucide-react": { Sparkles: () => null },
+    "lucide-react": { Sparkles: () => null, Globe: () => null },
     "../../context/AuthContext.jsx": { useAuth: () => ({ user, setUser: (next) => { user = typeof next === "function" ? next(user) : next; } }) },
     "../../api/users.js": { updateProfile: async (data) => { writes.push(data); if (options.error) throw options.error; if (options.pending) await options.pending; return { id: "alice", ...data }; } },
     "../../api/client.js": { apiErrorMessage: (error) => error.message },
+    "../../lib/languages.js": { KAS_LANGUAGES: [{ id: "English", label: "English", native: "English (Default)" }] },
   } });
   let view; await act(async () => { view = create(React.createElement(module.exports.default)); });
   t.after(() => act(() => view.unmount()));

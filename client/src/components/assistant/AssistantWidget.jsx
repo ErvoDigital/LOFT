@@ -44,13 +44,13 @@ function voiceErrorMessage(err, stage) {
   const timedOut = err?.response?.status === 504 || ["ECONNABORTED", "ETIMEDOUT"].includes(err?.code);
   if (stage === "transcription") return timedOut
     ? "Turning your recording into text took too long. Please try recording again."
-    : "Lofty couldn't turn your recording into text. Please try recording again.";
+    : "Kas couldn't turn your recording into text. Please try recording again.";
   if (stage === "playback") return timedOut
     ? "Generating voice audio took too long. Your answer is available in chat. Tap Retry audio to try again."
-    : "Lofty couldn't generate voice audio. Your answer is available in chat. Tap Retry audio to try again.";
+    : "Kas couldn't generate voice audio. Your answer is available in chat. Tap Retry audio to try again.";
   return timedOut
-    ? "Lofty took too long to answer. Please try asking again."
-    : "Lofty couldn't finish your answer. Please try asking again.";
+    ? "Kas took too long to answer. Please try asking again."
+    : "Kas couldn't finish your answer. Please try asking again.";
 }
 
 // Conversation history stays in memory; tools and confirmations run on the server.
@@ -166,7 +166,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
     assistantStatus().then((status) => { if (current) setConfigured(status.configured); }).catch((err) => { if (current) {
       setConfigured(null);
       if (isAssistantUnavailable(err)) setUnavailable(true);
-      setError(isAssistantUnavailable(err) ? ASSISTANT_UNAVAILABLE_MESSAGE : "Couldn't check Lofty's availability. Close and reopen to try again.");
+      setError(isAssistantUnavailable(err) ? ASSISTANT_UNAVAILABLE_MESSAGE : "Couldn't check Kas's availability. Close and reopen to try again.");
     } });
     return () => { current = false; };
   }, [open]);
@@ -505,7 +505,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
     if (!configured) {
       bubbleHolding.current = false;
       setBubble((b) => b && { ...b, holding: false });
-      setVoiceError(configured === false ? "Your team needs to finish assistant setup before Lofty can answer." : "Lofty is still starting up. Try again in a moment.");
+      setVoiceError(configured === false ? "Your team needs to finish assistant setup before Kas can answer." : "Kas is still starting up. Try again in a moment.");
       return true;
     }
     changeVoiceMode(true);
@@ -559,15 +559,15 @@ export default function AssistantWidget({ launcherContainer = null }) {
   // Only the launchers move into the sidebar. The conversation and voice
   // session stay mounted here when the viewport changes.
   const launchers = (
-    <div role="group" aria-label="Lofty controls" className={launcherContainer
+    <div role="group" aria-label="Kas controls" className={launcherContainer
       ? "flex shrink-0 flex-col items-center gap-3 print:hidden"
       : "assistant-dock flex shrink-0 items-center justify-end gap-3 border-t border-ink-900/[0.06] px-3 dark:border-white/[0.06] sm:px-5 print:hidden"}>
       {!open && !bubble && (
         <button
           type="button"
           onClick={startTouchTurn}
-          aria-label="Talk to Lofty"
-          title="Talk to Lofty"
+          aria-label="Talk to Kas"
+          title="Talk to Kas"
           disabled={thinking || transcribing || Boolean(confirming)}
           className="btn-secondary flex h-12 w-12 shrink-0 items-center justify-center rounded-full p-0 shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50 sm:h-14 sm:w-14 lg:hidden"
         >
@@ -578,10 +578,10 @@ export default function AssistantWidget({ launcherContainer = null }) {
         ref={launcherRef}
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Open Lofty"
+        aria-label="Open Kas"
         aria-expanded={open}
         aria-controls="loft-assistant"
-        title="Lofty chat"
+        title="Kas chat"
         style={{ "--level": 0, "--turn": 0 }}
         className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-[transform,opacity,filter] duration-200 hover:-translate-y-0.5 hover:brightness-110 active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 sm:h-14 sm:w-14 lg:h-10 lg:w-10 ${open ? "invisible scale-75 opacity-0" : ""}`}
       >
@@ -608,7 +608,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
             id="loft-assistant"
             ref={panelRef}
             role="dialog"
-            aria-label="Lofty"
+            aria-label="Kas"
             tabIndex={-1}
             className="dropdown-panel assistant-wash assistant-panel z-40 flex min-h-0 min-w-0 animate-slide-fade-in flex-col overflow-hidden focus:outline-none"
           >
@@ -617,7 +617,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
                 <Sparkles className="h-[18px] w-[18px]" />
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-50">Lofty</h2>
+                <h2 className="text-sm font-semibold text-ink-900 dark:text-ink-50">Kas</h2>
                 <p className="flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${unavailable || configured === false ? "bg-amber-500" : configured === null ? "bg-ink-400" : "bg-accent-500"}`} aria-hidden="true" />
                   <span className="truncate">{unavailable ? "Temporarily unavailable" : configured === null ? "Checking setup" : configured ? "Ready to ask" : "Setup needed"}</span>
@@ -626,7 +626,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
               <button
                 type="button"
                 onClick={startTouchTurn}
-                aria-label="Talk to Lofty"
+                aria-label="Talk to Kas"
                 disabled={thinking || transcribing || recording || Boolean(confirming) || Boolean(bubble?.holding)}
                 className="btn-secondary inline-flex min-h-11 shrink-0 items-center gap-1.5 px-3 text-xs disabled:opacity-50"
               >
@@ -636,7 +636,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="Close Lofty"
+                aria-label="Close Kas"
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-ink-500 transition-colors hover:bg-ink-900/[0.06] hover:text-ink-900 dark:text-ink-400 dark:hover:bg-white/[0.08] dark:hover:text-ink-50"
               >
                 <X className="h-[18px] w-[18px]" />
@@ -665,7 +665,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
             <div ref={scrollRef} className="min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4 sm:py-4" aria-live="polite">
               <div className="space-y-1.5">
                 <p className="text-sm font-semibold text-ink-900 dark:text-ink-50">
-                  Hi{firstName ? ` ${firstName}` : ""}, I'm Lofty, your SyncTayo workspace assistant.
+                  Hi{firstName ? ` ${firstName}` : ""}, I'm Kas, your SyncTayo workspace assistant.
                 </p>
                 <p className="text-sm leading-relaxed text-ink-600 dark:text-ink-300">
                   I can help you plan from your tasks and events, and prepare tasks and meetings for you to confirm.
@@ -716,7 +716,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
                 <div role="alert" className="flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold">Lofty is temporarily unavailable</p>
+                    <p className="text-sm font-semibold">Kas is temporarily unavailable</p>
                     <p className="mt-1 text-xs leading-relaxed">{ASSISTANT_UNAVAILABLE_MESSAGE}</p>
                     {configured && draft.trim() && (
                       <button type="button" onClick={() => send(draft)} disabled={thinking || Boolean(confirming) || transcribing || recording} className="mt-2 min-h-11 rounded-lg border border-amber-300 px-3 text-xs font-semibold transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/30 dark:hover:bg-amber-500/10">
@@ -734,7 +734,7 @@ export default function AssistantWidget({ launcherContainer = null }) {
                   role="status"
                   className="flex w-fit items-center gap-1 rounded-2xl rounded-bl-sm border border-ink-200 bg-white px-3.5 py-3 dark:border-ink-700 dark:bg-ink-800"
                 >
-                  <span className="sr-only">Lofty is thinking</span>
+                  <span className="sr-only">Kas is thinking</span>
                   {[0, 150, 300].map((delay) => (
                     <span
                       key={delay}
@@ -757,10 +757,10 @@ export default function AssistantWidget({ launcherContainer = null }) {
                 <input
                   ref={inputRef}
                   className="input min-h-11 min-w-0 flex-1 !text-base sm:!text-sm"
-                  placeholder="Ask Lofty anything…"
+                  placeholder="Ask Kas anything…"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  aria-label="Message Lofty"
+                  aria-label="Message Kas"
                   maxLength={4000}
                 />
                 <button type="submit" className="btn-primary min-h-11 shrink-0" disabled={!draft.trim() || thinking || Boolean(confirming) || transcribing || recording || !configured}>

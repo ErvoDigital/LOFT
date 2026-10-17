@@ -43,10 +43,10 @@ export default function AssistantDetailForm({ request, disabled, onChange, onSub
     finally { submittingRef.current = false; setSubmitting(false); }
   }
 
-  if (request.submitted) return <p role="status" className="rounded-xl border border-brand-200 bg-brand-50 p-3 text-left text-sm text-brand-800 dark:border-brand-700 dark:bg-brand-900/30 dark:text-brand-200">Details sent to Lofty.</p>;
+  if (request.submitted) return <p role="status" className="rounded-xl border border-brand-200 bg-brand-50 p-3 text-left text-sm text-brand-800 dark:border-brand-700 dark:bg-brand-900/30 dark:text-brand-200">Details sent to Kas.</p>;
 
   return (
-    <form onSubmit={submit} aria-label="Details for Lofty" className="min-w-0 space-y-3 rounded-xl border border-ink-200 bg-white p-3 text-left text-sm dark:border-ink-700 dark:bg-ink-800">
+    <form onSubmit={submit} aria-label="Details for Kas" className="min-w-0 space-y-3 rounded-xl border border-ink-200 bg-white p-3 text-left text-sm dark:border-ink-700 dark:bg-ink-800">
       <p className="font-semibold">{request.prompt}</p>
       <fieldset disabled={busy} className="min-w-0 space-y-3">
         {request.fields.map((field) => {

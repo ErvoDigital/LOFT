@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mail, MessageSquare, UserCheck, UserPen, UserPlus, UserX } from "lucide-react";
+import { Mail, MessageSquare, UserCheck, UserPen, UserPlus, UserX, Phone, Clock } from "lucide-react";
 import * as usersApi from "../../api/users.js";
 import * as messagesApi from "../../api/messages.js";
 import { apiErrorMessage } from "../../api/client.js";
@@ -147,17 +147,38 @@ export default function MemberProfileModal({ open, onClose, userId, workspaceId 
               )}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-lg font-semibold tracking-tight text-ink-900 dark:text-ink-50">
-                {profile.user.name}
-                {isMe && <span className="font-normal text-ink-400"> (you)</span>}
-              </p>
-              <a
-                href={`mailto:${profile.user.email}`}
-                className="flex min-w-0 items-center gap-1.5 text-sm text-ink-500 hover:text-brand-600 dark:text-ink-400 dark:hover:text-brand-300"
-              >
-                <Mail className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{profile.user.email}</span>
-              </a>
+              <div className="flex flex-wrap items-baseline gap-1.5">
+                <p className="truncate text-lg font-semibold tracking-tight text-ink-900 dark:text-ink-50">
+                  {profile.user.name}
+                  {isMe && <span className="font-normal text-ink-400"> (you)</span>}
+                </p>
+                {profile.user.pronouns && (
+                  <span className="rounded-md bg-ink-100 px-1.5 py-0.5 text-xs font-normal text-ink-600 dark:bg-white/10 dark:text-ink-300">
+                    {profile.user.pronouns}
+                  </span>
+                )}
+              </div>
+              {profile.user.title && (
+                <p className="text-xs font-medium text-brand-700 dark:text-brand-300">{profile.user.title}</p>
+              )}
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <a
+                  href={`mailto:${profile.user.email}`}
+                  className="flex min-w-0 items-center gap-1.5 text-ink-500 hover:text-brand-600 dark:text-ink-400 dark:hover:text-brand-300"
+                >
+                  <Mail className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{profile.user.email}</span>
+                </a>
+                {profile.user.phone && (
+                  <a
+                    href={`tel:${profile.user.phone}`}
+                    className="flex min-w-0 items-center gap-1.5 text-ink-500 hover:text-brand-600 dark:text-ink-400 dark:hover:text-brand-300"
+                  >
+                    <Phone className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{profile.user.phone}</span>
+                  </a>
+                )}
+              </div>
               <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-500 dark:text-ink-400">
                 {supported && <span className={online ? "font-medium text-emerald-600 dark:text-emerald-400" : ""}>{online ? "Online" : "Offline"}</span>}
                 {supported && focus && <span aria-hidden="true">·</span>}
@@ -166,9 +187,30 @@ export default function MemberProfileModal({ open, onClose, userId, workspaceId 
                     {memberTitle(focus)} in {focus.name}
                   </span>
                 )}
+                {profile.user.timezone && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {(() => {
+                        try {
+                          return `${new Intl.DateTimeFormat([], { timeZone: profile.user.timezone, hour: "numeric", minute: "2-digit" }).format(new Date())} local`;
+                        } catch {
+                          return profile.user.timezone;
+                        }
+                      })()}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
+
+          {profile.user.bio && (
+            <div className="rounded-xl border border-ink-100 bg-ink-50/70 px-3.5 py-2.5 text-xs text-ink-700 dark:border-white/[0.06] dark:bg-white/[0.03] dark:text-ink-200">
+              <p className="leading-relaxed">{profile.user.bio}</p>
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-2">
             {isMe ? (

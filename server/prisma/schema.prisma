@@ -39,6 +39,12 @@ model User {
   passwordChangeCodeExpiry DateTime?
   twoFactorEnabled         Boolean   @default(false)
   aiPriorityEnabled        Boolean   @default(true)
+  bio                      String?
+  pronouns                 String?
+  title                    String?
+  timezone                 String?   @default("Asia/Manila")
+  themePreference          String?
+  aiLanguage               String?   @default("English")
   planPreferences          String?
   notificationPreferences  String?
   createdAt        DateTime  @default(now())

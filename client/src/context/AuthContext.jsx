@@ -1,11 +1,19 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import * as authApi from "../api/auth.js";
+import { useTheme } from "./ThemeContext.jsx";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { syncPreferences } = useTheme();
+
+  useEffect(() => {
+    if (user?.themePreference) {
+      syncPreferences(user.themePreference);
+    }
+  }, [user?.themePreference, syncPreferences]);
 
   useEffect(() => {
     const token = localStorage.getItem("loft_token");

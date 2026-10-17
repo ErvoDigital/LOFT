@@ -102,7 +102,7 @@ function MyPlanPage({ userId, aiEnabled }) {
     return () => { requestId.current++; };
   }, [load]);
 
-  // Keep the server's capacity and Lofty's context consistent with the UI.
+  // Keep the server's capacity and Kas's context consistent with the UI.
   useEffect(() => {
     try {
       localStorage.setItem(`${CAPACITY_KEY}:${userId}`, String(capacity));
@@ -253,7 +253,7 @@ function MyPlanPage({ userId, aiEnabled }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold text-ink-900 dark:text-ink-50">My Plan</h2>
-            <p className="text-sm text-ink-500">Your tasks across workspaces, with Lofty’s guidance and room to plan your own way.</p>
+            <p className="text-sm text-ink-500">Your tasks across workspaces, with Kas’s guidance and room to plan your own way.</p>
             {view !== "calendar" && (
               <div className="mt-2 flex items-center gap-2 text-sm text-ink-600 dark:text-ink-300">
                 <label htmlFor="plan-capacity">Hours per day</label>
@@ -306,7 +306,7 @@ function MyPlanPage({ userId, aiEnabled }) {
           <>
             {hasTasks && <>
               <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-ink-500">
-                <p>{aiEnabled ? "Lofty analyzes priorities automatically. Reorder or edit any task below." : "Automatic AI analysis is off. Reorder or edit any task below."}</p>
+                <p>{aiEnabled ? "Kas analyzes priorities automatically. Reorder or edit any task below." : "Automatic AI analysis is off. Reorder or edit any task below."}</p>
                 {(preferences.order.length > 0 || Object.keys(preferences.dates).length > 0) && <button type="button" className="min-h-11 text-brand-700 underline dark:text-brand-300" onClick={() => setPreferences(emptyManualPlan())}>Reset personal changes</button>}
               </div>
               {aiEnabled && <PlanRecommendations analysis={analysis} tasks={plan.tasks} onOpen={openTaskDetail} />}

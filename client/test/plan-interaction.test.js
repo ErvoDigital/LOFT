@@ -107,7 +107,7 @@ test("Disabled personal setting prevents automatic analysis but leaves manual or
   const page = await mount(t, { aiEnabled: false, order: ["b", "a", "c"] });
   await page.analyze();
   assert.equal(page.recommendations.length, 0);
-  assert.equal(page.view.root.findAllByProps({ "aria-label": "Lofty priority analysis" }).length, 0);
+  assert.equal(page.view.root.findAllByProps({ "aria-label": "Kas priority analysis" }).length, 0);
   await page.click("Move Fix release down");
   assert.deepEqual(page.rows(), ["b", "a", "c"]);
   await page.click("Edit task Prepare notes");

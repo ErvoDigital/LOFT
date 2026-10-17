@@ -86,7 +86,7 @@
 }
 
 @layer components {
-  /* Reserve space for Lofty's mobile launchers. On desktop they live in the
+  /* Reserve space for Kas's mobile launchers. On desktop they live in the
      sidebar, so floating notices don't need any extra footer clearance. */
   .assistant-dock {
     height: var(--assistant-dock-height);

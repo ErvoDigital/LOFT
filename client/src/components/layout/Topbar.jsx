@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, LogOut, Sun, Moon, Menu } from "lucide-react";
+import { User, LogOut, Sun, Moon, Menu, Palette } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import Avatar from "../common/Avatar.jsx";
@@ -90,6 +90,15 @@ export default function Topbar({ title, context, navOpen, onOpenNav }) {
                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-ink-600 transition-colors hover:bg-brand-500/10 hover:text-brand-700 dark:text-ink-300 dark:hover:bg-white/[0.08] dark:hover:text-brand-300"
               >
                 <User className="h-3.5 w-3.5" /> Profile settings
+              </button>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  navigate("/profile?tab=appearance");
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-ink-600 transition-colors hover:bg-brand-500/10 hover:text-brand-700 dark:text-ink-300 dark:hover:bg-white/[0.08] dark:hover:text-brand-300"
+              >
+                <Palette className="h-3.5 w-3.5" /> Colors & appearance
               </button>
               <button
                 onClick={logout}

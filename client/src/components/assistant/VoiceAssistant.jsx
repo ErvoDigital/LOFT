@@ -5,7 +5,7 @@ import { spokenReplyAt } from "../../utils/assistantTranscript.js";
 import VoiceOrb from "./VoiceOrb.jsx";
 import useVisualViewport from "../../hooks/useVisualViewport.js";
 
-// How long M has to be held before Lofty starts listening, so an accidental
+// How long M has to be held before Kas starts listening, so an accidental
 // tap does nothing.
 const HOLD_MS = 200;
 
@@ -106,13 +106,13 @@ function VoiceTranscript({ text, replyId, audio }) {
     <div
       ref={viewportRef}
       role="region"
-      aria-label="Lofty's voice transcript"
+      aria-label="Kas's voice transcript"
       tabIndex={0}
       onScroll={handleScroll}
       data-scrolled={scrolled}
       className="voice-transcript pointer-events-auto w-full max-w-lg rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60"
     >
-      <p aria-label="Lofty's spoken reply" className="whitespace-pre-wrap break-words px-2 text-lg font-medium leading-relaxed tracking-tight text-ink-900 dark:text-ink-50 sm:text-xl">
+      <p aria-label="Kas's spoken reply" className="whitespace-pre-wrap break-words px-2 text-lg font-medium leading-relaxed tracking-tight text-ink-900 dark:text-ink-50 sm:text-xl">
         {text}
       </p>
     </div>
@@ -156,15 +156,15 @@ function useMicLevel(stream) {
   return read;
 }
 
-// Voice for Lofty: tapping Talk or holding M outside a text field brings up
+// Voice for Kas: tapping Talk or holding M outside a text field brings up
 // the orb in the middle of the screen. The recording, transcription, reply
 // and spoken audio belong to the bubble, with shared chat history; this is the
 // full-screen view of one turn, driven by these props:
 //
 // - phase: listening | thinking | speaking | done | error
-// - heard / reply: the turn's transcribed question and Lofty's answer
+// - heard / reply: the turn's transcribed question and Kas's answer
 // - stream: the recorder's microphone stream while listening, for the orb
-// - onHoldStart() starts a turn and returns false when Lofty is busy;
+// - onHoldStart() starts a turn and returns false when Kas is busy;
 //   onHoldEnd() sends what was recorded; onSkip() stops the spoken answer;
 //   onClose() ends the bubble (the widget moves the turn into its chat).
 //
@@ -362,7 +362,7 @@ export default function VoiceAssistant({
       ref={overlayRef}
       role="dialog"
       aria-modal="true"
-      aria-label="Lofty voice"
+      aria-label="Kas voice"
       data-interactive={Boolean(replyControls)}
       tabIndex={-1}
       className="voice-overlay fixed inset-x-0 z-[65] flex animate-fade-in flex-col items-center overflow-hidden px-4 focus:outline-none print:hidden"
@@ -438,7 +438,7 @@ export default function VoiceAssistant({
               </div>
             </div>
           )}
-          {replyControls && <div className="pointer-events-auto w-full max-w-lg space-y-3 text-ink-900 dark:text-ink-100" aria-label="Lofty reply controls">{replyControls}</div>}
+          {replyControls && <div className="pointer-events-auto w-full max-w-lg space-y-3 text-ink-900 dark:text-ink-100" aria-label="Kas reply controls">{replyControls}</div>}
         </div>
       </div>
 
@@ -488,7 +488,7 @@ export default function VoiceAssistant({
       <button
         type="button"
         onClick={() => setMinimized(false)}
-        title="Show Lofty voice"
+        title="Show Kas voice"
         className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-900/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-100 dark:hover:bg-white/[0.06]"
       >
         <VoiceOrb state={phase} small />

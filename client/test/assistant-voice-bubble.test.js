@@ -49,13 +49,13 @@ async function mount(t, overrides = {}) {
   });
   let view;
   await act(async () => { view = create(React.createElement(exported.exports.default, props), {
-    createNodeMock: ({ props: nodeProps }) => nodeProps["aria-label"] === "Lofty's voice transcript" ? overrides.transcriptViewport || null : nodeProps["aria-label"] === "Live recording transcript" ? overrides.recordingViewport || null : null,
+    createNodeMock: ({ props: nodeProps }) => nodeProps["aria-label"] === "Kas's voice transcript" ? overrides.transcriptViewport || null : nodeProps["aria-label"] === "Live recording transcript" ? overrides.recordingViewport || null : null,
   }); });
   t.after(() => act(() => view.unmount()));
   const click = async (label) => act(async () => view.root.findAllByType("button").find((b) => b.props["aria-label"] === label || b.props.title === label).props.onClick());
   const update = async (changes) => { Object.assign(props, changes); await act(async () => view.update(React.createElement(exported.exports.default, props))); };
   const tick = async () => { await act(async () => { const pending = [...frames]; frames.clear(); for (const [, fn] of pending) fn(16); }); };
-  const spokenText = () => view.root.findAllByProps({ "aria-label": "Lofty's spoken reply" })[0]?.children.join("") || "";
+  const spokenText = () => view.root.findAllByProps({ "aria-label": "Kas's spoken reply" })[0]?.children.join("") || "";
   return { view, events, listeners, timers, frames, body, click, update, tick, spokenText };
 }
 
@@ -87,7 +87,7 @@ test("User speech keeps updating while minimized and remains visible during fina
   assert.ok(captions());
   await bubble.update({ transcribing: false, interimTranscript: false });
   assert.equal(bubble.view.root.findAllByProps({ "aria-label": "Live recording transcript" }).length, 0);
-  await bubble.click("Show Lofty voice");
+  await bubble.click("Show Kas voice");
   assert.ok(bubble.view.root.findByProps({ "aria-label": "Your voice question" }));
 });
 
@@ -101,7 +101,7 @@ test("Confirmation and detail controls render inside the expanded voice dialog a
   assert.deepEqual(bubble.events, []);
   await bubble.click("Minimize");
   assert.equal(bubble.view.root.findAllByProps({ role: "dialog" }).length, 0);
-  await bubble.click("Show Lofty voice");
+  await bubble.click("Show Kas voice");
   assert.equal(dialog().findAllByProps({ "aria-label": "Inline details" }).length, 1);
 });
 
@@ -169,7 +169,7 @@ test("Ask again from the minimized pill starts a tap turn and expands the bubble
   await bubble.click("Minimize");
   await bubble.click("Ask again");
   assert.deepEqual(bubble.events, ["talk"]);
-  assert.equal(bubble.view.root.findByProps({ role: "dialog" }).props["aria-label"], "Lofty voice");
+  assert.equal(bubble.view.root.findByProps({ role: "dialog" }).props["aria-label"], "Kas voice");
 });
 
 test("Play is available in both the full bubble and its minimized pill", async (t) => {
@@ -220,7 +220,7 @@ test("Minimizing continues transcript progress and replay begins the reveal agai
   await bubble.click("Minimize");
   audio.currentTime = 6;
   await bubble.tick();
-  await bubble.click("Show Lofty voice");
+  await bubble.click("Show Kas voice");
   assert.equal(bubble.spokenText(), "One two three");
   audio.currentTime = 10;
   audio.ended = true;
@@ -264,7 +264,7 @@ test("The spoken transcript follows new words, yields to manual scrolling and re
   const viewport = scrollViewport();
   const audio = { currentTime: 3, duration: 10, ended: false };
   const bubble = await mount(t, { phase: "speaking", reply: "One two three four", replyId: 1, audio, transcriptViewport: viewport });
-  const transcript = () => bubble.view.root.findByProps({ "aria-label": "Lofty's voice transcript" });
+  const transcript = () => bubble.view.root.findByProps({ "aria-label": "Kas's voice transcript" });
   const scroll = async (top) => {
     viewport.scrollTop = top;
     await act(async () => transcript().props.onScroll({ currentTarget: viewport }));
@@ -292,7 +292,7 @@ test("Replay and new replies restore automatic transcript scrolling after readin
   const bubble = await mount(t, { phase: "done", reply: "One two three four", replyId: 1, audio, transcriptViewport: viewport });
   const scrollBack = async () => {
     viewport.scrollTop = 0;
-    await act(async () => bubble.view.root.findByProps({ "aria-label": "Lofty's voice transcript" }).props.onScroll({ currentTarget: viewport }));
+    await act(async () => bubble.view.root.findByProps({ "aria-label": "Kas's voice transcript" }).props.onScroll({ currentTarget: viewport }));
   };
   await scrollBack();
   audio.currentTime = 0;

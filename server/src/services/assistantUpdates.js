@@ -45,7 +45,7 @@ export async function confirmAssistantUpdate(action, userId, db) {
     const previous = await tx.assistantMutation?.findUnique({ where: { id: action.actionId } });
     if (previous) return { kind: action.kind, id: previous.recordId, workspaceId: previous.workspaceId, alreadyCreated: true };
     const { record, changes } = checked;
-    if ((record.updatedAt ? new Date(record.updatedAt).toISOString() : null) !== data.expectedUpdatedAt) throw new ApiError(409, "This item changed after the preview. Ask Lofty for a fresh preview.");
+    if ((record.updatedAt ? new Date(record.updatedAt).toISOString() : null) !== data.expectedUpdatedAt) throw new ApiError(409, "This item changed after the preview. Ask Kas for a fresh preview.");
     const task = action.kind === "task_update", { attendeeIds, ...patch } = changes;
     if (task && patch.dueDate !== undefined) patch.remindedAt = null;
     if (!task && patch.startTime !== undefined) patch.remindedAt = null;
