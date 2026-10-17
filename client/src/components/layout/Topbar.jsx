@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import Avatar from "../common/Avatar.jsx";
 import NotificationsBell from "../notifications/NotificationsBell.jsx";
+import GlobalSearch from "./GlobalSearch.jsx";
 
 const PAGE_TITLES = {
   "/": "Dashboard",
@@ -53,6 +54,7 @@ export default function Topbar({ title, context, navOpen, onOpenNav }) {
         </h1>
       </div>
       <div className="flex shrink-0 items-center gap-1 sm:gap-2 lg:gap-3">
+        <GlobalSearch />
         <button
           onClick={toggleTheme}
           title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}

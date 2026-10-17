@@ -47,7 +47,7 @@ function ClashItem({ item, color }) {
   const isTask = item.kind === "task";
   return (
     <Link
-      to={`/workspaces/${item.workspaceId}/${isTask ? "tasks" : "calendar"}`}
+      to={`/workspaces/${item.workspaceId}/${isTask ? "tasks?task=" : "calendar?event="}${item.id}`}
       title={`${item.title} · ${item.workspaceName}`}
       className="group flex min-w-0 items-center gap-2.5 rounded-xl border border-ink-900/[0.06] bg-white/60 px-3 py-1.5 transition-colors hover:border-brand-400/50 hover:bg-white dark:border-white/[0.06] dark:bg-white/[0.03] dark:hover:border-brand-400/30 dark:hover:bg-white/[0.06]"
     >

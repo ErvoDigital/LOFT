@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { CalendarX, Plus } from "lucide-react";
 import * as eventsApi from "../api/events.js";
 import * as workspacesApi from "../api/workspaces.js";
@@ -107,6 +107,7 @@ function NextUp({ event, now, onReveal }) {
 
 export default function WorkspaceCalendar() {
   const { workspaceId } = useParams();
+  const location = useLocation();
   const { socket } = useSocket();
   const now = useNow();
   const [view, setView] = useState(readView);
@@ -124,6 +125,11 @@ export default function WorkspaceCalendar() {
   // The open event is tracked by id, not by value, so a live edit or
   // cancellation from someone else flows straight into the open card.
   const [detailsId, setDetailsId] = useState(null);
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get("event");
+    const event = events.find((item) => item.id === id);
+    if (event) { setDetailsId(event.id); setSelectedDate(startOfDay(new Date(event.startTime))); setMonthDate(startOfMonth(new Date(event.startTime))); }
+  }, [location.search, workspaceId, loading]);
   const [error, setError] = useState("");
   const confirm = useConfirm();
 
@@ -151,7 +157,7 @@ export default function WorkspaceCalendar() {
   useEffect(() => {
     if (!socket) return;
     const handler = () => load();
-    const events = ["event:created", "event:updated", "event:cancelled", "event:draft-created", "event:draft-updated", "event:draft-deleted"];
+    const events = ["event:created", "event:updated", "event:cancelled", "event:attendance", "event:draft-created", "event:draft-updated", "event:draft-deleted"];
     events.forEach((e) => socket.on(e, handler));
     return () => events.forEach((e) => socket.off(e, handler));
   }, [socket, load]);
@@ -377,6 +383,7 @@ export default function WorkspaceCalendar() {
       </div>
 
       <EventDetailsModal
+        onSaved={load}
         open={!!detailsEvent}
         onClose={() => setDetailsId(null)}
         event={detailsEvent}

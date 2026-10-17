@@ -16,6 +16,7 @@ import PreviewModal from "../components/storage/PreviewModal.jsx";
 import UploadProgressPanel from "../components/storage/UploadProgressPanel.jsx";
 import EmptyState from "../components/common/EmptyState.jsx";
 import Spinner from "../components/common/Spinner.jsx";
+import RecycleBin from "../components/storage/RecycleBin.jsx";
 import { can } from "../lib/access.js";
 import { ACCEPTED_UPLOAD_TYPES } from "../lib/uploads.js";
 
@@ -43,6 +44,9 @@ export default function WorkspaceStorage() {
   const [movingAsset, setMovingAsset] = useState(null);
   const [previewing, setPreviewing] = useState(null); // { asset, version } | null
   const fileInputRef = useRef(null);
+  const [pausedUpload, setPausedUpload] = useState(null);
+  const requestedAsset = searchParams.get("asset");
+  useEffect(() => { const asset = assets.find((item) => item.id === requestedAsset); if (asset) setPreviewing({ asset, version: asset.latestVersion }); }, [requestedAsset, loading]);
 
   function downloadFile(assetId, version) {
     return assetsApi.downloadVersion(workspaceId, assetId, version);
@@ -175,6 +179,7 @@ export default function WorkspaceStorage() {
 
   async function uploadNew(file, folderId = currentFolderId) {
     setError("");
+    setPausedUpload(null);
     const uploadId = `${Date.now()}-${Math.random()}`;
     setNewUploads((prev) => [...prev, { id: uploadId, name: file.name, size: file.size, progress: 0 }]);
     try {
@@ -186,6 +191,7 @@ export default function WorkspaceStorage() {
       load();
     } catch (err) {
       setError(apiErrorMessage(err));
+      if (file.size > 5 * 1024 * 1024) setPausedUpload({ file, folderId });
     } finally {
       setNewUploads((prev) => prev.filter((u) => u.id !== uploadId));
     }
@@ -234,10 +240,10 @@ export default function WorkspaceStorage() {
 
   async function remove(assetId) {
     const ok = await confirm({
-      title: "Delete this file?",
+      title: "Move this file to the recycle bin?",
       subject: assets.find((a) => a.id === assetId)?.name,
-      message: "Every version of it will be deleted for everyone in this workspace. This can't be undone.",
-      confirmLabel: "Delete file",
+      message: "It will be hidden from the workspace. You can restore it with all its versions from the recycle bin.",
+      confirmLabel: "Move to recycle bin",
     });
     if (!ok) return;
     try {
@@ -289,6 +295,7 @@ export default function WorkspaceStorage() {
       onDrop={handlePageDrop}
     >
       <div className="mx-auto max-w-6xl space-y-4 p-4 sm:p-6">
+        {pausedUpload && <div role="status" className="rounded-xl bg-amber-500/10 p-3 text-sm">Upload paused: {pausedUpload.file.name}. Completed parts are kept for 24 hours. <button className="ml-2 font-medium text-brand-600" onClick={() => uploadNew(pausedUpload.file, pausedUpload.folderId)}>Resume upload</button></div>}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm">
@@ -307,6 +314,7 @@ export default function WorkspaceStorage() {
             <p className="text-xs text-ink-400 touch:hidden">Drag a new take onto an existing file to save it as the next version.</p>
           </div>
           <div className="flex gap-2">
+            <RecycleBin workspaceId={workspaceId} onChanged={load} />
             <button className="btn-secondary flex-1 sm:flex-none" onClick={() => setFolderModal({ parentId: currentFolderId })}>
               <FolderPlus className="mr-1.5 inline h-4 w-4" />
               New folder
@@ -404,6 +412,7 @@ export default function WorkspaceStorage() {
                       onDropFile={(file) => uploadVersionFor(a.id, file)}
                       onMergeDrop={(sourceId) => merge(a.id, sourceId)}
                       onDownload={(version) => downloadFile(a.id, version)}
+                      onRestoreVersion={async (version) => { if (await confirm({ title: `Restore V${version.version}?`, subject: a.name, message: "A copy becomes the latest version. Existing versions remain available.", confirmLabel: "Restore version" })) { try { await assetsApi.restoreVersion(workspaceId, a.id, version.id); load(); } catch (err) { setError(apiErrorMessage(err)); } } }}
                       onPreview={(version) => setPreviewing({ asset: a, version })}
                       onMove={setMovingAsset}
                       onDelete={remove}

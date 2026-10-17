@@ -157,3 +157,11 @@ export async function validateUploadedFile(file) {
 
   return { originalName, extension, mimeType: file.mimetype.toLowerCase() };
 }
+
+export function validateUploadMetadata(originalname, mimetype, size) {
+  const originalName = normalizeUploadFilename(originalname);
+  const extension = path.extname(originalName).toLowerCase();
+  if (!Number.isInteger(size) || size < 1 || size > MAX_UPLOAD_BYTES) throw new ApiError(413, "File exceeds the 25 MiB upload limit");
+  if (!TYPES.get(extension)?.has(String(mimetype || "").toLowerCase())) throw new ApiError(415, "File type is not allowed");
+  return { originalName, mimeType: mimetype.toLowerCase() };
+}

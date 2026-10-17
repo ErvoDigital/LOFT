@@ -33,6 +33,8 @@ import { PageBreak } from "../lib/tiptapPageBreak.js";
 import { Pagination } from "../lib/tiptapPagination.js";
 import { promptForLink } from "../lib/tiptapLink.js";
 import Avatar from "../components/common/Avatar.jsx";
+import DocumentHistory from "../components/documents/DocumentHistory.jsx";
+import { connectDocumentRecovery } from "../lib/documentRecovery.js";
 import Spinner from "../components/common/Spinner.jsx";
 import DocumentToolbar from "../components/documents/DocumentToolbar.jsx";
 import DocumentMenuBar from "../components/documents/DocumentMenuBar.jsx";
@@ -162,9 +164,19 @@ export default function DocumentEditor() {
   // old effect's cleanup — a real crash reproduced via "Make a copy" then
   // navigating to the new doc. State keeps this in lockstep with `ready`.
   const [providerInstance, setProviderInstance] = useState(null);
+  const [saveStatus, setSaveStatus] = useState("saved"), [recoveryError, setRecoveryError] = useState("");
   const documentReady = ready && providerInstance?.documentId === docId && meta?.id === docId;
 
   const ydoc = useMemo(() => new Y.Doc(), [docId]);
+  useEffect(() => {
+    if (!documentReady) return;
+    let closed = false, recovery;
+    connectDocumentRecovery(user.id, docId, ydoc, setRecoveryError).then((value) => { recovery = value; if (closed) recovery.close(); }).catch(() => setRecoveryError("Offline recovery is unavailable on this device."));
+    const status = (event) => { if (event.documentId === docId) setSaveStatus(event.status); };
+    const local = () => setSaveStatus("saving");
+    ydoc.on("update", local); socket?.on("document:save-status", status);
+    return () => { closed = true; recovery?.close(); ydoc.off("update", local); socket?.off("document:save-status", status); };
+  }, [documentReady, docId, ydoc, socket, user.id]);
   const titleSaveTimer = useRef(null);
   const titleInputRef = useRef(null);
   const titlePending = useRef(null);
@@ -455,12 +467,14 @@ export default function DocumentEditor() {
           ))}
         </div>
         <ModeSwitcher mode={mode} onChange={setMode} />
+        {documentReady && <DocumentHistory workspaceId={workspaceId} documentId={docId} editor={editorInstance} ydoc={ydoc} onLayout={applyLayout} onTitle={handleTitleChange} />}
         {documentReady && mode !== "viewing" && <button onClick={() => { editorInstance?.chain().addPage().run(); setPageless(false); }} disabled={!editorInstance} aria-label="Add page" className="btn-primary shrink-0 !px-2.5 !py-1.5 !text-xs"><Plus className="h-3.5 w-3.5" /><span className="hidden sm:inline">Add page</span></button>}
       </div>
 
       {actionError && <div role="alert" className="flex items-center justify-between gap-3 bg-red-50 px-4 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400 print:hidden"><span>{actionError}</span><div className="flex shrink-0 gap-3">{titlePending.current && <button onClick={() => void saveTitle(titlePending.current)} className="font-medium underline">Retry title save</button>}<button onClick={() => setActionError("")} aria-label="Dismiss error"><X className="h-4 w-4" /></button></div></div>}
       {!connected && ready && <div role="status" className="bg-accent-50 px-4 py-2 text-xs text-accent-700 dark:bg-accent-500/10 dark:text-accent-400 print:hidden">Connection lost. Keep this tab open; your changes will sync when you reconnect.</div>}
 
+      {documentReady && <p role="status" className={`px-4 py-1 text-xs print:hidden ${saveStatus === "error" ? "bg-red-500/10 text-red-600" : "text-ink-400"}`}>{!connected ? "Offline · changes will sync when connected" : saveStatus === "error" ? "Save failed. Retrying automatically; keep this tab open." : saveStatus === "saving" ? "Saving changes…" : "All changes saved"}{recoveryError ? ` · ${recoveryError}` : ""}</p>}
       {!documentReady ? (
         <div className="flex flex-1 items-center justify-center">
           <Spinner />

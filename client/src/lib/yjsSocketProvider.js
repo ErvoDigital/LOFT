@@ -98,6 +98,9 @@ export class SocketYjsProvider {
           try {
             Y.applyUpdate(this.ydoc, fromBase64(res.update), this);
             this.synced = true;
+            // Updates made offline may never have reached the server. Merge
+            // our full state after every authorized join, including reconnects.
+            this.socket.emit("document:update", { documentId: this.documentId, update: toBase64(Y.encodeStateAsUpdate(this.ydoc)) });
             resolve(res);
           } catch {
             reject(new Error("Couldn't sync this document. Please reopen it."));

@@ -6,10 +6,11 @@ import { emitToWorkspace } from "../sockets/io.js";
 import { assertValidStatus, ensureWorkspaceStatuses } from "./taskStatuses.controller.js";
 import { can } from "../services/permissions.js";
 import { deleteStoredVersions } from "../services/assetStorage.js";
+import { assertParent, changedTaskFields, serializable } from "../services/taskCollaboration.js";
 
 const TIERS = ["TIER_1", "TIER_2", "TIER_3", "TIER_4"];
 
-const taskSchema = z.object({
+export const taskSchema = z.object({
   title: z.string().min(1).max(160),
   description: z.string().max(2000).optional(),
   tier: z.enum(TIERS).default("TIER_3"),
@@ -20,6 +21,8 @@ const taskSchema = z.object({
   isSnoozed: z.boolean().optional(),
   assigneeId: z.string().optional().nullable(),
   order: z.number().optional(),
+  parentTaskId: z.string().min(1).nullable().optional(),
+  sourceMessageId: z.string().min(1).optional(),
 });
 
 function serialize(task) {
@@ -41,6 +44,8 @@ function serialize(task) {
     assignee: task.assignee,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
+    parentTaskId: task.parentTaskId,
+    sourceMessageId: task.sourceMessageId,
   };
 }
 
@@ -69,6 +74,10 @@ export async function listMyTasks(req, res) {
 export async function createTask(req, res) {
   const data = taskSchema.parse(req.body);
   const workspaceId = req.params.workspaceId;
+  if (data.sourceMessageId) {
+    const message = await prisma.message.findFirst({ where: { id: data.sourceMessageId, conversation: { participants: { some: { userId: req.userId } }, OR: [{ workspaceId }, { workspaceId: null }] } } });
+    if (!message) throw new ApiError(403, "Source message is not accessible");
+  }
 
   if (data.status) {
     await assertValidStatus(workspaceId, data.status);
@@ -92,12 +101,17 @@ export async function createTask(req, res) {
     data.order = (last?.order ?? 0) + 1;
   }
 
-  const task = await prisma.task.create({
+  const task = await serializable(prisma, async (tx) => {
+    if (data.parentTaskId) await assertParent(tx, workspaceId, null, data.parentTaskId);
+    const created = await tx.task.create({
     data: { ...data, ...(req.assistantActionId ? { id: req.assistantActionId } : {}), workspaceId, createdById: req.userId },
     include: {
       workspace: { select: { name: true, color: true } },
       assignee: { select: { id: true, name: true, avatarColor: true } },
     },
+    });
+    await tx.taskChange?.create({ data: { taskId: created.id, userId: req.userId, changes: JSON.stringify({ created: { before: null, after: created.title } }) } });
+    return created;
   });
 
   emitToWorkspace(workspaceId, "task:created", serialize(task));
@@ -115,6 +129,7 @@ export async function createTask(req, res) {
 
 export async function updateTask(req, res) {
   const data = taskSchema.partial().parse(req.body);
+  if (data.sourceMessageId !== undefined) throw new ApiError(400, "A task's source cannot be changed");
   const existing = await prisma.task.findUnique({ where: { id: req.params.taskId } });
   if (!existing || existing.workspaceId !== req.params.workspaceId) throw new ApiError(404, "Task not found");
 
@@ -138,13 +153,21 @@ export async function updateTask(req, res) {
     if (!isMember) throw new ApiError(400, "Assignee is not a member of this workspace");
   }
 
-  const task = await prisma.task.update({
+  const task = await serializable(prisma, async (tx) => {
+    const current = await tx.task.findUnique({ where: { id: existing.id } });
+    if (!current || current.workspaceId !== req.params.workspaceId) throw new ApiError(404, "Task not found");
+    if (data.parentTaskId) await assertParent(tx, current.workspaceId, current.id, data.parentTaskId);
+    const updated = await tx.task.update({
     where: { id: req.params.taskId },
-    data,
+    data: { ...data, ...(data.dueDate !== undefined && String(data.dueDate) !== String(existing.dueDate) ? { remindedAt: null } : {}) },
     include: {
       workspace: { select: { name: true, color: true } },
       assignee: { select: { id: true, name: true, avatarColor: true } },
     },
+    });
+    const changes = changedTaskFields(current, updated);
+    if (Object.keys(changes).length) await tx.taskChange?.create({ data: { taskId: updated.id, userId: req.userId, changes: JSON.stringify(changes) } });
+    return updated;
   });
 
   emitToWorkspace(req.params.workspaceId, "task:updated", serialize(task));

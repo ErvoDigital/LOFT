@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { CalendarX, Clock, Link2, MapPin, Pencil, Users, Video } from "lucide-react";
 import Modal from "../common/Modal.jsx";
 import Avatar from "../common/Avatar.jsx";
+import EventActions from "./EventActions.jsx";
 import {
   durationLabel,
   eventMinutes,
@@ -79,7 +80,7 @@ function LocationRow({ location, status }) {
 // Editing and cancelling are admin-only (enforced again on the API side, in
 // events.routes.js), so members get the same full picture without the risk of
 // nudging a shared calendar out from under everyone else.
-export default function EventDetailsModal({ open, onClose, event, now, canManage, createdByName, onEdit, onCancelEvent }) {
+export default function EventDetailsModal({ open, onClose, event, now, canManage, createdByName, onEdit, onCancelEvent, onSaved }) {
   if (!event) return null;
 
   const status = eventStatus(event, now);
@@ -132,7 +133,7 @@ export default function EventDetailsModal({ open, onClose, event, now, canManage
                     className="inline-flex items-center gap-1.5 rounded-full border border-ink-900/[0.08] bg-white/60 py-0.5 pl-0.5 pr-2.5 text-xs font-medium text-ink-700 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-ink-200"
                   >
                     <Avatar name={person.name} color={person.avatarColor} size={20} />
-                    {person.name}
+                    {person.name}<span className="text-[10px] text-ink-400">{(person.response || "PENDING").toLowerCase()}</span>
                   </span>
                 ))}
               </div>
@@ -146,6 +147,7 @@ export default function EventDetailsModal({ open, onClose, event, now, canManage
           </p>
         )}
 
+        <EventActions key={event.id} event={event} canManage={canManage} onSaved={onSaved} />
         {canManage ? (
           <div className="flex items-center gap-2 border-t border-ink-900/[0.08] pt-4 dark:border-white/[0.08]">
             <button type="button" onClick={onEdit} className="btn-primary flex-1">

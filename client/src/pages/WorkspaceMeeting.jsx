@@ -23,6 +23,7 @@ import {
 import { useSocket } from "../context/SocketContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMeeting } from "../context/MeetingContext.jsx";
+import MeetingConnectionStatus from "../components/meeting/MeetingConnectionStatus.jsx";
 import { useWorkspaces } from "../context/WorkspaceContext.jsx";
 import * as conversationsApi from "../api/conversations.js";
 import * as eventsApi from "../api/events.js";
@@ -452,6 +453,7 @@ export default function WorkspaceMeeting() {
           <div className="min-w-0"><h1 className="truncate text-sm font-semibold">{workspaceName} · Meeting</h1><p className="mt-0.5 flex items-center gap-1.5 text-xs text-white/50"><span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-brand-400" : "bg-amber-400"}`} />{connected ? "Connected" : "Reconnecting…"}{joinedAt && <span className="tabular-nums">· {elapsedMeetingTime(joinedAt, now)}</span>} · {cameraCount} in call</p></div>
           <div role="group" aria-label="Meeting layout" className="flex rounded-lg bg-white/5 p-1">{[["grid", "Grid", LayoutGrid], ["speaker", "Speaker", UserRound]].map(([value, label, Icon]) => <button key={value} onClick={() => { setLayout(value); if (value === "grid") setFocusedId(null); }} aria-pressed={layout === value} className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs ${layout === value ? "bg-white/15 text-white" : "text-white/50 hover:text-white"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}</div>
         </header>
+        <MeetingConnectionStatus />
         {error && <p role="alert" className="mb-2 shrink-0 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p>}
         {primaryScreen ? (
           <div

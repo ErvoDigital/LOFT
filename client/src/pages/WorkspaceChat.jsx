@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { MessageSquare, Hash, Circle, Trash2 } from "lucide-react";
 import * as conversationsApi from "../api/conversations.js";
 import * as workspacesApi from "../api/workspaces.js";
@@ -19,6 +19,7 @@ import { can } from "../lib/access.js";
 export default function WorkspaceChat() {
   const { user } = useAuth();
   const { workspaceId } = useParams();
+  const location = useLocation();
   const { socket } = useSocket();
   const [conversations, setConversations] = useState([]);
   const [members, setMembers] = useState([]);
@@ -35,6 +36,10 @@ export default function WorkspaceChat() {
   // default channel, since most workspaces only ever use that one.
   const twoPane = useMediaQuery(TWO_PANE);
   const [showThread, setShowThread] = useState(true);
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get("conversation");
+    if (!loading && id && conversations.some((conversation) => conversation.id === id)) { setActiveId(id); setShowThread(true); }
+  }, [location.search, loading, workspaceId]);
 
   const load = useCallback(async () => {
     const request = ++loadRequest.current;
@@ -165,6 +170,7 @@ export default function WorkspaceChat() {
         </div>
       ) : !twoPane && !showThread ? null : (
         <ChatThread
+          targetMessageId={new URLSearchParams(location.search).get("message")}
           key={active.id}
           conversation={active}
           headerStart={

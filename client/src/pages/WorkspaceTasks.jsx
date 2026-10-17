@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { SlidersHorizontal } from "lucide-react";
 import * as tasksApi from "../api/tasks.js";
 import * as workspacesApi from "../api/workspaces.js";
@@ -23,6 +23,7 @@ import { can } from "../lib/access.js";
 
 export default function WorkspaceTasks() {
   const { workspaceId } = useParams();
+  const location = useLocation();
   const { socket } = useSocket();
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
@@ -126,6 +127,10 @@ export default function WorkspaceTasks() {
   }, [socket, load, workspaceId]);
 
   const detailsTask = detailsTaskId ? tasks.find((t) => t.id === detailsTaskId) : null;
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get("task");
+    if (id && tasks.some((task) => task.id === id)) { setDetailsTaskId(id); setDetailsOpen(true); }
+  }, [location.search, workspaceId, loading]);
 
   const canEditStatuses = can(access, "statuses.manage");
   const visibleTasks = useMemo(() => filterTasks(tasks, filters, columns, user.id), [tasks, filters, columns, user.id, today]);

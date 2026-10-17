@@ -26,6 +26,10 @@ function publish(target, event, payload) {
     .catch((err) => console.error(`realtime publish failed (${target}/${event})`, err));
 }
 
+export function emitToDocument(documentId, event, payload) {
+  return publish(`document:${documentId}`, event, payload);
+}
+
 export function emitToUser(userId, event, payload) {
   publish(`user:${userId}`, event, payload);
 }

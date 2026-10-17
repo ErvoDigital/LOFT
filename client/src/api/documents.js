@@ -1,4 +1,7 @@
 import { api } from "./client.js";
+export const listRevisions = (workspaceId, documentId) => api.get(`/workspaces/${workspaceId}/documents/${documentId}/revisions`).then((r) => r.data.revisions);
+export const getRevision = (workspaceId, documentId, revisionId) => api.get(`/workspaces/${workspaceId}/documents/${documentId}/revisions/${revisionId}`).then((r) => r.data.revision);
+export const createRevision = (workspaceId, documentId, content) => api.post(`/workspaces/${workspaceId}/documents/${documentId}/revisions`, { content }).then((r) => r.data.revision);
 
 export const listDocuments = (workspaceId) =>
   api.get(`/workspaces/${workspaceId}/documents`).then((r) => r.data.documents);

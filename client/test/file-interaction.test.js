@@ -70,6 +70,7 @@ async function mount(t, component = "preview", overrides = {}, apiOverrides = {}
       "./dragTypes.js": { ASSET_DRAG_TYPE: "asset" },
       "../../lib/fileIcons.jsx": { FileIcon: noop, formatSize: () => "12 B", timeAgo: () => "Just now" },
       "../storage/PreviewModal.jsx": noop,
+      "./TaskCollaboration.jsx": noop,
     },
     navigator: { pdfViewerEnabled: overrides.pdfViewerEnabled ?? true },
     URL: { createObjectURL: () => "blob:file-preview", revokeObjectURL: (url) => urls.push(url) },

@@ -39,6 +39,8 @@ model User {
   passwordChangeCodeExpiry DateTime?
   twoFactorEnabled         Boolean   @default(false)
   aiPriorityEnabled        Boolean   @default(true)
+  planPreferences          String?
+  notificationPreferences  String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -157,6 +159,8 @@ model Event {
   endTime     DateTime
   createdById String
   remindedAt  DateTime?
+  seriesId    String?
+  recurrence  String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -191,6 +195,8 @@ model EventAttendee {
   id      String @id @default(uuid())
   eventId String
   userId  String
+  response String @default("PENDING")
+  respondedAt DateTime?
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -213,6 +219,8 @@ model Task {
   createdById String
   assigneeId  String?
   remindedAt  DateTime?
+  parentTaskId String?
+  sourceMessageId String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -220,6 +228,40 @@ model Task {
   createdBy User      @relation("TaskCreator", fields: [createdById], references: [id])
   assignee  User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
   attachments Asset[]
+  parentTask Task? @relation("Subtasks", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  subtasks Task[] @relation("Subtasks")
+  dependencies TaskDependency[] @relation("BlockedTask")
+  dependents TaskDependency[] @relation("BlockingTask")
+  comments TaskComment[]
+  changes TaskChange[]
+}
+
+model TaskDependency {
+  taskId String
+  dependsOnId String
+  task Task @relation("BlockedTask", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn Task @relation("BlockingTask", fields: [dependsOnId], references: [id], onDelete: Cascade)
+  @@id([taskId, dependsOnId])
+}
+
+model TaskComment {
+  id String @id @default(uuid())
+  taskId String
+  userId String
+  content String
+  createdAt DateTime @default(now())
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  @@index([taskId, createdAt])
+}
+
+model TaskChange {
+  id String @id @default(uuid())
+  taskId String
+  userId String
+  changes String
+  createdAt DateTime @default(now())
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  @@index([taskId, createdAt])
 }
 
 // A workspace's kanban columns — fully admin-customizable (labels, colors,
@@ -311,11 +353,16 @@ model Message {
   content           String
   attachmentAssetId String?
   createdAt         DateTime @default(now())
+  editedAt          DateTime?
+  parentMessageId   String?
+  isPinned          Boolean @default(false)
 
   conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User              @relation("MessageSender", fields: [senderId], references: [id])
   attachment   Asset?            @relation(fields: [attachmentAssetId], references: [id], onDelete: SetNull)
   reactions    MessageReaction[]
+  parentMessage Message? @relation("MessageReplies", fields: [parentMessageId], references: [id], onDelete: SetNull)
+  replies Message[] @relation("MessageReplies")
 }
 
 // One row per (message, user, emoji) — a user can react to the same message
@@ -367,6 +414,8 @@ model Notification {
   link      String?
   meta      String?
   isRead    Boolean  @default(false)
+  dedupeKey String? @unique
+  snoozedUntil DateTime?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -382,6 +431,7 @@ model Asset {
   taskId       String?
   name         String
   uploadedById String
+  deletedAt    DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -466,6 +516,47 @@ model Document {
   workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy User               @relation("DocumentCreator", fields: [createdById], references: [id])
   assignees DocumentAssignee[]
+  revisions DocumentRevision[]
+}
+
+model DocumentRevision {
+  id String @id @default(uuid())
+  documentId String
+  title String
+  content Bytes
+  createdById String?
+  createdAt DateTime @default(now())
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  @@index([documentId, createdAt])
+}
+
+model UploadSession {
+  id String @id @default(uuid())
+  workspaceId String
+  userId String
+  storageKey String @unique
+  uploadId String
+  name String
+  mimeType String
+  size Int
+  partSize Int
+  folderId String?
+  assetId String?
+  completedAssetId String?
+  checksum String
+  objectCompleted Boolean @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([userId, workspaceId])
+}
+
+model AssistantMutation {
+  id String @id
+  userId String
+  workspaceId String
+  kind String
+  recordId String
+  createdAt DateTime @default(now())
 }
 
 model DocumentAssignee {

@@ -29,6 +29,7 @@ function database() {
   const pushes = [];
   const missing = () => Object.assign(new Error("Missing"), { code: "P2025" });
   const db = {
+    user: { async findUnique() { return { notificationPreferences: null }; } },
     workspaceMember: { async findUnique({ where: { workspaceId_userId: pair } }) { return pair.workspaceId === workspaceId ? membership.get(pair.userId) || null : null; } },
     eventDraft: {
       async create({ data }) { const id = data.id || randomUUID(); if (drafts.has(id)) throw Object.assign(new Error("Duplicate"), { code: "P2002" }); const row = { attendeeIds: null, deferredFields: "", ...data, id }; drafts.set(id, row); return row; },

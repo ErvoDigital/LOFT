@@ -2,6 +2,7 @@ import { CreditCard, Receipt, Mail, Sparkles } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useWorkspaces } from "../context/WorkspaceContext.jsx";
 import PlanSettings from "../components/profile/PlanSettings.jsx";
+import NotificationSettings from "../components/profile/NotificationSettings.jsx";
 
 // Account-level planning preferences and billing information.
 
@@ -90,6 +91,7 @@ export default function Settings() {
   return (
     <div className="mx-auto max-w-3xl space-y-8 p-4 sm:p-6">
       <PlanSettings />
+      <NotificationSettings />
       <BillingSection />
     </div>
   );

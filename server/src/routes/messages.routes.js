@@ -9,6 +9,7 @@ router.get("/conversations", messagesController.listConversations);
 router.delete("/conversations/:conversationId", messagesController.deleteConversation);
 router.get("/conversations/:conversationId/messages", messagesController.getMessages);
 router.post("/conversations/:conversationId/messages", messagesController.sendMessageRest);
+router.patch("/conversations/:conversationId/messages/:messageId", messagesController.updateMessage);
 router.delete("/conversations/:conversationId/messages/:messageId", messagesController.deleteMessage);
 router.post("/conversations/:conversationId/messages/:messageId/reactions", messagesController.toggleReaction);
 router.post("/dm/:userId", messagesController.startDirectMessage);

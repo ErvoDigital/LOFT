@@ -4,6 +4,7 @@ import { useSocket } from "./SocketContext.jsx";
 import { useAuth } from "./AuthContext.jsx";
 import { useSpeakingDetection } from "../hooks/useSpeakingDetection.js";
 import Modal from "../components/common/Modal.jsx";
+import { getMeetingConfig } from "../api/meetingConfig.js";
 
 const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
 
@@ -39,6 +40,19 @@ export function MeetingProvider({ children }) {
   const [joinedAt, setJoinedAt] = useState(null);
   const [deviceBusy, setDeviceBusy] = useState(false);
   const [error, setError] = useState("");
+  const [connectionStates, setConnectionStates] = useState({});
+  const [relayConfigured, setRelayConfigured] = useState(false);
+  const iceServersRef = useRef(ICE_SERVERS);
+  const iceReadyRef = useRef(null);
+  const iceFetchedAt = useRef(0);
+  const recoveryTimers = useRef(new Map());
+  useEffect(() => {
+    let current = true;
+    iceReadyRef.current = Promise.resolve().then(() => getMeetingConfig()).then((config) => {
+      if (current) { iceServersRef.current = config.iceServers; setRelayConfigured(config.relayConfigured); iceFetchedAt.current = Date.now(); }
+    }).catch(() => {});
+    return () => { current = false; recoveryTimers.current.forEach(clearTimeout); recoveryTimers.current.clear(); };
+  }, [user?.id]);
   // True once the camera/mic stream has been acquired and previewed but
   // before the socket join actually happens — the "check your camera and
   // mic" lobby step, shown for both starting and joining a call.
@@ -115,7 +129,8 @@ export function MeetingProvider({ children }) {
     (peerId, isInitiator) => {
       if (peersRef.current.has(peerId)) return peersRef.current.get(peerId);
 
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
+      let recoveryAttempts = 0;
       localStreamRef.current?.getTracks().forEach((track) => pc.addTrack(track, localStreamRef.current));
       // A listener with no outgoing tracks still needs media sections in the
       // initial offer so the other participant can send their camera and voice.
@@ -161,7 +176,21 @@ export function MeetingProvider({ children }) {
         }
       };
       pc.onconnectionstatechange = () => {
-        if (["failed", "closed", "disconnected"].includes(pc.connectionState)) {
+        setConnectionStates((states) => ({ ...states, [peerId]: pc.connectionState }));
+        clearTimeout(recoveryTimers.current.get(peerId));
+        if (pc.connectionState === "connected") recoveryAttempts = 0;
+        if (isInitiator && ["failed", "disconnected"].includes(pc.connectionState) && recoveryAttempts < 3) {
+          recoveryTimers.current.set(peerId, setTimeout(async () => {
+            if (peersRef.current.get(peerId) !== pc || !socket?.connected || pc.signalingState === "closed") return;
+            recoveryAttempts++;
+            try {
+              if (pc.signalingState && pc.signalingState !== "stable") return;
+              await pc.setLocalDescription(await pc.createOffer({ iceRestart: true }));
+              socket.emit("meeting:signal", { toUserId: peerId, data: { type: "offer", sdp: pc.localDescription, cameraStreamId: localStreamRef.current?.id, screenStreamId: localScreenStreamRef.current?.id } });
+            } catch { setConnectionStates((states) => ({ ...states, [peerId]: "failed" })); }
+          }, pc.connectionState === "failed" ? 1000 : 8000));
+        }
+        if (pc.connectionState === "closed") {
           peersRef.current.delete(peerId);
         }
       };
@@ -381,7 +410,7 @@ export function MeetingProvider({ children }) {
   // The actual join, called once the user confirms from the lobby — reuses
   // the stream already acquired by acquireDevices() rather than requesting
   // getUserMedia a second time.
-  function confirmJoin() {
+  async function confirmJoin() {
     const workspaceId = pendingWorkspaceId;
     if (!workspaceId || !localStreamRef.current || joining || joinPendingRef.current || deviceBusyRef.current) return;
     if (!socket?.connected) {
@@ -392,6 +421,11 @@ export function MeetingProvider({ children }) {
     const session = mediaSessionRef.current;
     joinPendingRef.current = true;
     setJoining(true);
+    if (Date.now() - iceFetchedAt.current > 50 * 60000 && iceFetchedAt.current) {
+      iceReadyRef.current = getMeetingConfig().then((config) => { iceServersRef.current = config.iceServers; iceFetchedAt.current = Date.now(); }).catch(() => {});
+    }
+    await iceReadyRef.current;
+    if (session !== mediaSessionRef.current || !socket.connected) { joinPendingRef.current = false; setJoining(false); return; }
     socket.emit("meeting:join", workspaceId, (res) => {
       if (session !== mediaSessionRef.current) return;
       joinPendingRef.current = false;
@@ -434,6 +468,8 @@ export function MeetingProvider({ children }) {
     socket?.emit("meeting:leave");
     peersRef.current.forEach((pc) => pc.close());
     peersRef.current.clear();
+    recoveryTimers.current.forEach(clearTimeout); recoveryTimers.current.clear();
+    setConnectionStates({});
     stopLocalScreenShare();
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
@@ -690,6 +726,8 @@ export function MeetingProvider({ children }) {
     joinedAt,
     deviceBusy,
     error,
+    connectionStates,
+    relayConfigured,
     lobbyOpen,
     pendingWorkspaceId,
     confirmWorkspaceId,

@@ -6,7 +6,7 @@ import { FileIcon, formatSize, timeAgo } from "../../lib/fileIcons.jsx";
 import { fileFailure } from "../../lib/fileFeedback.js";
 import FileFailureNotice from "./FileFailureNotice.jsx";
 
-export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, onDownload, onPreview, onMove, onDelete, uploadProgress, materializing }) {
+export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, onDownload, onPreview, onMove, onDelete, onRestoreVersion, uploadProgress, materializing }) {
   const [expanded, setExpanded] = useState(false);
   const [dragState, setDragState] = useState(null); // "merge" | "version" | null
   const [downloading, setDownloading] = useState(null);
@@ -165,6 +165,7 @@ export default function AssetCard({ asset, canManage, onDropFile, onMergeDrop, o
               <span className="font-medium text-ink-600 dark:text-ink-300">V{v.version}</span>
               <span className="truncate px-2 text-ink-400">{formatSize(v.size)} · {timeAgo(v.createdAt)}</span>
               <div className="flex shrink-0 items-center gap-1">
+                {canManage && onRestoreVersion && v.id !== latest.id && <button type="button" className="px-1 text-[11px] text-brand-600" onClick={() => onRestoreVersion(v)}>Restore</button>}
                 <button
                   onClick={() => onPreview(v)}
                   title="Preview"

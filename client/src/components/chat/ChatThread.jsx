@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import MessageActions from "./MessageActions.jsx";
 import {
   MessageCircle,
   MessageSquare,
@@ -139,7 +140,8 @@ function AttachmentIcon({ mimeType, className }) {
 // Messages page and each workspace's own Chat section.
 // headerStart sits before the conversation name: the phone layouts put
 // their way back to the conversation list there.
-export default function ChatThread({ conversation, headerStart, headerExtra }) {
+export default function ChatThread({ conversation, headerStart, headerExtra, targetMessageId }) {
+  const [replyTo, setReplyTo] = useState(null), [pinsOnly, setPinsOnly] = useState(false);
   const roomy = useMediaQuery("(min-width: 640px)");
   const { user } = useAuth();
   const { socket, connected } = useSocket();
@@ -285,7 +287,7 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
       setAwayFromBottom(false);
       nearBottom.current = true;
       socket?.emit("conversation:join", conversationId);
-      messagesApi.getMessagePage(conversationId, { q: searchQuery }).then((page) => {
+      messagesApi.getMessagePage(conversationId, { q: searchQuery, ...(targetMessageId && !searchQuery ? { around: targetMessageId } : {}), ...(pinsOnly ? { pinned: true } : {}) }).then((page) => {
         if (cancelled || requestId !== historyRequest.current) return;
         shouldScrollToBottom.current = true;
         page.messages.forEach((m) => knownMessages.current.add(m.id));
@@ -306,7 +308,15 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
       socket?.off("connect", load);
       socket?.emit("conversation:leave", conversationId);
     };
-  }, [conversationId, socket, searchQuery, retry]);
+  }, [conversationId, socket, searchQuery, retry, targetMessageId, pinsOnly]);
+
+  useEffect(() => { setReplyTo(null); setPinsOnly(false); }, [conversationId]);
+  useEffect(() => {
+    if (!socket) return;
+    const updated = (message) => { if (message.conversationId === conversationId) setMessages((items) => pinsOnly && !message.isPinned ? items.filter((item) => item.id !== message.id) : items.map((item) => item.id === message.id ? message : item)); };
+    socket.on("message:updated", updated);
+    return () => socket.off("message:updated", updated);
+  }, [socket, conversationId, pinsOnly]);
 
   useLayoutEffect(() => {
     if (loadingMessages) return;
@@ -328,7 +338,7 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
     setLoadError("");
     const request = historyRequest.current;
     try {
-      const page = await messagesApi.getMessagePage(conversationId, { before: nextCursor, q: searchQuery });
+      const page = await messagesApi.getMessagePage(conversationId, { before: nextCursor, q: searchQuery, ...(pinsOnly ? { pinned: true } : {}) });
       if (request !== historyRequest.current) return;
       const container = scrollRef.current;
       if (container) prependAnchor.current = { top: container.scrollTop, height: container.scrollHeight };
@@ -432,10 +442,7 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
     setSending(true);
     setSendError("");
     const requestId = ++sendRequestRef.current;
-    socket.emit(
-      "message:send",
-      { conversationId, content, attachmentAssetId: pendingAttachment?.assetId },
-      (res) => {
+    const received = (res) => {
         if (requestId !== sendRequestRef.current) return;
         sendingRef.current = false;
         setSending(false);
@@ -453,13 +460,15 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
         setAwayFromBottom(false);
         updateDraft("");
         setPendingAttachment(null);
+        setReplyTo(null);
         setMentionState(null);
         setEmojiPickerOpen(false);
         socket.emit("typing", { conversationId, isTyping: false });
         clearTimeout(typingTimeout.current);
         requestAnimationFrame(() => inputRef.current?.focus());
-      }
-    );
+      };
+    if (replyTo) messagesApi.sendMessage(conversationId, { content, attachmentAssetId: pendingAttachment?.assetId, parentMessageId: replyTo.id }).then((message) => received({ message })).catch((err) => received({ error: apiErrorMessage(err) }));
+    else socket.emit("message:send", { conversationId, content, attachmentAssetId: pendingAttachment?.assetId }, received);
   }
 
   function insertEmoji(emoji) {
@@ -596,6 +605,7 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-ink-50 dark:bg-ink-900">
       <div className="flex min-h-[57px] items-center gap-2.5 border-b border-ink-200 bg-white px-3 py-2.5 dark:border-ink-700 dark:bg-ink-800 sm:px-5 sm:py-3">
         {headerStart}
+        <button type="button" aria-pressed={pinsOnly} onClick={() => setPinsOnly(!pinsOnly)} className="rounded-lg px-2 py-1 text-xs text-ink-500">{pinsOnly ? "All messages" : "Pinned"}</button>
         {conversation.isMeetingChat ? (
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg brand-mark text-white">
             <MessageSquare className="h-4 w-4" />
@@ -715,7 +725,11 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
                         {m.sender.name}
                       </button>
                     )}
+                    {m.parentMessage && <p className="mb-1 truncate border-l-2 border-current pl-2 text-xs opacity-70">Reply to {m.parentMessage.sender?.name}: {m.parentMessage.content || "Attachment"}</p>}
+                    {m.isPinned && <p className="mb-1 text-[10px] opacity-70">Pinned</p>}
                     {m.content && <p className="whitespace-pre-wrap break-words">{renderContent(m.content, user.id)}</p>}
+                    {m.editedAt && <span className="text-[10px] opacity-60">Edited</span>}
+                    <MessageActions message={m} userId={user.id} workspaceId={workspaceId} onReply={setReplyTo} onUpdated={(message) => setMessages((items) => pinsOnly && !message.isPinned ? items.filter((item) => item.id !== message.id) : items.map((item) => item.id === message.id ? message : item))} />
                     {m.attachment && (
                       <button
                         type="button"
@@ -818,6 +832,7 @@ export default function ChatThread({ conversation, headerStart, headerExtra }) {
       </div>
 
       <div ref={composerRef} className="border-t border-ink-200 bg-white p-2.5 dark:border-ink-700 dark:bg-ink-800 sm:p-4">
+        {replyTo && <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-brand-500/10 p-2 text-xs"><span className="truncate">Replying to {replyTo.sender.name}: {plainMessage(replyTo.content) || "Attachment"}</span><button type="button" aria-label="Cancel reply" onClick={() => setReplyTo(null)}>Cancel</button></div>}
         {!connected && <p role="status" className="mb-2 text-xs text-amber-700 dark:text-amber-400">Live connection unavailable. Reconnecting…</p>}
         {sendError && <p role="alert" className="mb-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">{sendError}</p>}
         {loadError && <div role="alert" className="mb-2 flex items-center gap-3 text-xs text-red-600 dark:text-red-400"><span className="flex-1">{loadError}</span><button type="button" className="font-semibold underline" onClick={() => messages.length && nextCursor ? loadOlder() : setRetry((value) => value + 1)}>Retry</button></div>}

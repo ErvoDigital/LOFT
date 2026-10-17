@@ -1,8 +1,10 @@
 import { api } from "./client.js";
 
 export const listConversations = () => api.get("/messages/conversations").then((r) => r.data.conversations);
-export const getMessagePage = (conversationId, { before, q, limit = 50 } = {}) =>
-  api.get(`/messages/conversations/${conversationId}/messages`, { params: { before, q, limit } }).then((r) => r.data);
+export const getMessagePage = (conversationId, { before, q, limit = 50, around, pinned } = {}) =>
+  api.get(`/messages/conversations/${conversationId}/messages`, { params: { before, q, limit, ...(around ? { around } : {}), ...(pinned ? { pinned: "true" } : {}) } }).then((r) => r.data);
+export const sendMessage = (conversationId, data) => api.post(`/messages/conversations/${conversationId}/messages`, data).then((r) => r.data.message);
+export const updateMessage = (conversationId, messageId, data) => api.patch(`/messages/conversations/${conversationId}/messages/${messageId}`, data).then((r) => r.data.message);
 export const getMessages = (conversationId) => getMessagePage(conversationId).then((page) => page.messages);
 export const startDirectMessage = (userId) =>
   api.post(`/messages/dm/${userId}`).then((r) => r.data.conversationId);

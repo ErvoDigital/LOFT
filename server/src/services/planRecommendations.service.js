@@ -45,6 +45,7 @@ export function recommendationContext(plan, { timeZone = "Asia/Manila", manual, 
       priority: priorityLabel(task.tier), score: task.score, estimatedMinutes: task.estimatedMinutes,
       dueDate: task.dueDate, plannedDay: dateOf(task), pinned: task.isPinned,
       overdue: Boolean(task.dueDate && new Date(task.dueDate) < now),
+      blockedBy: task.blockedBy || [],
     })),
     // Only meetings the caller attends and conflicts already authorized by
     // getPlanData reach the model. Bound context for large workspaces.

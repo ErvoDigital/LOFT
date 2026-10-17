@@ -28,13 +28,14 @@ function serializeVersion(version) {
   };
 }
 
-function serialize(asset) {
+export function serialize(asset) {
   const versions = [...asset.versions].sort((a, b) => b.version - a.version);
   return {
     id: asset.id,
     workspaceId: asset.workspaceId,
     folderId: asset.folderId,
     taskId: asset.taskId,
+    deletedAt: asset.deletedAt,
     name: asset.name,
     uploadedBy: asset.uploadedBy,
     createdAt: asset.createdAt,
@@ -45,7 +46,7 @@ function serialize(asset) {
   };
 }
 
-const assetInclude = {
+export const assetInclude = {
   uploadedBy: { select: { id: true, name: true, avatarColor: true } },
   versions: {
     orderBy: { version: "desc" },
@@ -61,7 +62,8 @@ async function loadFolderAccessMap(workspaceId) {
   return new Map(folders.map((folder) => [folder.id, folder]));
 }
 
-async function assertAssetFolderAccess(req, asset, folderById = null) {
+export async function assertAssetFolderAccess(req, asset, folderById = null) {
+  if (asset.deletedAt && !req.allowDeletedAsset) throw new ApiError(404, "File is in the recycle bin");
   if (!asset.folderId) return;
   const folders = folderById || (await loadFolderAccessMap(asset.workspaceId));
   const folder = folders.get(asset.folderId);
@@ -73,7 +75,7 @@ async function assertAssetFolderAccess(req, asset, folderById = null) {
 export async function listAssets(req, res) {
   const workspaceId = req.params.workspaceId;
   const [assets, folders] = await Promise.all([
-    prisma.asset.findMany({ where: { workspaceId, taskId: null }, include: assetInclude, orderBy: { updatedAt: "desc" } }),
+    prisma.asset.findMany({ where: { workspaceId, taskId: null, deletedAt: null }, include: assetInclude, orderBy: { updatedAt: "desc" } }),
     prisma.folder.findMany({ where: { workspaceId }, include: { members: true } }),
   ]);
   const folderById = new Map(folders.map((f) => [f.id, f]));
@@ -145,7 +147,7 @@ export async function listTaskAttachments(req, res) {
   const task = await prisma.task.findUnique({ where: { id: taskId } });
   if (!task || task.workspaceId !== workspaceId) throw new ApiError(404, "Task not found");
 
-  const assets = await prisma.asset.findMany({ where: { taskId }, include: assetInclude, orderBy: { createdAt: "asc" } });
+  const assets = await prisma.asset.findMany({ where: { taskId, deletedAt: null }, include: assetInclude, orderBy: { createdAt: "asc" } });
   res.json({ assets: assets.map(serialize) });
 }
 

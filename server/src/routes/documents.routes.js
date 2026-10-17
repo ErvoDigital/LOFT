@@ -1,5 +1,6 @@
 import { Router } from "express";
 import * as documentsController from "../controllers/documents.controller.js";
+import * as history from "../controllers/documentHistory.controller.js";
 import { requireAuth, requireWorkspaceMember } from "../middleware/auth.js";
 
 const router = Router({ mergeParams: true });
@@ -7,6 +8,9 @@ router.use(requireAuth, requireWorkspaceMember());
 
 router.get("/", documentsController.listWorkspaceDocuments);
 router.get("/:documentId", documentsController.getWorkspaceDocument);
+router.get("/:documentId/revisions", history.listRevisions);
+router.post("/:documentId/revisions", history.createRevision);
+router.get("/:documentId/revisions/:revisionId", history.getRevision);
 router.post("/", documentsController.createWorkspaceDocument);
 router.patch("/:documentId", documentsController.renameWorkspaceDocument);
 router.patch("/:documentId/access", documentsController.updateDocumentAccess);

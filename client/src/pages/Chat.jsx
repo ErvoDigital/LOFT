@@ -80,7 +80,7 @@ export default function Chat() {
   // Already on this page when a profile's "Message" button is used: the route
   // doesn't remount, so pick the new state up here. The state is cleared
   // afterwards so a refresh doesn't keep forcing that conversation open.
-  const requestedId = location.state?.conversationId;
+  const requestedId = new URLSearchParams(location.search).get("conversation") || location.state?.conversationId;
   useEffect(() => {
     if (!requestedId) return;
     setActiveId(requestedId);
@@ -238,6 +238,7 @@ export default function Chat() {
         <div className="hidden flex-1 items-center justify-center text-ink-400 md:flex">Select a conversation</div>
       ) : !twoPane && !showThread ? null : (
         <ChatThread
+          targetMessageId={new URLSearchParams(location.search).get("message")}
           key={active.id}
           conversation={active}
           headerStart={

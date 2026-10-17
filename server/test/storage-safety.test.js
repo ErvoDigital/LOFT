@@ -651,6 +651,8 @@ describe("visibility and membership cleanup", () => {
   it("excludes task attachments from global asset search", async () => {
     let assetWhere;
     const fake = {
+      document: { findMany: async () => [] },
+      event: { findMany: async () => [] },
       workspaceMember: {
         findMany: async () => [{ workspaceId: "ws", role: "MEMBER", permissions: "" }],
       },

@@ -1,14 +1,16 @@
 import { Link } from "react-router-dom";
 import { priorityLabel } from "../../lib/priorities.js";
 
+function formatChange(field, value) { if (value == null) return "None"; if (field === "tier") return priorityLabel(value); if (["dueDate", "startTime", "endTime"].includes(field)) return new Date(value).toLocaleString(); return Array.isArray(value) ? value.join(", ") : String(value); }
+
 export default function AssistantActionCards({ actions = [], workspaces = [], userId, confirming, disabled, onConfirm, onDismiss }) {
   return actions.map((action) => (
-    <section key={action.id} aria-label={`${action.kind === "task" ? "Task" : "Meeting"} confirmation`} className="min-w-0 rounded-xl border border-ink-200 bg-white p-3 text-left text-sm [overflow-wrap:anywhere] dark:border-ink-700 dark:bg-ink-800">
-      <p className="font-semibold">{action.kind === "task" ? "Create task" : action.kind === "event_draft" ? "Save meeting draft" : "Create meeting"}: {action.data.title}</p>
+    <section key={action.id} aria-label={`${action.kind.startsWith("task") ? "Task" : "Meeting"} confirmation`} className="min-w-0 rounded-xl border border-ink-200 bg-white p-3 text-left text-sm [overflow-wrap:anywhere] dark:border-ink-700 dark:bg-ink-800">
+      <p className="font-semibold">{action.kind.endsWith("_update") ? `Update ${action.kind.startsWith("task") ? "task" : "meeting"}` : action.kind.startsWith("task") ? "Create task" : action.kind === "event_draft" ? "Save meeting draft" : "Create meeting"}: {action.data.title || action.preview?.title}</p>
       <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">Workspace: {action.preview?.workspaceName || workspaces.find((w) => w.id === action.data.workspaceId)?.name || action.data.workspaceId}</p>
       {action.data.description && <p className="mt-1 whitespace-pre-wrap">{action.data.description}</p>}
       {action.data.location && <p className="mt-1 text-xs">Location: {action.data.location}</p>}
-      {action.kind === "task" ? <>
+      {action.kind.endsWith("_update") ? <dl className="mt-3 space-y-2">{Object.entries(action.data.changes).map(([field, value]) => <div key={field}><dt className="text-xs font-medium">{field}</dt><dd className="text-xs text-ink-500">{formatChange(field, action.data.before[field])} → {formatChange(field, value)}</dd></div>)}</dl> : action.kind.startsWith("task") ? <>
         <p className="mt-1 text-xs">Priority: {priorityLabel(action.data.tier)}{action.data.deferredFields?.includes("tier") ? " (default until you edit it)" : ""} · {action.data.assigneeId ? `Assigned to ${action.data.assigneeId === userId ? "you" : action.preview?.people?.[0]?.name || action.data.assigneeId}` : "Unassigned"}</p>
         {action.data.dueDate && <p className="mt-1 text-xs">Due: {new Date(action.data.dueDate).toLocaleString()}</p>}
       </> : <>
@@ -20,8 +22,8 @@ export default function AssistantActionCards({ actions = [], workspaces = [], us
       {action.data.deferredFields?.length > 0 && <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">You can add the remaining details later.</p>}
       {action.error && <p role="alert" className="mt-2 text-sm text-red-700 dark:text-red-300">{action.error}</p>}
       {action.result ? <>
-        <p role="status" className="mt-2 font-medium text-brand-700 dark:text-brand-300">{action.kind === "task" ? "Task saved" : action.kind === "event_draft" ? "Meeting draft saved" : "Meeting saved"}</p>
-        <Link className="mt-1 inline-block min-h-11 py-3 text-brand-600 underline dark:text-brand-400" to={`/workspaces/${action.result.workspaceId}/${action.kind === "task" ? "tasks" : "calendar"}`}>Saved — open {action.kind === "task" ? "task board" : "calendar"}</Link>
+        <p role="status" className="mt-2 font-medium text-brand-700 dark:text-brand-300">{action.kind.startsWith("task") ? "Task saved" : action.kind === "event_draft" ? "Meeting draft saved" : "Meeting saved"}</p>
+        <Link className="mt-1 inline-block min-h-11 py-3 text-brand-600 underline dark:text-brand-400" to={`/workspaces/${action.result.workspaceId}/${action.kind.startsWith("task") ? "tasks" : "calendar"}`}>Saved — open {action.kind.startsWith("task") ? "task board" : "calendar"}</Link>
       </> : action.dismissed ? <p className="mt-2 text-xs">Dismissed</p> : (
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" className="btn-primary min-h-11" onClick={() => onConfirm(action)} disabled={Boolean(confirming) || disabled}>{confirming === action.id ? "Saving…" : "Confirm"}</button>

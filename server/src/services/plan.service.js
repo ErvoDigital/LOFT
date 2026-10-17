@@ -12,6 +12,7 @@
 // isn't lost from the plan.
 
 import { calculatePriorityScore } from "./priority.service.js";
+import { dayInZone, addDayKey, zonedInstant } from "../../../shared/time.js";
 
 export const PLAN_HORIZON_DAYS = 30;
 const DEFAULT_DAILY_CAPACITY_HOURS = 6;
@@ -29,8 +30,9 @@ function dayIndex(date, today) {
 // tasks: [{ id, title, workspaceId, workspaceName, workspaceColor, tier,
 // status, estimatedMinutes, dueDate, isPinned, isSnoozed }] — callers are
 // expected to have already excluded tasks in a "done" status.
-export function buildPlan({ tasks, now = new Date(), dailyCapacityHours = DEFAULT_DAILY_CAPACITY_HOURS, horizonDays = PLAN_HORIZON_DAYS }) {
-  const today = startOfDay(now);
+export function buildPlan({ tasks, now = new Date(), dailyCapacityHours = DEFAULT_DAILY_CAPACITY_HOURS, horizonDays = PLAN_HORIZON_DAYS, timeZone = "Asia/Manila", capacityByDate = {} }) {
+  const todayKey = dayInZone(now, timeZone);
+  const today = new Date(`${todayKey}T00:00:00Z`);
 
   const dated = [];
   const someday = [];
@@ -38,9 +40,9 @@ export function buildPlan({ tasks, now = new Date(), dailyCapacityHours = DEFAUL
     const effortHours = (task.estimatedMinutes ?? 30) / 60;
     const score = calculatePriorityScore(task, now);
     if (task.dueDate) {
-      const due = startOfDay(task.dueDate);
+      const due = new Date(`${dayInZone(task.dueDate, timeZone)}T00:00:00Z`);
       const overdue = due < today;
-      dated.push({ task, effortHours, score, dueIndex: overdue ? 0 : dayIndex(due, today), overdue });
+      dated.push({ task, effortHours, score, dueIndex: overdue ? 0 : Math.min(horizonDays, Math.round((due - today) / 86400000)), overdue });
     } else {
       someday.push({ task, effortHours, score });
     }
@@ -51,7 +53,8 @@ export function buildPlan({ tasks, now = new Date(), dailyCapacityHours = DEFAUL
 
   const capacity = new Map(); // dayIndex -> hours remaining
   const dayItems = new Map(); // dayIndex -> [{ task, hours, overflow }]
-  const remainingCapacity = (i) => (capacity.has(i) ? capacity.get(i) : dailyCapacityHours);
+  const dayCapacity = (i) => capacityByDate[addDayKey(todayKey, i)]?.availableHours ?? dailyCapacityHours;
+  const remainingCapacity = (i) => (capacity.has(i) ? capacity.get(i) : dayCapacity(i));
   const allocate = (i, hours, extra) => {
     capacity.set(i, remainingCapacity(i) - hours);
     if (!dayItems.has(i)) dayItems.set(i, []);
@@ -109,9 +112,9 @@ export function buildPlan({ tasks, now = new Date(), dailyCapacityHours = DEFAUL
     const items = dayItems.get(i);
     if (!items || items.length === 0) continue;
     days.push({
-      date: new Date(today.getTime() + i * 86400000).toISOString(),
+      date: zonedInstant(addDayKey(todayKey, i), "12:00", timeZone).toISOString(),
       isToday: i === 0,
-      capacityHours: dailyCapacityHours,
+      capacityHours: dayCapacity(i),
       plannedHours: Math.round(items.reduce((sum, it) => sum + it.hours, 0) * 100) / 100,
       items: items
         .sort((a, b) => b.score - a.score)

@@ -1,11 +1,12 @@
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
 import { isFolderVisible } from "../services/folderAccess.js";
+import { can } from "../services/permissions.js";
 
 const MAX_QUERY_LENGTH = 100;
 const CATEGORY_LIMIT = 10;
 
-export async function globalSearch(req, res) {
+export async function searchRecords(req, res, db = prisma) {
   const rawQ = req.query.q;
 
   // Handle missing or non-string query parameter
@@ -32,20 +33,18 @@ export async function globalSearch(req, res) {
   }
 
   // 1. Determine authorized workspaces and roles for the authenticated caller
-  const memberships = await prisma.workspaceMember.findMany({
+  let memberships = await db.workspaceMember.findMany({
     where: { userId: req.userId },
     select: { workspaceId: true, role: true, permissions: true },
   });
 
-  if (memberships.length === 0) {
-    return res.json({
-      query: queryStr,
-      results: { tasks: [], messages: [], assets: [], users: [] },
-    });
+  if (req.query.workspaceId) {
+    if (typeof req.query.workspaceId !== "string" || !memberships.some((m) => m.workspaceId === req.query.workspaceId)) throw new ApiError(403, "Workspace is not accessible");
+    memberships = memberships.filter((m) => m.workspaceId === req.query.workspaceId);
   }
 
   const authorizedWorkspaceIds = memberships.map((m) => m.workspaceId);
-  const folders = await prisma.folder.findMany({
+  const folders = await db.folder.findMany({
     where: { workspaceId: { in: authorizedWorkspaceIds } },
     include: { members: true },
   });
@@ -69,9 +68,9 @@ export async function globalSearch(req, res) {
   }));
 
   // 2. Parallel scoped database queries across Tasks, Messages, Assets, and Users
-  const [tasks, messages, assets, users] = await Promise.all([
+  const [tasks, messages, assets, users, documents, events] = await Promise.all([
     // TASKS: Only in authorized workspaces, matching title or description
-    prisma.task.findMany({
+    db.task.findMany({
       where: {
         workspaceId: { in: authorizedWorkspaceIds },
         OR: [
@@ -88,10 +87,10 @@ export async function globalSearch(req, res) {
     }),
 
     // MESSAGES: Only in authorized channels/conversations where the user is a participant
-    prisma.message.findMany({
+    db.message.findMany({
       where: {
         conversation: {
-          workspaceId: { in: authorizedWorkspaceIds },
+          OR: [{ workspaceId: { in: authorizedWorkspaceIds } }, ...(!req.query.workspaceId ? [{ workspaceId: null }] : [])],
           participants: { some: { userId: req.userId } },
         },
         content: { contains: queryStr, mode: "insensitive" },
@@ -105,10 +104,11 @@ export async function globalSearch(req, res) {
     }),
 
     // ASSETS: Authorization directly enforced via Prisma query; no candidate buffer
-    prisma.asset.findMany({
+    db.asset.findMany({
       where: {
         name: { contains: queryStr, mode: "insensitive" },
         taskId: null,
+        deletedAt: null,
         OR: assetPermissionBranches,
       },
       take: CATEGORY_LIMIT,
@@ -121,7 +121,7 @@ export async function globalSearch(req, res) {
     }),
 
     // USERS: Only users discoverable in workspaces shared with the caller
-    prisma.user.findMany({
+    db.user.findMany({
       where: {
         memberships: {
           some: { workspaceId: { in: authorizedWorkspaceIds } },
@@ -141,12 +141,22 @@ export async function globalSearch(req, res) {
         avatarUrl: true,
       },
     }),
+    db.document.findMany({
+      where: { title: { contains: queryStr, mode: "insensitive" }, OR: memberships.map((member) => ({ workspaceId: member.workspaceId, ...(can(member, "documents.viewAll") ? {} : { OR: [{ visibility: "WORKSPACE" }, { createdById: req.userId }, { assignees: { some: { userId: req.userId } } }] }) })) },
+      take: CATEGORY_LIMIT, orderBy: { updatedAt: "desc" }, select: { id: true, title: true, workspaceId: true, workspace: { select: { name: true } }, updatedAt: true },
+    }),
+    db.event.findMany({
+      where: { workspaceId: { in: authorizedWorkspaceIds }, OR: [{ title: { contains: queryStr, mode: "insensitive" } }, { description: { contains: queryStr, mode: "insensitive" } }] },
+      take: CATEGORY_LIMIT, orderBy: { startTime: "desc" }, select: { id: true, title: true, workspaceId: true, workspace: { select: { name: true } }, startTime: true, endTime: true },
+    }),
   ]);
 
   // 3. Return serialized response
   res.json({
     query: queryStr,
     results: {
+      documents: documents.map(({ workspace, ...doc }) => ({ ...doc, workspaceName: workspace.name })),
+      events: events.map(({ workspace, ...event }) => ({ ...event, workspaceName: workspace.name })),
       tasks: tasks.map((t) => ({
         id: t.id,
         workspaceId: t.workspaceId,
@@ -203,3 +213,5 @@ export async function globalSearch(req, res) {
     },
   });
 }
+
+export async function globalSearch(req, res) { return searchRecords(req, res); }

@@ -22,6 +22,7 @@ import TaskDetailsPanel from "../components/tasks/TaskDetailsPanel.jsx";
 import Spinner from "../components/common/Spinner.jsx";
 import EmptyState from "../components/common/EmptyState.jsx";
 import Select from "../components/common/Select.jsx";
+import PlanAvailability from "../components/plan/PlanAvailability.jsx";
 
 const CAPACITY_KEY = "loft:plan-capacity";
 const CAPACITY_OPTIONS = [2, 4, 6, 8, 10];
@@ -65,14 +66,30 @@ function MyPlanPage({ userId, aiEnabled }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const requestId = useRef(0);
   const savingTasks = useRef(new Set());
+  const initializedPreferences = useRef(false);
+  const preferenceQueue = useRef(Promise.resolve());
+  const [accountReady, setAccountReady] = useState(false);
+  const [accountError, setAccountError] = useState("");
+  const [accountSaving, setAccountSaving] = useState(false);
+  const [saveRetry, setSaveRetry] = useState(0);
 
   // Two loads can overlap (e.g. a priority edit's reload racing a socket-driven
   // one) — only the most recently issued response is allowed to land, so a
   // slow, now-stale request can't clobber a fresher one.
   const load = useCallback(() => {
     const id = ++requestId.current;
-    return planApi.getPlan(capacity).then((data) => {
-      if (id === requestId.current) { setPlan(data); setError(""); }
+    return planApi.getPlan(initializedPreferences.current ? capacity : undefined).then((data) => {
+      if (id === requestId.current) {
+        if (!initializedPreferences.current) {
+          initializedPreferences.current = true;
+          if (data.preferencesSaved) {
+            setPreferences({ order: data.preferences.order, dates: data.preferences.dates });
+            setCapacity(data.preferences.dailyCapacityHours);
+          }
+          setAccountReady(true);
+        }
+        setPlan(data); setError("");
+      }
     }).catch((err) => {
       if (id === requestId.current) setError(apiErrorMessage(err));
     }).finally(() => {
@@ -100,6 +117,18 @@ function MyPlanPage({ userId, aiEnabled }) {
   }, [preferences, userId]);
 
   useEffect(() => {
+    if (!accountReady) return;
+    let current = true;
+    const timer = setTimeout(() => {
+      setAccountSaving(true);
+      const patch = { ...preferences, dailyCapacityHours: capacity };
+      preferenceQueue.current = preferenceQueue.current.catch(() => {}).then(() => planApi.savePreferences(patch));
+      preferenceQueue.current.then(() => { if (current) setAccountError(""); }).catch((err) => { if (current) setAccountError(apiErrorMessage(err)); }).finally(() => { if (current) setAccountSaving(false); });
+    }, 600);
+    return () => { current = false; clearTimeout(timer); };
+  }, [accountReady, preferences, capacity, saveRetry]);
+
+  useEffect(() => {
     try {
       localStorage.setItem(VIEW_KEY, view);
     } catch {
@@ -117,7 +146,7 @@ function MyPlanPage({ userId, aiEnabled }) {
 
   // Every view is derived from the flat task list, so patching the one task
   // there updates the day lanes, the week and the calendar at once.
-  const items = useMemo(() => applyManualPlan(toPlanItems(plan?.tasks, capacity), preferences, aiEnabled ? aiOrder : []), [plan, capacity, preferences, aiEnabled, aiOrder]);
+  const items = useMemo(() => applyManualPlan(toPlanItems(plan?.tasks, capacity, new Date(), plan?.capacityByDate), preferences, aiEnabled ? aiOrder : []), [plan, capacity, preferences, aiEnabled, aiOrder]);
   const lanes = useMemo(() => buildDayLanes(items), [items]);
   const atRisk = useMemo(() => items.filter((it) => it.atRisk), [items]);
   const manual = useMemo(() => ({ order: preferences.order.filter((id) => plan?.tasks.some((task) => task.id === id)), dates: Object.fromEntries(Object.entries(preferences.dates).filter(([id]) => plan?.tasks.some((task) => task.id === id))) }), [preferences, plan]);
@@ -218,6 +247,9 @@ function MyPlanPage({ userId, aiEnabled }) {
   return (
     <>
       <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
+        {accountSaving && <p role="status" className="text-xs text-ink-500">Saving personal plan…</p>}
+        {accountError && <p role="alert" className="text-sm text-red-600">Your plan is saved on this device, but account sync failed. {accountError} <button className="underline" onClick={() => setSaveRetry((value) => value + 1)}>Retry sync</button></p>}
+        {plan?.preferences && <PlanAvailability key={JSON.stringify([plan.preferences.hoursByWeekday, plan.preferences.accountForMeetings, plan.preferences.timeZone])} preferences={plan.preferences} onSaved={load} />}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold text-ink-900 dark:text-ink-50">My Plan</h2>

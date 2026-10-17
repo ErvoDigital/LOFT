@@ -2,13 +2,7 @@
 // differentiator: surfacing collisions that only exist because a person
 // belongs to several independent workspaces that can't see each other.
 
-function sameDay(a, b) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
+import { dayInZone } from "../../../shared/time.js";
 
 function overlaps(aStart, aEnd, bStart, bEnd) {
   return aStart < bEnd && bStart < aEnd;
@@ -17,7 +11,8 @@ function overlaps(aStart, aEnd, bStart, bEnd) {
 // events: [{ id, title, workspaceId, workspaceName, startTime, endTime }]
 // tasks:  [{ id, title, workspaceId, workspaceName, dueDate, tier }] — callers
 // are expected to have already excluded tasks in a "done" status.
-export function detectConflicts({ events, tasks }) {
+export function detectConflicts({ events, tasks, timeZone = "Asia/Manila", dailyCapacityHours = 6 }) {
+  const sameDay = (a, b) => dayInZone(a, timeZone) === dayInZone(b, timeZone);
   const conflicts = [];
 
   for (let i = 0; i < events.length; i++) {
@@ -48,8 +43,9 @@ export function detectConflicts({ events, tasks }) {
       if (sameDay(new Date(a.dueDate), new Date(b.dueDate))) {
         conflicts.push({
           type: "DEADLINE_CLASH",
-          severity: a.tier === "TIER_1" || b.tier === "TIER_1" ? "high" : "medium",
-          message: `"${a.title}" (${a.workspaceName}) and "${b.title}" (${b.workspaceName}) are both due ${new Date(a.dueDate).toDateString()}`,
+          severity: a.tier === "TIER_1" || b.tier === "TIER_1" ? "high" : (a.estimatedMinutes ?? 30) + (b.estimatedMinutes ?? 30) > dailyCapacityHours * 60 ? "medium" : "low",
+          workload: { estimatedHours: ((a.estimatedMinutes ?? 30) + (b.estimatedMinutes ?? 30)) / 60, capacityHours: dailyCapacityHours },
+          message: `"${a.title}" (${a.workspaceName}) and "${b.title}" (${b.workspaceName}) are both due ${dayInZone(a.dueDate, timeZone)}`,
           items: [
             { kind: "task", id: a.id, title: a.title, workspaceId: a.workspaceId, workspaceName: a.workspaceName, time: a.dueDate },
             { kind: "task", id: b.id, title: b.title, workspaceId: b.workspaceId, workspaceName: b.workspaceName, time: b.dueDate },

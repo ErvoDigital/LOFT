@@ -9,6 +9,7 @@ import { purgeConversationAndAttachments } from "../services/conversationPurge.j
 const sendSchema = z.object({
   content: z.string().max(4000).default(""),
   attachmentAssetId: z.string().optional(),
+  parentMessageId: z.string().min(1).max(100).optional(),
 });
 
 // A single pictograph, optionally followed by a variation selector, skin-tone
@@ -53,6 +54,7 @@ function serializeAttachment(asset) {
 }
 
 const messageInclude = {
+  parentMessage: { select: { id: true, content: true, sender: { select: { name: true } } } },
   sender: { select: { id: true, name: true, avatarColor: true, avatarUrl: true } },
   attachment: { include: { versions: { orderBy: { version: "desc" }, take: 1 } } },
   reactions: { include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: "asc" } },
@@ -81,6 +83,10 @@ function serializeMessage(message) {
     conversationId: message.conversationId,
     content: message.content,
     createdAt: message.createdAt,
+    parentMessageId: message.parentMessageId,
+    parentMessage: message.parentMessage,
+    editedAt: message.editedAt,
+    isPinned: Boolean(message.isPinned),
     sender: message.sender,
     attachment: serializeAttachment(message.attachment),
     reactions: message.reactions ? serializeReactions(message.reactions) : [],
@@ -161,12 +167,22 @@ async function assertParticipant(conversationId, userId) {
 export async function getMessages(req, res) {
   await assertParticipant(req.params.conversationId, req.userId);
 
-  const { before, q, limit } = z.object({
+  const { before, q, limit, around, pinned } = z.object({
     before: z.string().max(512).optional(),
     q: z.string().trim().max(200).default(""),
     limit: z.coerce.number().int().min(1).max(100).default(50),
+    around: z.string().min(1).max(100).optional(),
+    pinned: z.enum(["true"]).optional(),
   }).parse(req.query || {});
   const where = { conversationId: req.params.conversationId, AND: [] };
+  if (pinned) where.isPinned = true;
+  if (around && !before && !q) {
+    const target = await prisma.message.findUnique({ where: { id: around } });
+    if (!target || target.conversationId !== req.params.conversationId) throw new ApiError(404, "Message not found");
+    const rows = await prisma.message.findMany({ where: { conversationId: req.params.conversationId, createdAt: { lte: target.createdAt } }, include: messageInclude, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: limit });
+    const oldest = rows.at(-1);
+    return res.json({ messages: rows.reverse().map(serializeMessage), hasMore: rows.length === limit, nextCursor: oldest ? Buffer.from(JSON.stringify({ id: oldest.id, createdAt: oldest.createdAt.toISOString() })).toString("base64url") : null });
+  }
   if (before) {
     let cursor;
     try {
@@ -201,12 +217,16 @@ export async function getMessages(req, res) {
 }
 
 export async function sendMessageRest(req, res) {
-  const { content, attachmentAssetId } = sendSchema.parse(req.body);
+  const { content, attachmentAssetId, parentMessageId } = sendSchema.parse(req.body);
   const trimmed = content.trim();
   if (!trimmed && !attachmentAssetId) throw new ApiError(400, "Message must have content or an attachment");
 
   const conversation = await assertParticipant(req.params.conversationId, req.userId);
   const conversationId = req.params.conversationId;
+  if (parentMessageId) {
+    const parent = await prisma.message.findUnique({ where: { id: parentMessageId } });
+    if (!parent || parent.conversationId !== conversationId) throw new ApiError(400, "Reply must reference a message in this conversation");
+  }
 
   if (attachmentAssetId) {
     const asset = await prisma.asset.findUnique({ where: { id: attachmentAssetId }, include: { folder: true } });
@@ -216,11 +236,16 @@ export async function sendMessageRest(req, res) {
   }
 
   const message = await prisma.message.create({
-    data: { conversationId, senderId: req.userId, content: trimmed, attachmentAssetId: attachmentAssetId || null },
+    data: { conversationId, senderId: req.userId, content: trimmed, attachmentAssetId: attachmentAssetId || null, ...(parentMessageId ? { parentMessageId } : {}) },
     include: messageInclude,
   });
 
+  const serialized = serializeMessage(message);
   const participants = await prisma.conversationParticipant.findMany({ where: { conversationId } });
+  participants.forEach((person) => {
+    emitToUser(person.userId, "message:new", serialized);
+    emitToUser(person.userId, "message:preview", { conversationId, workspaceId: conversation.workspaceId, ...serialized });
+  });
   const mentionedIds = extractMentionedUserIds(trimmed, participants.map((p) => p.userId), req.userId);
   // A meeting chat isn't reachable from the chat page by design, so its
   // mentions point back at the meeting itself.
@@ -241,6 +266,18 @@ export async function sendMessageRest(req, res) {
   );
 
   res.status(201).json({ message: serializeMessage(message) });
+}
+
+export async function updateMessage(req, res) {
+  const data = z.object({ content: z.string().trim().min(1).max(4000).optional(), isPinned: z.boolean().optional() }).strict().refine((value) => Object.keys(value).length > 0).parse(req.body);
+  await assertParticipant(req.params.conversationId, req.userId);
+  const current = await prisma.message.findUnique({ where: { id: req.params.messageId } });
+  if (!current || current.conversationId !== req.params.conversationId) throw new ApiError(404, "Message not found");
+  if (data.content !== undefined && current.senderId !== req.userId) throw new ApiError(403, "Only the author can edit this message");
+  const message = await prisma.message.update({ where: { id: current.id }, data: { ...data, ...(data.content !== undefined ? { editedAt: new Date() } : {}) }, include: messageInclude });
+  const participants = await prisma.conversationParticipant.findMany({ where: { conversationId: current.conversationId } });
+  participants.forEach((person) => emitToUser(person.userId, "message:updated", serializeMessage(message)));
+  res.json({ message: serializeMessage(message) });
 }
 
 // Toggles the caller's own reaction: adding it if they haven't reacted with

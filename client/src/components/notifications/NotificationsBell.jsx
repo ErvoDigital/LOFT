@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell } from "lucide-react";
 import { useNotifications } from "../../context/NotificationsContext.jsx";
+import { snoozeNotification } from "../../api/notifications.js";
 
 function timeAgo(date) {
   const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
@@ -18,6 +19,13 @@ export default function NotificationsBell() {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const navigate = useNavigate();
+  const [snoozeError, setSnoozeError] = useState("");
+  const groups = [];
+  for (const item of notifications) {
+    const previous = groups.at(-1);
+    if (previous && previous.type === item.type && previous.link === item.link && previous.isRead === item.isRead && Math.abs(new Date(previous.createdAt) - new Date(item.createdAt)) < 600000) previous.ids.push(item.id);
+    else groups.push({ ...item, ids: [item.id] });
+  }
 
   useEffect(() => {
     function onClick(e) {
@@ -56,11 +64,13 @@ export default function NotificationsBell() {
           {error && <div role="alert" className="m-2 rounded-lg bg-red-500/10 p-2 text-xs text-red-600 dark:text-red-300"><p>{error}</p><button onClick={refresh} className="mt-1 font-semibold underline">Retry</button></div>}
           <div className="max-h-96 overflow-y-auto overscroll-contain max-sm:max-h-[70vh]">
             {notifications.length === 0 && <p className="px-2 py-6 text-center text-sm text-ink-400">You're all caught up.</p>}
-            {notifications.map((n) => (
+            {snoozeError && <p role="alert" className="text-xs text-red-600">{snoozeError}</p>}
+            {groups.map((n) => (
+              <div key={n.id} className="relative">
               <button
                 key={n.id}
                 onClick={() => {
-                  markRead(n.id);
+                  n.ids.forEach((id) => markRead(id));
                   setOpen(false);
                   if (n.link) navigate(n.link);
                 }}
@@ -68,11 +78,13 @@ export default function NotificationsBell() {
               >
                 <div className="flex w-full items-center gap-1.5">
                   {!n.isRead && <span className="h-1.5 w-1.5 rounded-full bg-brand-600" />}
-                  <span className="font-medium text-ink-700 dark:text-ink-200">{n.title}</span>
+                  <span className="font-medium text-ink-700 dark:text-ink-200">{n.title}{n.ids.length > 1 ? ` · ${n.ids.length} updates` : ""}</span>
                 </div>
                 {n.body && <span className="text-xs text-ink-400">{n.body}</span>}
                 <span className="text-[11px] text-ink-300">{timeAgo(n.createdAt)}</span>
               </button>
+              <button type="button" aria-label={`Snooze ${n.title} for one hour`} className="mb-2 ml-2 text-[11px] text-brand-600" onClick={async () => { try { await Promise.all(n.ids.map((id) => snoozeNotification(id, 60))); await refresh(); setSnoozeError(""); } catch { setSnoozeError("Could not snooze. Please try again."); } }}>Remind me in 1 hour</button>
+              </div>
             ))}
           </div>
         </div>

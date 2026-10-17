@@ -1,8 +1,14 @@
 import { api } from "./client.js";
+import { uploadResumable } from "../lib/resumableUpload.js";
+export const listTrash = (workspaceId) => api.get(`/workspaces/${workspaceId}/assets/trash`).then((r) => r.data.assets);
+export const restoreAsset = (workspaceId, assetId) => api.post(`/workspaces/${workspaceId}/assets/${assetId}/restore`);
+export const purgeAsset = (workspaceId, assetId) => api.delete(`/workspaces/${workspaceId}/assets/${assetId}/permanent`);
+export const restoreVersion = (workspaceId, assetId, versionId) => api.post(`/workspaces/${workspaceId}/assets/${assetId}/versions/${versionId}/restore`).then((r) => r.data.asset);
 
 export const listAssets = (workspaceId) => api.get(`/workspaces/${workspaceId}/assets`).then((r) => r.data.assets);
 
 export const uploadAsset = (workspaceId, file, folderId, onProgress) => {
+  if (file.size > 5 * 1024 * 1024) return uploadResumable(workspaceId, file, { folderId, onProgress });
   const form = new FormData();
   form.append("file", file);
   if (folderId) form.append("folderId", folderId);
@@ -29,6 +35,7 @@ export const uploadChatAttachment = (workspaceId, conversationId, file, onProgre
 };
 
 export const uploadVersion = (workspaceId, assetId, file, onProgress) => {
+  if (file.size > 5 * 1024 * 1024) return uploadResumable(workspaceId, file, { assetId, onProgress });
   const form = new FormData();
   form.append("file", file);
   return api

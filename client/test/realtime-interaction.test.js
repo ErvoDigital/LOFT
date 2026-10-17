@@ -74,7 +74,7 @@ async function mountChat(t, connected = true, initialHistory = [], options = {})
     "../../context/ConfirmContext.jsx": { useConfirm: () => noop },
     "../../context/MemberProfileContext.jsx": { useMemberProfile: () => noop },
     "../common/Avatar.jsx": noop, "../common/EmptyState.jsx": noop, "../common/Spinner.jsx": noop, "../common/Modal.jsx": noop,
-    "../storage/PreviewModal.jsx": noop, "../storage/UploadProgressPanel.jsx": noop, "./EmojiPicker.jsx": noop,
+    "../storage/PreviewModal.jsx": noop, "../storage/UploadProgressPanel.jsx": noop, "./EmojiPicker.jsx": noop, "./MessageActions.jsx": noop,
     "../../lib/colors.js": { displayColor: () => "", textOn: () => "" },
     "../../hooks/useMediaQuery.js": () => true,
     "../../lib/access.js": { can: () => false },

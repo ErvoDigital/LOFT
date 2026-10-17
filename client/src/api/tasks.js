@@ -1,4 +1,8 @@
 import { api } from "./client.js";
+export const getTaskDetails = (workspaceId, taskId) => api.get(`/workspaces/${workspaceId}/tasks/${taskId}/details`).then((r) => r.data);
+export const addComment = (workspaceId, taskId, content) => api.post(`/workspaces/${workspaceId}/tasks/${taskId}/comments`, { content });
+export const addDependency = (workspaceId, taskId, dependsOnId) => api.post(`/workspaces/${workspaceId}/tasks/${taskId}/dependencies`, { dependsOnId });
+export const removeDependency = (workspaceId, taskId, dependsOnId) => api.delete(`/workspaces/${workspaceId}/tasks/${taskId}/dependencies/${dependsOnId}`);
 
 export const listMyTasks = () => api.get("/tasks").then((r) => r.data.tasks);
 export const listWorkspaceTasks = (workspaceId) =>

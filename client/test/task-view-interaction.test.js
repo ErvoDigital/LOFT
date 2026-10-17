@@ -43,7 +43,7 @@ async function mount(t, options = {}) {
   };
   const module = { exports: {} };
   vm.runInNewContext(code, { module, require: createRequire(import.meta.url), mocks: {
-    "lucide-react": icons, "react-router-dom": { useParams: () => scope },
+    "lucide-react": icons, "react-router-dom": { useParams: () => scope, useLocation: () => ({ search: options.search || "" }) },
     "tasks.js": api, "workspaces.js": { getWorkspace: async () => ({ myRole: options.role || "ADMIN", members: [] }) }, "taskStatuses.js": { listTaskStatuses: async () => statuses },
     "client.js": { apiErrorMessage: (error) => error.message }, "SocketContext.jsx": { useSocket: () => ({ socket }) }, "AuthContext.jsx": { useAuth: () => ({ user: { id: "self" } }) },
     "Select.jsx": ({ options, onChange, ...props }) => React.createElement("select", { ...props, onChange: (event) => onChange(event.target.value) }, options.map((option) => React.createElement("option", { value: option.value, key: option.value }, option.label))),
@@ -51,7 +51,7 @@ async function mount(t, options = {}) {
     "TaskModal.jsx": ({ open, task, onSaved }) => open ? React.createElement("section", { "data-editor": true, "data-edit-id": task?.id, onSaved }) : null,
     "TaskDetailsPanel.jsx": ({ open, task }) => open && task ? React.createElement("section", { "data-details-id": task.id }, task.title) : null,
     "TaskStatusManagerModal.jsx": noop,
-  }, setInterval, clearInterval, localStorage: { getItem: (key) => storage.get(key), setItem: (key, value) => storage.set(key, value) } });
+  }, URLSearchParams, setInterval, clearInterval, localStorage: { getItem: (key) => storage.get(key), setItem: (key, value) => storage.set(key, value) } });
   const component = module.exports.default;
   let view;
   await act(async () => { view = create(React.createElement(component)); });

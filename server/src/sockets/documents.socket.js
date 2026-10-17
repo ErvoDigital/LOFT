@@ -2,6 +2,9 @@ import * as Y from "yjs";
 import { prisma } from "../db/prisma.js";
 import { emitToWorkspace } from "./io.js";
 import { isDocumentVisible } from "../services/documentAccess.js";
+import { saveDocumentEntry } from "../services/documentSave.js";
+import { writeDocumentSnapshot } from "../services/documentSnapshot.js";
+import { emitToDocument } from "./io.js";
 
 // In-memory authoritative merge point per open document — lets a late joiner
 // sync via one full-state message instead of replayed history, and decouples
@@ -17,6 +20,7 @@ function scheduleSave(documentId) {
   const entry = docs.get(documentId);
   if (!entry) return;
   entry.dirty = true;
+  emitToDocument(documentId, "document:save-status", { documentId, status: "saving" });
   clearTimeout(entry.saveTimer);
   entry.saveTimer = setTimeout(() => flushSave(documentId), SAVE_DEBOUNCE_MS);
   if (!entry.maxWaitTimer) {
@@ -31,16 +35,16 @@ async function flushSave(documentId) {
   entry.saveTimer = null;
   clearTimeout(entry.maxWaitTimer);
   entry.maxWaitTimer = null;
-  if (!entry.dirty) return;
-  entry.dirty = false;
-
-  const content = Buffer.from(Y.encodeStateAsUpdate(entry.ydoc));
-  try {
-    const updated = await prisma.document.update({ where: { id: documentId }, data: { content } });
-    emitToWorkspace(entry.workspaceId, "document:updated", { id: documentId, updatedAt: updated.updatedAt });
-  } catch (err) {
-    console.error("document autosave failed", err);
-  }
+  await saveDocumentEntry(entry, {
+    write: () => writeDocumentSnapshot(prisma, documentId, Buffer.from(Y.encodeStateAsUpdate(entry.ydoc))),
+    scheduleRetry: (delay) => { if (docs.get(documentId) === entry) entry.saveTimer = setTimeout(() => flushSave(documentId), delay); },
+    onSaved: (updated, dirty) => {
+      emitToWorkspace(entry.workspaceId, "document:updated", { id: documentId, updatedAt: updated.updatedAt });
+      emitToDocument(documentId, "document:save-status", { documentId, status: dirty ? "saving" : "saved", savedAt: updated.updatedAt });
+    },
+    onError: () => emitToDocument(documentId, "document:save-status", { documentId, status: "error" }),
+  });
+  if (!entry.dirty && entry.sockets.size === 0 && docs.get(documentId) === entry) docs.delete(documentId);
 }
 
 // Purges any live in-memory doc/timers without attempting a final save — used
@@ -130,7 +134,7 @@ export function registerDocumentHandlers(io, socket) {
       if (entry.sockets.size === 0) {
         flushSave(documentId).finally(() => {
           // Only evict if nobody rejoined while the save was in flight.
-          if (docs.get(documentId)?.sockets.size === 0) docs.delete(documentId);
+          if (!entry.dirty && !entry.saving && docs.get(documentId)?.sockets.size === 0) docs.delete(documentId);
         });
       }
     }

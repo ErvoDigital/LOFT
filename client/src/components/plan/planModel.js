@@ -43,7 +43,7 @@ export function formatHours(hours) {
 // The shape PlanTaskRow and MyPlan's handlers read: `taskId` and `hours`
 // (30 minutes when there's no estimate, as the server's planner assumes),
 // plus `atRisk`/`shortfallHours` from markAtRisk below.
-export function toPlanItems(tasks = [], capacity, now = new Date()) {
+export function toPlanItems(tasks = [], capacity, now = new Date(), capacityByDate) {
   const items = tasks.map((t) => ({
     ...t,
     taskId: t.id,
@@ -51,7 +51,7 @@ export function toPlanItems(tasks = [], capacity, now = new Date()) {
     atRisk: false,
     shortfallHours: 0,
   }));
-  markAtRisk(items, capacity, now);
+  markAtRisk(items, capacity, now, capacityByDate);
   return items;
 }
 
@@ -60,7 +60,7 @@ export function toPlanItems(tasks = [], capacity, now = new Date()) {
 // Deadline order finds room wherever it exists — Tuesday's work can start on
 // a clear Monday — and priority only decides which of a day's tasks is the
 // one left over. Overdue work is due now, so it counts against today.
-function markAtRisk(items, capacity, now) {
+function markAtRisk(items, capacity, now, capacityByDate) {
   const today = startOfDay(now);
   const queue = items
     .filter((it) => it.dueDate)
@@ -70,7 +70,8 @@ function markAtRisk(items, capacity, now) {
   let booked = 0;
   for (const { it, day } of queue) {
     booked += it.hours;
-    const room = capacity * (day + 1);
+    let room = 0;
+    for (let i = 0; i <= Math.min(day, 3650); i++) room += capacityByDate?.[dayKey(addDays(today, i))]?.availableHours ?? capacity;
     if (booked > room + 1e-9) {
       it.atRisk = true;
       it.shortfallHours = Math.round(Math.min(it.hours, booked - room) * 100) / 100;

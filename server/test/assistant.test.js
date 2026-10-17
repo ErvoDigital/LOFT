@@ -634,3 +634,137 @@ test("Assistant voice routes require auth, enforce membership and return normali
     clearPrismaClient(fake.db);
   }
 });
+
+test("Lofty summarizes permitted documents and conversations with source links and blocks unauthorized or meeting chats", async () => {
+  const Y = await import("yjs");
+  const fake = fakeDatabase();
+  const docId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const hiddenDocId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  const convId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+  const meetingConvId = "99999999-9999-4999-8999-999999999999";
+  const ydoc = new Y.Doc();
+  ydoc.getXmlFragment("default").insert(0, [new Y.XmlText("Launch checklist is ready for review.")]);
+  const content = Buffer.from(Y.encodeStateAsUpdate(ydoc));
+  ydoc.destroy();
+
+  fake.db.workspaceMember.findMany = async () => [{ workspaceId, role: "MEMBER", permissions: "", user: { id: userId, name: "Tester" } }];
+  fake.db.folder = { async findMany() { return []; } };
+  fake.db.asset = { async findMany() { return []; } };
+  fake.db.user = { async findMany() { return []; } };
+  fake.db.document = {
+    async findUnique({ where }) {
+      if (where.id === docId) return { id: docId, workspaceId, title: "Launch Plan", visibility: "WORKSPACE", createdById: partnerId, assignees: [], content };
+      if (where.id === hiddenDocId) return { id: hiddenDocId, workspaceId, title: "Restricted Doc", visibility: "ASSIGNED", createdById: partnerId, assignees: [], content };
+      return null;
+    },
+    async findMany() {
+      return [{ id: docId, workspaceId, title: "Launch Plan", visibility: "WORKSPACE", createdById: partnerId, assignees: [], workspace: { name: "School" }, updatedAt: new Date("2026-10-17T09:00:00Z") }];
+    },
+  };
+  fake.db.conversation = {
+    async findUnique({ where }) {
+      if (where.id === convId) return { id: convId, workspaceId, title: "General", isMeetingChat: false, participants: [{ userId }] };
+      if (where.id === meetingConvId) return { id: meetingConvId, workspaceId, title: "Meeting Room", isMeetingChat: true, participants: [{ userId }] };
+      return null;
+    },
+  };
+  fake.db.message = {
+    async findMany() {
+      return [{
+        id: "m-1",
+        content: "Let us ship on Friday",
+        createdAt: new Date("2026-10-17T09:00:00Z"),
+        sender: { id: partnerId, name: "Partner", avatarColor: "#5B5BD6" },
+        conversation: { id: convId, title: "General", isGroup: true, workspaceId, workspace: { name: "School" }, participants: [{ user: { id: userId, name: "Tester" } }] },
+      }];
+    },
+  };
+
+  const textResult = await answerAssistant({ userId, workspaceId, message: "Summarize the Launch Plan and General chat", history: [], timeZone: "Asia/Manila" }, fake.db, async ({ executeTool }) => {
+    const search = await executeTool("search_content", { query: "Launch" });
+    assert.equal(search.documents.length, 1);
+    const doc = await executeTool("read_document", { recordId: docId });
+    assert.match(doc.text, /Launch checklist is ready/);
+    await assert.rejects(executeTool("read_document", { recordId: hiddenDocId }), /Document is not accessible/);
+    const conv = await executeTool("read_conversation", { recordId: convId });
+    assert.equal(conv.messages[0].content, "Let us ship on Friday");
+    await assert.rejects(executeTool("read_conversation", { recordId: meetingConvId }), /Conversation is not accessible/);
+    return "Here is the summary.";
+  });
+  assert.match(textResult.reply, /Sources: \[Launch Plan\]\(\/workspaces\/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\/docs\/dddddddd-dddd-4ddd-8ddd-dddddddddddd\) · \[General\]\(\/workspaces\/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\/chat\?conversation=ffffffff-ffff-4fff-8fff-ffffffffffff\)/);
+  assert.equal(textResult.sources.length, 2);
+
+  const voiceResult = await answerAssistant({ userId, workspaceId, message: "Read the Launch Plan", history: [], timeZone: "Asia/Manila", interactionMode: "voice" }, fake.db, async ({ executeTool }) => {
+    await executeTool("read_document", { recordId: docId });
+    return "Spoken summary.";
+  });
+  assert.doesNotMatch(voiceResult.reply, /Sources:/);
+  assert.equal(voiceResult.sources.length, 1);
+});
+
+test("Proposing and confirming task and event updates enforces permissions, concurrency checks, and idempotency", async () => {
+  const fake = fakeDatabase();
+  const taskId = "33333333-3333-4333-8333-333333333333";
+  const eventId = "44444444-4444-4444-8444-444444444444";
+  const mutations = new Map();
+  fake.records.task.set(taskId, {
+    id: taskId,
+    workspaceId,
+    title: "Initial Task",
+    tier: "TIER_3",
+    status: "todo",
+    assigneeId: userId,
+    updatedAt: new Date("2026-10-17T08:00:00.000Z"),
+  });
+  fake.records.event.set(eventId, {
+    id: eventId,
+    workspaceId,
+    title: "Initial Event",
+    startTime: new Date("2026-10-18T10:00:00.000Z"),
+    endTime: new Date("2026-10-18T11:00:00.000Z"),
+    attendees: [{ userId }],
+    updatedAt: new Date("2026-10-17T08:00:00.000Z"),
+  });
+  fake.db.taskStatus.findUnique = async ({ where }) => (where.id === "done" ? { id: "done", workspaceId } : null);
+  fake.db.task.update = async ({ where, data }) => {
+    const next = { ...fake.records.task.get(where.id), ...data, updatedAt: new Date("2026-10-17T09:00:00.000Z") };
+    fake.records.task.set(where.id, next);
+    return next;
+  };
+  fake.db.event.update = async ({ where, data }) => {
+    const next = { ...fake.records.event.get(where.id), ...data, updatedAt: new Date("2026-10-17T09:00:00.000Z") };
+    fake.records.event.set(where.id, next);
+    return next;
+  };
+  fake.db.assistantMutation = {
+    async findUnique({ where }) { return mutations.get(where.id) || null; },
+    async create({ data }) { mutations.set(data.id, data); return data; },
+  };
+  fake.access("MEMBER", "events.manage");
+
+  const proposal = await answerAssistant({ userId, workspaceId, message: "Mark Initial Task urgent and rename Initial Event", history: [], timeZone: "Asia/Manila" }, fake.db, async ({ executeTool }) => {
+    await executeTool("propose_task_update", { workspaceId, recordId: taskId, changes: { tier: "TIER_1", status: "done" } });
+    await executeTool("propose_event_update", { workspaceId, recordId: eventId, changes: { title: "Updated Event" } });
+    return "Please confirm the updates.";
+  });
+  assert.equal(proposal.actions.length, 2);
+  assert.deepEqual(proposal.actions[0].data.before, { tier: "TIER_3", status: "todo" });
+  assert.deepEqual(proposal.actions[1].data.before, { title: "Initial Event" });
+
+  setPrismaClient(fake.db);
+  try {
+    const firstConfirm = await confirmAction(proposal.actions[0].token, userId, fake.db);
+    assert.equal(firstConfirm.id, taskId);
+    assert.equal(fake.records.task.get(taskId).tier, "TIER_1");
+
+    const duplicateConfirm = await confirmAction(proposal.actions[0].token, userId, fake.db);
+    assert.equal(duplicateConfirm.alreadyCreated, true);
+
+    // Simulate concurrent modification before confirming the event update
+    fake.records.event.get(eventId).updatedAt = new Date("2026-10-17T08:30:00.000Z");
+    await assert.rejects(confirmAction(proposal.actions[1].token, userId, fake.db), /changed after the preview/);
+  } finally {
+    clearPrismaClient(fake.db);
+  }
+});
+

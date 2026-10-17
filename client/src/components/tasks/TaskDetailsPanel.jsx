@@ -10,6 +10,7 @@ import { ACCEPTED_UPLOAD_TYPES } from "../../lib/uploads.js";
 import { fileFailure } from "../../lib/fileFeedback.js";
 import FileFailureNotice from "../storage/FileFailureNotice.jsx";
 import { formatTaskDue, isTaskOverdue } from "../../lib/taskViews.js";
+import TaskCollaboration from "./TaskCollaboration.jsx";
 
 function formatDuration(minutes) {
   const m = Number(minutes) || 0;
@@ -206,8 +207,10 @@ export default function TaskDetailsPanel({ open, task, workspaceId, statuses, on
                 <TierBadge tier={task.tier} />
               </div>
               <h3 className="text-lg font-semibold text-ink-900 dark:text-ink-50">{task.title}</h3>
+              {task.sourceMessageId && <p className="mt-1 text-xs text-ink-400">Created from a conversation message</p>}
             </div>
 
+            <TaskCollaboration key={task.id} task={task} workspaceId={workspaceId} />
             <div className={`grid gap-4 ${expanded ? "grid-cols-4" : "grid-cols-2"}`}>
               <div>
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-400">Status</p>

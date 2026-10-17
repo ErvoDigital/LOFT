@@ -4,6 +4,7 @@ import { getPlanData } from "../services/planData.service.js";
 import { recommendPlan } from "../services/planRecommendations.service.js";
 import { prisma } from "../db/prisma.js";
 import { createHash } from "node:crypto";
+import { planPreferencesSchema, readPreferences, timeZoneSchema } from "../services/preferences.js";
 
 const capacitySchema = z.coerce.number().min(1).max(16);
 const dateKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => Number.isFinite(new Date(value).getTime()) && new Date(value).toISOString().slice(0, 10) === value, "Invalid planned day");
@@ -17,8 +18,18 @@ const recent = new Map();
 const cachedAnalysis = new Map();
 
 export async function getPlan(req, res) {
-  const dailyCapacityHours = capacitySchema.default(6).parse(req.query.capacity);
-  res.json(await getPlanData({ userId: req.userId, dailyCapacityHours }));
+  const dailyCapacityHours = capacitySchema.optional().parse(req.query.capacity);
+  const timeZone = req.query.timeZone ? timeZoneSchema.parse(req.query.timeZone) : undefined;
+  res.json(await getPlanData({ userId: req.userId, dailyCapacityHours, timeZone }));
+}
+
+export async function savePreferences(req, res) {
+  const patch = planPreferencesSchema.partial().parse(req.body);
+  const user = await prisma.user.findUnique({ where: { id: req.userId }, select: { planPreferences: true } });
+  if (!user) throw new ApiError(401, "User not found");
+  const preferences = planPreferencesSchema.parse({ ...readPreferences(user.planPreferences, planPreferencesSchema), ...patch });
+  await prisma.user.update({ where: { id: req.userId }, data: { planPreferences: JSON.stringify(preferences) } });
+  res.json({ preferences });
 }
 
 export async function getRecommendations(req, res) {

@@ -25,6 +25,8 @@ export default function EventModal({ open, onClose, workspaceId, members, defaul
   const [error, setError] = useState("");
   const confirm = useConfirm();
   const [loading, setLoading] = useState(false);
+  const [repeat, setRepeat] = useState("NONE"), [repeatCount, setRepeatCount] = useState(4);
+  const [conflicts, setConflicts] = useState([]), [conflictError, setConflictError] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -54,7 +56,17 @@ export default function EventModal({ open, onClose, workspaceId, members, defaul
       setAttendeeIds(members.map((m) => m.user.id));
     }
     setError("");
+    setRepeat("NONE"); setConflicts([]); setConflictError("");
   }, [open, event, draft, defaultDate, defaultStart, members]);
+
+  useEffect(() => {
+    if (!open || draft || !startTime || !endTime || new Date(endTime) <= new Date(startTime)) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      Promise.resolve().then(() => eventsApi.previewConflicts(workspaceId, { startTime: new Date(startTime).toISOString(), endTime: new Date(endTime).toISOString(), attendeeIds, ...(event ? { excludeEventId: event.id } : {}) }, controller.signal)).then((items) => { if (!controller.signal.aborted) { setConflicts(items); setConflictError(""); } }).catch(() => { if (!controller.signal.aborted) { setConflicts([]); setConflictError("Availability could not be checked. You can retry by adjusting the time."); } });
+    }, 350);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [open, workspaceId, startTime, endTime, attendeeIds, event, draft]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -80,7 +92,9 @@ export default function EventModal({ open, onClose, workspaceId, members, defaul
         startTime: startTime ? new Date(startTime).toISOString() : null,
         endTime: endTime ? new Date(endTime).toISOString() : null,
         attendeeIds,
+        ...(!draft && !isEdit && repeat !== "NONE" ? { recurrence: { frequency: repeat, count: repeatCount, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone } } : {}),
       };
+      if ((!draft || schedule) && conflicts.length && !await confirm({ title: "Save despite scheduling conflicts?", message: `${conflicts.map((item) => item.name).join(", ")} already ${conflicts.length === 1 ? "has" : "have"} another commitment at this time.`, confirmLabel: "Save event", cancelLabel: "Change time" })) return;
       const saved = draft
         ? schedule ? await eventsApi.scheduleEventDraft(workspaceId, draft.id, payload) : await eventsApi.updateEventDraft(workspaceId, draft.id, payload)
         : isEdit ? await eventsApi.updateEvent(workspaceId, event.id, payload) : await eventsApi.createEvent(workspaceId, payload);
@@ -143,6 +157,10 @@ export default function EventModal({ open, onClose, workspaceId, members, defaul
             <DateTimePicker id="event-ends" value={endTime} onChange={setEndTime} align="end" required={!draft} />
           </div>
         </div>
+        {!draft && !isEdit && <div className="flex items-end gap-3"><label className="flex-1 text-sm">Repeat<select className="input mt-1" value={repeat} onChange={(e) => setRepeat(e.target.value)}><option value="NONE">Does not repeat</option><option value="DAILY">Daily</option><option value="WEEKLY">Weekly</option></select></label>{repeat !== "NONE" && <label className="w-28 text-sm">Occurrences<input className="input mt-1" type="number" min="2" max="52" value={repeatCount} onChange={(e) => setRepeatCount(Number(e.target.value))} /></label>}</div>}
+        {isEdit && event.seriesId && <p className="text-xs text-ink-500">Part of a recurring series. Changes apply to this occurrence.</p>}
+        {conflicts.length > 0 && <p role="status" className="rounded-lg bg-amber-500/10 p-3 text-sm text-amber-700">Scheduling conflict: {conflicts.map((item) => item.name).join(", ")} already {conflicts.length === 1 ? "has" : "have"} another commitment.</p>}
+        {conflictError && <p role="status" className="text-xs text-ink-500">{conflictError}</p>}
         <div>
           <label className="mb-1 block text-sm font-medium text-ink-600 dark:text-ink-300">Location (optional)</label>
           <input className="input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Room, link, or address" />

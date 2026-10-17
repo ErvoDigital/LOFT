@@ -4,6 +4,8 @@ import { Pool } from "pg";
 import * as Y from "yjs";
 import { attachDatabasePool, upgradeWebSocket } from "@neon/functions";
 import { isAllowedOrigin } from "./origins.mjs";
+import { saveDocumentEntry } from "../../server/src/services/documentSave.js";
+import { notificationPreferencesSchema, readPreferences, quietNow } from "../../server/src/services/preferences.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const CLIENT_URL = process.env.CLIENT_URL;
@@ -129,13 +131,17 @@ setInterval(() => {
 }, 10 * 60 * 1000).unref?.();
 
 async function notify(userId, { type, title, body, link }) {
+  const user = await pool.query(`SELECT "notificationPreferences" FROM "User" WHERE id=$1`, [userId]);
+  const settings = readPreferences(user.rows[0]?.notificationPreferences, notificationPreferencesSchema);
+  const workspaceId = link?.match(/\/workspaces\/([^/]+)/)?.[1];
+  if (settings.disabledTypes.includes(type) || settings.mutedWorkspaceIds.includes(workspaceId)) return;
   const id = crypto.randomUUID();
   const res = await pool.query(
     `INSERT INTO "Notification" (id, "userId", type, title, body, link, "isRead", "createdAt")
      VALUES ($1,$2,$3,$4,$5,$6,false,now()) RETURNING *`,
     [id, userId, type, title, body ?? null, link ?? null]
   );
-  await publish(`user:${userId}`, "notification:new", res.rows[0]);
+  await publish(`user:${userId}`, "notification:new", { ...res.rows[0], silent: quietNow(settings) });
 }
 
 // ---- Chat ----
@@ -484,6 +490,7 @@ function scheduleSave(documentId) {
   const entry = docs.get(documentId);
   if (!entry) return;
   entry.dirty = true;
+  void publish(`document:${documentId}`, "document:save-status", { documentId, status: "saving" });
   clearTimeout(entry.saveTimer);
   entry.saveTimer = setTimeout(() => flushSave(documentId), SAVE_DEBOUNCE_MS);
   if (!entry.maxWaitTimer) entry.maxWaitTimer = setTimeout(() => flushSave(documentId), SAVE_MAX_WAIT_MS);
@@ -496,22 +503,28 @@ async function flushSave(documentId) {
   entry.saveTimer = null;
   clearTimeout(entry.maxWaitTimer);
   entry.maxWaitTimer = null;
-  if (!entry.dirty) return;
-  entry.dirty = false;
-
-  const content = Buffer.from(Y.encodeStateAsUpdate(entry.ydoc));
-  try {
-    const res = await pool.query(`UPDATE "Document" SET content=$1, "updatedAt"=now() WHERE id=$2 RETURNING "updatedAt"`, [
-      content,
-      documentId,
-    ]);
-    await publish(`workspace:${entry.workspaceId}`, "document:updated", {
-      id: documentId,
-      updatedAt: res.rows[0].updatedAt,
-    });
-  } catch (err) {
-    console.error("document autosave failed", err);
-  }
+  await saveDocumentEntry(entry, {
+    write: async () => {
+      const content = Buffer.from(Y.encodeStateAsUpdate(entry.ydoc));
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(`SELECT id FROM "Document" WHERE id=$1 FOR UPDATE`, [documentId]);
+        await client.query(`INSERT INTO "DocumentRevision" (id, "documentId", title, content, "createdAt") SELECT $1, id, title, content, now() FROM "Document" WHERE id=$2 AND content IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "DocumentRevision" WHERE "documentId"=$2 AND "createdAt">now()-interval '5 minutes')`, [crypto.randomUUID(), documentId]);
+        await client.query(`DELETE FROM "DocumentRevision" WHERE id IN (SELECT id FROM "DocumentRevision" WHERE "documentId"=$1 ORDER BY "createdAt" DESC OFFSET 50)`, [documentId]);
+        const result = await client.query(`UPDATE "Document" SET content=$1, "updatedAt"=now() WHERE id=$2 RETURNING "updatedAt"`, [content, documentId]);
+        if (!result.rows[0]) throw Object.assign(new Error("Document no longer exists"), { code: "P2025" });
+        await client.query("COMMIT"); return result.rows[0];
+      } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+    },
+    scheduleRetry: (delay) => { if (docs.get(documentId) === entry) entry.saveTimer = setTimeout(() => flushSave(documentId), delay); },
+    onSaved: async (updated, dirty) => {
+      await publish(`workspace:${entry.workspaceId}`, "document:updated", { id: documentId, updatedAt: updated.updatedAt });
+      await publish(`document:${documentId}`, "document:save-status", { documentId, status: dirty ? "saving" : "saved", savedAt: updated.updatedAt });
+    },
+    onError: () => { void publish(`document:${documentId}`, "document:save-status", { documentId, status: "error" }); },
+  });
+  if (!entry.dirty && entry.sockets.size === 0 && docs.get(documentId) === entry) docs.delete(documentId);
 }
 
 async function handleDocumentJoin(conn, documentId) {
@@ -577,7 +590,7 @@ function handleDocumentLeave(conn) {
     if (!stillPresent) publish(`document:${documentId}`, "document:presence-leave", { userId: conn.userId });
     if (entry.sockets.size === 0) {
       flushSave(documentId).finally(() => {
-        if (docs.get(documentId)?.sockets.size === 0) docs.delete(documentId);
+        if (!entry.dirty && !entry.saving && docs.get(documentId)?.sockets.size === 0) docs.delete(documentId);
       });
     }
   }

@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, CopyObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, ListPartsCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import { ApiError } from "./ApiError.js";
@@ -52,6 +52,41 @@ export function generateStoredName() {
   return crypto.randomUUID();
 }
 
+function multipartInput(session) {
+  assertStorageConfigured();
+  return { Bucket: storageConfig().bucket, Key: objectKey(session.workspaceId, session.storageKey), UploadId: session.uploadId };
+}
+export async function beginMultipart(workspaceId, storedName, mimeType) {
+  assertStorageConfigured();
+  const result = await getS3Client().send(new CreateMultipartUploadCommand({ Bucket: storageConfig().bucket, Key: objectKey(workspaceId, storedName), ContentType: mimeType }));
+  return result.UploadId;
+}
+export async function signMultipartPart(session, number) {
+  return getSignedUrl(getS3Client(), new UploadPartCommand({ ...multipartInput(session), PartNumber: number }), { expiresIn: 900 });
+}
+export async function multipartParts(session) {
+  const result = await getS3Client().send(new ListPartsCommand(multipartInput(session)));
+  return (result.Parts || []).map((part) => ({ number: part.PartNumber, etag: part.ETag, size: part.Size }));
+}
+export async function finishMultipart(session, parts) {
+  try {
+    await getS3Client().send(new CompleteMultipartUploadCommand({ ...multipartInput(session), MultipartUpload: { Parts: parts.map((part) => ({ PartNumber: part.number, ETag: part.etag })) } }));
+  } catch (error) {
+    // A successful completion whose HTTP response was lost has no upload ID
+    // left. The server-generated object key makes checking that case safe.
+    const head = await getS3Client().send(new HeadObjectCommand({ Bucket: storageConfig().bucket, Key: objectKey(session.workspaceId, session.storageKey) })).catch(() => null);
+    if (head?.ContentLength !== session.size) throw error;
+  }
+}
+export async function readMultipartObject(session) {
+  const result = await getS3Client().send(new GetObjectCommand({ Bucket: storageConfig().bucket, Key: objectKey(session.workspaceId, session.storageKey) }));
+  if (result.ContentLength !== session.size) throw new ApiError(400, "Uploaded file size does not match");
+  return Buffer.from(await result.Body.transformToByteArray());
+}
+export async function abortMultipart(session) {
+  await getS3Client().send(new AbortMultipartUploadCommand(multipartInput(session)));
+}
+
 function objectKey(workspaceId, storedName) {
   return `${workspaceId}/${storedName}`;
 }
@@ -67,6 +102,12 @@ export async function uploadObject(workspaceId, storedName, buffer, mimeType) {
       ContentType: mimeType,
     })
   );
+}
+
+export async function copyObject(workspaceId, source, target) {
+  assertStorageConfigured();
+  const { bucket } = storageConfig();
+  await getS3Client().send(new CopyObjectCommand({ Bucket: bucket, CopySource: `${bucket}/${objectKey(workspaceId, source)}`, Key: objectKey(workspaceId, target) }));
 }
 
 export async function deleteObject(workspaceId, storedName) {

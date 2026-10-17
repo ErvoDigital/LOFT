@@ -951,3 +951,32 @@ test("Generated audio URLs are released when the widget is unmounted", async (t)
   assert.ok(widget.revoked.includes("blob:test-audio"));
   assert.equal(widget.audio[0].paused, true);
 });
+
+test("Task and event update action cards display before/after changes and confirm cleanly", async (t) => {
+  const reply = deferred();
+  const widget = await mount(t, { reply });
+  await widget.type("Update the task priority and summarize the doc");
+  await widget.submit();
+  await act(async () => reply.resolve({
+    reply: "Here is the update preview.\n\nSources: [Launch Plan](/workspaces/workspace/docs/doc-1)",
+    actions: [{
+      id: "update-1",
+      token: "signed-task-update",
+      kind: "task_update",
+      data: {
+        workspaceId: "workspace",
+        recordId: "task-1",
+        before: { tier: "TIER_3" },
+        changes: { tier: "TIER_1" },
+      },
+      preview: { title: "Ship release", workspaceName: "Launch" },
+    }],
+  }));
+  const content = JSON.stringify(widget.view.toJSON());
+  assert.match(content, /Update task/);
+  assert.match(content, /Ship release/);
+  assert.match(content, /"Medium"," → ","Urgent"/);
+  await act(async () => widget.view.root.findAllByType("button").find((b) => b.children.includes("Confirm")).props.onClick());
+  assert.deepEqual(widget.confirmations, ["signed-task-update"]);
+});
+

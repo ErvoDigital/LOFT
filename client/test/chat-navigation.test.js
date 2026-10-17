@@ -26,7 +26,7 @@ const user = { id: "self", name: "Alex" };
 const deferred = () => { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; };
 function load(code, mocks) {
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, require: createRequire(import.meta.url), mocks, setTimeout, clearTimeout, localStorage: { getItem: () => null, setItem() {} } });
+  vm.runInNewContext(code, { module, require: createRequire(import.meta.url), mocks, URLSearchParams, setTimeout, clearTimeout, localStorage: { getItem: () => null, setItem() {} } });
   return module.exports.default;
 }
 async function mountPage(t, code, api, scope = { workspaceId: "first" }) {

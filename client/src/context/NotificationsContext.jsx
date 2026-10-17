@@ -62,12 +62,13 @@ export function NotificationsProvider({ children }) {
       commit(account, {
         notifications: [notification, ...current.notifications].slice(0, 50),
         unreadCount: current.unreadCount + (notification.isRead ? 0 : 1),
-        toasts: appIsActive() && !notification.isRead ? [...current.toasts, notification].slice(-3) : current.toasts,
+        toasts: appIsActive() && !notification.isRead && !notification.silent ? [...current.toasts, notification].slice(-3) : current.toasts,
       });
     };
     socket.on("notification:new", onNew);
+    socket.on("notification:resumed", refresh);
     socket.on("connect", refresh);
-    return () => { socket.off("notification:new", onNew); socket.off("connect", refresh); };
+    return () => { socket.off("notification:new", onNew); socket.off("notification:resumed", refresh); socket.off("connect", refresh); };
   }, [socket, userId, refresh, commit]);
 
   useEffect(() => {
