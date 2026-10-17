@@ -46,12 +46,26 @@ export function MeetingProvider({ children }) {
   const iceReadyRef = useRef(null);
   const iceFetchedAt = useRef(0);
   const recoveryTimers = useRef(new Map());
+  const ensureIceConfig = useCallback(() => {
+    if (!user?.id) return Promise.resolve();
+    if (!iceReadyRef.current || (iceFetchedAt.current && Date.now() - iceFetchedAt.current > 50 * 60000)) {
+      iceReadyRef.current = Promise.resolve()
+        .then(() => getMeetingConfig())
+        .then((config) => {
+          if (config?.iceServers) iceServersRef.current = config.iceServers;
+          if (typeof config?.relayConfigured === "boolean") setRelayConfigured(config.relayConfigured);
+          iceFetchedAt.current = Date.now();
+        })
+        .catch(() => {});
+    }
+    return iceReadyRef.current;
+  }, [user?.id]);
   useEffect(() => {
-    let current = true;
-    iceReadyRef.current = Promise.resolve().then(() => getMeetingConfig()).then((config) => {
-      if (current) { iceServersRef.current = config.iceServers; setRelayConfigured(config.relayConfigured); iceFetchedAt.current = Date.now(); }
-    }).catch(() => {});
-    return () => { current = false; recoveryTimers.current.forEach(clearTimeout); recoveryTimers.current.clear(); };
+    iceServersRef.current = ICE_SERVERS;
+    iceReadyRef.current = null;
+    iceFetchedAt.current = 0;
+    setRelayConfigured(false);
+    return () => { recoveryTimers.current.forEach(clearTimeout); recoveryTimers.current.clear(); };
   }, [user?.id]);
   // True once the camera/mic stream has been acquired and previewed but
   // before the socket join actually happens — the "check your camera and
@@ -354,6 +368,7 @@ export function MeetingProvider({ children }) {
     setPendingWorkspaceId(workspaceId);
     setError("");
     setJoining(true);
+    void ensureIceConfig();
     try {
       const stream = devices.video || devices.audio ? await navigator.mediaDevices.getUserMedia(devices) : new MediaStream();
       if (session !== mediaSessionRef.current) { stream.getTracks().forEach((track) => track.stop()); return; }
@@ -421,10 +436,7 @@ export function MeetingProvider({ children }) {
     const session = mediaSessionRef.current;
     joinPendingRef.current = true;
     setJoining(true);
-    if (Date.now() - iceFetchedAt.current > 50 * 60000 && iceFetchedAt.current) {
-      iceReadyRef.current = getMeetingConfig().then((config) => { iceServersRef.current = config.iceServers; iceFetchedAt.current = Date.now(); }).catch(() => {});
-    }
-    await iceReadyRef.current;
+    await ensureIceConfig();
     if (session !== mediaSessionRef.current || !socket.connected) { joinPendingRef.current = false; setJoining(false); return; }
     socket.emit("meeting:join", workspaceId, (res) => {
       if (session !== mediaSessionRef.current) return;

@@ -66,7 +66,7 @@ function MyPlanPage({ userId, aiEnabled }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const requestId = useRef(0);
   const savingTasks = useRef(new Set());
-  const initializedPreferences = useRef(false);
+  const initializedPreferences = useRef(false); const lastSavedPreferences = useRef("");
   const preferenceQueue = useRef(Promise.resolve());
   const [accountReady, setAccountReady] = useState(false);
   const [accountError, setAccountError] = useState("");
@@ -86,7 +86,7 @@ function MyPlanPage({ userId, aiEnabled }) {
             setPreferences({ order: data.preferences.order, dates: data.preferences.dates });
             setCapacity(data.preferences.dailyCapacityHours);
           }
-          setAccountReady(true);
+          const initialPrefs = data.preferencesSaved ? { order: data.preferences.order, dates: data.preferences.dates } : preferences; const initialCap = data.preferencesSaved ? data.preferences.dailyCapacityHours : capacity; const hasLocalToSync = !data.preferencesSaved && Boolean(data.preferences) && (initialPrefs.order.length > 0 || Object.keys(initialPrefs.dates).length > 0); lastSavedPreferences.current = hasLocalToSync ? "" : JSON.stringify({ ...initialPrefs, dailyCapacityHours: initialCap }); setAccountReady(Boolean(data.preferences));
         }
         setPlan(data); setError("");
       }
@@ -117,13 +117,13 @@ function MyPlanPage({ userId, aiEnabled }) {
   }, [preferences, userId]);
 
   useEffect(() => {
-    if (!accountReady) return;
+    if (!accountReady || typeof planApi.savePreferences !== "function") return; const patch = { ...preferences, dailyCapacityHours: capacity }; const serialized = JSON.stringify(patch); if (serialized === lastSavedPreferences.current) return;
     let current = true;
     const timer = setTimeout(() => {
       setAccountSaving(true);
       const patch = { ...preferences, dailyCapacityHours: capacity };
       preferenceQueue.current = preferenceQueue.current.catch(() => {}).then(() => planApi.savePreferences(patch));
-      preferenceQueue.current.then(() => { if (current) setAccountError(""); }).catch((err) => { if (current) setAccountError(apiErrorMessage(err)); }).finally(() => { if (current) setAccountSaving(false); });
+      preferenceQueue.current.then(() => { lastSavedPreferences.current = serialized; if (current) setAccountError(""); }).catch((err) => { if (current) setAccountError(apiErrorMessage(err)); }).finally(() => { if (current) setAccountSaving(false); });
     }, 600);
     return () => { current = false; clearTimeout(timer); };
   }, [accountReady, preferences, capacity, saveRetry]);

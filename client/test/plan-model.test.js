@@ -41,6 +41,9 @@ test("Manual planned days affect every view and flag postponed deadlines without
   assert.equal(moved.atRisk, true);
   assert.deepEqual(buildDayLanes(manual, now)[0].items.map((item) => item.taskId), ["medium"]);
   assert.ok(buildWeek(manual, 0, now).days[1].items.some((item) => item.taskId === "urgent"));
+  const oct8 = toPlanItems([{ id: "single-digit", title: "Oct 8 task", tier: "TIER_2", score: 500, dueDate: new Date(2026, 9, 8, 17) }], 6, new Date(2026, 9, 8, 9));
+  assert.equal(buildDayLanes(oct8, new Date(2026, 9, 8, 9))[0].key, "2026-10-08");
+  assert.equal(applyManualPlan(oct8, { order: [], dates: { "single-digit": "2026-10-09" } })[0].plannedAfterDeadline, true);
 });
 
 test("Manual preferences are account scoped, tolerate blocked storage and discard malformed dates", () => {

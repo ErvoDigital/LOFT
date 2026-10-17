@@ -12,7 +12,7 @@ export function startOfDay(value) {
 
 export function dayKey(value) {
   const d = new Date(value);
-  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export function buildFortnight({ events, tasks, conflicts, length = HORIZON_DAYS }) {
