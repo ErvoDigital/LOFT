@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ApiError } from "../utils/ApiError.js";
-import { addDayKey, dayInZone, zonedInstant } from "../../../shared/time.js";
+import { addDayKey, dayInZone, zonedInstant } from "../utils/time.js";
 import { timeZoneSchema } from "./preferences.js";
 
 export const recurrenceSchema = z.object({ frequency: z.enum(["DAILY", "WEEKLY"]), count: z.number().int().min(2).max(52), timeZone: timeZoneSchema }).strict();

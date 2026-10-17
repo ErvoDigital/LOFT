@@ -12,7 +12,7 @@
 // isn't lost from the plan.
 
 import { calculatePriorityScore } from "./priority.service.js";
-import { dayInZone, addDayKey, zonedInstant } from "../../../shared/time.js";
+import { dayInZone, addDayKey, zonedInstant } from "../utils/time.js";
 
 export const PLAN_HORIZON_DAYS = 30;
 const DEFAULT_DAILY_CAPACITY_HOURS = 6;

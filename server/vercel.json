@@ -1,6 +1,5 @@
 {
   "buildCommand": "sh scripts/vercel-build.sh",
   "functions": { "api/index.js": { "maxDuration": 120 } },
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }],
-  "crons": [{ "path": "/api/cron/reminders", "schedule": "*/5 * * * *" }]
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
 }

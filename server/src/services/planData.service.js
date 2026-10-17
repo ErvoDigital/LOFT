@@ -3,7 +3,7 @@ import { buildPlan, PLAN_HORIZON_DAYS } from "./plan.service.js";
 import { calculatePriorityScore } from "./priority.service.js";
 import { detectConflicts } from "./conflict.service.js";
 import { planPreferencesSchema, readPreferences } from "./preferences.js";
-import { buildCapacityCalendar } from "../../../shared/time.js";
+import { buildCapacityCalendar } from "../utils/time.js";
 
 // My Plan — every open task assigned to the caller across all their
 // workspaces, ranked by the Smart Priority Engine (tier + deadline decay +

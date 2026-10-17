@@ -2,7 +2,7 @@
 // differentiator: surfacing collisions that only exist because a person
 // belongs to several independent workspaces that can't see each other.
 
-import { dayInZone } from "../../../shared/time.js";
+import { dayInZone } from "../utils/time.js";
 
 function overlaps(aStart, aEnd, bStart, bEnd) {
   return aStart < bEnd && bStart < aEnd;

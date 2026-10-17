@@ -1,10 +1,12 @@
 import { prisma } from "../db/prisma.js";
 import { z } from "zod";
 import { notificationPreferencesSchema, readPreferences } from "../services/preferences.js";
+import { maybeRunReminderJob } from "../services/reminder.service.js";
 
 const visible = () => ({ OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }] });
 
 export async function listNotifications(req, res) {
+  await maybeRunReminderJob();
   const notifications = await prisma.notification.findMany({
     where: { userId: req.userId, ...visible() },
     orderBy: { createdAt: "desc" },

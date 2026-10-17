@@ -71,6 +71,25 @@ export async function runReminderJob({ now = new Date(), db = prisma, send = not
   return { delivered, checkedAt: now.toISOString() };
 }
 
+let lastOpportunisticRunAt = 0;
+let opportunisticRunning = null;
+
+export async function maybeRunReminderJob({ now = new Date(), db = prisma, send = notify } = {}) {
+  if (!db?.event?.findMany || !db?.task?.findMany || !db?.notification?.findMany) return null;
+  if (opportunisticRunning) return opportunisticRunning;
+  if (now.getTime() - lastOpportunisticRunAt < CHECK_INTERVAL_MS) return null;
+  lastOpportunisticRunAt = now.getTime();
+  opportunisticRunning = runReminderJob({ now, db, send })
+    .catch((err) => {
+      console.error("Reminder check failed:", err);
+      return null;
+    })
+    .finally(() => {
+      opportunisticRunning = null;
+    });
+  return opportunisticRunning;
+}
+
 export function startReminderJob() {
   let running = false;
   const tick = async () => {
