@@ -75,6 +75,22 @@ test("Unavailable live captions leave the Stop and send control available", asyn
   assert.equal(bubble.view.root.findByProps({ "aria-label": "Stop and send" }).props.disabled, false);
 });
 
+test("User speech keeps updating while minimized and remains visible during final transcription", async (t) => {
+  const bubble = await mount(t, { phase: "listening", heard: "Schedule a", interimTranscript: true, micReady: true, canPlay: false, reply: "" });
+  assert.equal(bubble.view.root.findByProps({ "aria-label": "Live recording transcript" }).props["aria-live"], "polite");
+  await bubble.click("Minimize");
+  const captions = () => bubble.view.root.findByProps({ "aria-label": "Live recording transcript" });
+  assert.match(JSON.stringify(captions().children[0].children), /Schedule a/);
+  await bubble.update({ heard: "Schedule a meeting tomorrow" });
+  assert.match(JSON.stringify(captions().children[0].children), /Schedule a meeting tomorrow/);
+  await bubble.update({ phase: "thinking", transcribing: true });
+  assert.ok(captions());
+  await bubble.update({ transcribing: false, interimTranscript: false });
+  assert.equal(bubble.view.root.findAllByProps({ "aria-label": "Live recording transcript" }).length, 0);
+  await bubble.click("Show Lofty voice");
+  assert.ok(bubble.view.root.findByProps({ "aria-label": "Your voice question" }));
+});
+
 test("Confirmation and detail controls render inside the expanded voice dialog and survive minimizing", async (t) => {
   const controls = React.createElement("form", { "aria-label": "Inline details" }, React.createElement("input", { "aria-label": "Meeting title", type: "text" }), React.createElement("button", { type: "button" }, "Confirm"));
   const bubble = await mount(t, { replyControls: controls });

@@ -63,7 +63,7 @@ function RecordingTranscript({ text, interim, hasReply }) {
   return (
     <div className="w-full max-w-lg">
       {interim && <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">Live captions</p>}
-      <div ref={viewportRef} className="max-h-[min(12rem,24dvh)] overflow-y-auto overscroll-contain rounded-lg px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60" role="region" aria-label={interim ? "Live recording transcript" : "Your voice question"} tabIndex={0}
+      <div ref={viewportRef} className="max-h-[min(12rem,24dvh)] overflow-y-auto overscroll-contain rounded-lg px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60" role="region" aria-label={interim ? "Live recording transcript" : "Your voice question"} aria-live={interim ? "polite" : "off"} tabIndex={0}
         onScroll={({ currentTarget: viewport }) => { following.current = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 12; }}>
         <p className={`whitespace-pre-wrap break-words font-medium tracking-tight transition-[font-size,color] duration-300 ${
           hasReply ? "text-lg text-ink-500 dark:text-ink-400" : "text-2xl leading-snug text-ink-900 dark:text-ink-50 sm:text-[1.75rem]"
@@ -492,7 +492,14 @@ export default function VoiceAssistant({
         className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 text-sm font-medium text-ink-800 transition-colors hover:bg-ink-900/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-100 dark:hover:bg-white/[0.06]"
       >
         <VoiceOrb state={phase} small />
-        <span className="truncate">{transcribing ? "Transcribing…" : audioStatus === "generating" ? "Generating audio…" : PILL_LABEL[phase]}</span>
+        <span className="min-w-0 text-left">
+          <span className="block truncate">{transcribing ? "Transcribing…" : audioStatus === "generating" ? "Generating audio…" : PILL_LABEL[phase]}</span>
+          {heard && (phase === "listening" || transcribing) && (
+            <span aria-label="Live recording transcript" aria-live="polite" className="flex max-w-48 justify-end overflow-hidden text-xs font-normal text-ink-500 dark:text-ink-400">
+              <span className="shrink-0 whitespace-nowrap">{heard}</span>
+            </span>
+          )}
+        </span>
       </button>
       {phase === "listening" ? (
         <button

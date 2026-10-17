@@ -31,7 +31,116 @@ export function captionWav(chunks, sampleRate) {
   return new Blob([bytes], { type: "audio/wav" });
 }
 
-export function createLiveCaptions({ stream, context, transcribe, onTranscript, onUnavailable, NodeClass = globalThis.AudioWorkletNode }) {
+// Browser interim results arrive as words are recognized. Keep the PCM capture
+// running alongside them so a failed browser service can fall back to a complete
+// recording, including the words spoken before the failure.
+export function createLiveCaptions({
+  RecognitionClass = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition,
+  language = globalThis.navigator?.language || globalThis.document?.documentElement?.lang || "en-US",
+  onTranscript, onUnavailable, ...options
+}) {
+  let stopped = false;
+  let recognition;
+  let preview;
+  let previewUnavailable = false;
+  let restartTimer;
+  let firstResultTimer;
+  let committed = "";
+  let current = "";
+  let emptyEnds = 0;
+  let receivedResult = false;
+
+  function stopRecognition() {
+    clearTimeout(restartTimer);
+    clearTimeout(firstResultTimer);
+    const previous = recognition;
+    recognition = null;
+    if (!previous) return;
+    previous.onresult = previous.onerror = previous.onend = null;
+    try { previous.abort(); } catch { /* Recognition may already have ended. */ }
+  }
+
+  function fallback() {
+    if (stopped || !recognition) return;
+    stopRecognition();
+    if (previewUnavailable) onUnavailable();
+    else preview?.refresh();
+  }
+
+  function startRecognition() {
+    // Engines supporting audio-track input use the recorder's microphone;
+    // older engines ignore the argument and use their default microphone.
+    try { recognition.start(options.stream?.getAudioTracks?.()[0]); } catch { fallback(); }
+  }
+
+  try {
+    if (RecognitionClass) {
+      const recognizer = new RecognitionClass();
+      recognition = recognizer;
+      recognizer.lang = language;
+      recognizer.continuous = true;
+      recognizer.interimResults = true;
+      recognizer.maxAlternatives = 1;
+      recognizer.onresult = (event) => {
+        if (stopped || recognition !== recognizer) return;
+        // The results list contains this session's final and interim phrases.
+        // Rebuild it so revisions replace earlier guesses instead of repeating
+        // them. Only append across service restarts, which reset that list.
+        current = Array.from(event.results, (result) => result[0]?.transcript?.trim() || "").filter(Boolean).join(" ");
+        if (current) {
+          receivedResult = true;
+          clearTimeout(firstResultTimer);
+        }
+        onTranscript([committed, current].filter(Boolean).join(" "));
+      };
+      recognizer.onerror = ({ error }) => {
+        if (recognition !== recognizer || stopped) return;
+        // Silence ends some browser sessions; onend resumes the same turn.
+        if (error !== "no-speech") fallback();
+      };
+      recognizer.onend = () => {
+        if (stopped || recognition !== recognizer) return;
+        emptyEnds = current ? 0 : emptyEnds + 1;
+        if (emptyEnds >= 2) { fallback(); return; }
+        committed = [committed, current].filter(Boolean).join(" ");
+        current = "";
+        restartTimer = setTimeout(() => {
+          if (stopped || recognition !== recognizer) return;
+          startRecognition();
+        }, 150);
+      };
+    }
+  } catch { stopRecognition(); }
+
+  preview = createPreviewCaptions({
+    ...options,
+    enabled: () => !recognition,
+    onSpeech: () => {
+      // Some browsers expose recognition but never deliver results. Start the
+      // server fallback if speech has been captured for five seconds without
+      // any browser transcript, rather than leaving the screen empty.
+      if (recognition && !receivedResult) firstResultTimer = setTimeout(fallback, 5000);
+    },
+    onTranscript: (text) => { if (!stopped && !recognition) onTranscript(text); },
+    onUnavailable: () => {
+      previewUnavailable = true;
+      if (!stopped && !recognition) onUnavailable();
+    },
+  });
+  if (recognition) startRecognition();
+
+  return {
+    ready: preview.ready,
+    stop() {
+      if (stopped) return;
+      stopped = true;
+      stopRecognition();
+      preview.stop();
+    },
+  };
+}
+
+function createPreviewCaptions({ stream, context, transcribe, onTranscript, onUnavailable, enabled, onSpeech, NodeClass = globalThis.AudioWorkletNode }) {
   let stopped = false;
   let source;
   let processor;
@@ -45,6 +154,7 @@ export function createLiveCaptions({ stream, context, transcribe, onTranscript, 
   let chunks = [];
 
   function stop() {
+    if (stopped) return;
     stopped = true;
     controller?.abort();
     if (processor) { processor.port.onmessage = null; processor.port.close(); }
@@ -61,7 +171,7 @@ export function createLiveCaptions({ stream, context, transcribe, onTranscript, 
   async function snapshot() {
     // Never queue audio requests. When the provider is slow, the next request
     // contains the latest complete recording, not stale queued fragments.
-    if (stopped || pending || !hasSpeech || previews >= MAX_PREVIEWS || samples - lastSnapshot < context.sampleRate * SNAPSHOT_SECONDS) return;
+    if (stopped || !enabled() || pending || !hasSpeech || previews >= MAX_PREVIEWS || samples - lastSnapshot < context.sampleRate * SNAPSHOT_SECONDS) return;
     pending = true;
     previews++;
     lastSnapshot = samples;
@@ -99,6 +209,7 @@ export function createLiveCaptions({ stream, context, transcribe, onTranscript, 
           let power = 0;
           for (const value of chunk) power += value * value;
           hasSpeech = Math.sqrt(power / chunk.length) >= 0.003;
+          if (hasSpeech) onSpeech();
         }
         void snapshot();
       };
@@ -106,5 +217,5 @@ export function createLiveCaptions({ stream, context, transcribe, onTranscript, 
       source.connect(processor); processor.connect(mute); mute.connect(context.destination);
     } catch { unavailable(); }
   })();
-  return { stop, ready };
+  return { stop, ready, refresh: () => { void snapshot(); } };
 }

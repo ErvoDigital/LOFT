@@ -39,15 +39,19 @@ The local server credential can read/write/delete objects but returned `AccessDe
 
 ## Realtime WebSocket
 
+On 2026-10-17, the live client at `https://client.synctayo.online` was loading the Singapore realtime endpoint shown below, but that endpoint rejected its WebSocket upgrade with HTTP 403 (`forbidden`). Requests from `https://app.loft-client.site` and `https://loft-client.vercel.app` returned HTTP 401 (`unauthorized`) without a token, confirming that the current domain was rejected by the origin check before authentication or database access. The live API at `https://loft-server-delta.vercel.app` returned HTTP 200 for `/api/health`, allowed the current browser origin, and completed a database lookup through `/api/auth/login` for a unique nonexistent address, returning the expected HTTP 401 (`Invalid email or password`). This check created no account, session, email, or chat message. Direct database credentials and authenticated realtime access were unavailable in this workspace, so the realtime function's own database connection was not tested.
+
+The realtime allowlist now always includes the current and previous app origins, even with missing or stale deployment environment settings. `neon.ts` also defaults to the current domain and includes it in `REALTIME_ALLOWED_ORIGINS`. Deploy the updated **Neon realtime function** to apply this source fix; a Vercel frontend/API deployment alone does not update that function. The deployed origin rejection is still present until that deployment is completed. No database migration is required.
+
 The deployed realtime endpoint returned HTTP 403 to a WebSocket upgrade with origin `https://www.loft-client.site`, while the same authenticated request with origin `https://loft-client.vercel.app` upgraded successfully (HTTP 101).
 
 Rechecked on 2026-10-06: WebSocket upgrade requests from both `https://www.loft-client.site` and `https://loft-client.site` returned HTTP 403. The same request from `https://loft-client.vercel.app` without a token returned HTTP 401, showing that the old origin passes the origin check and reaches JWT authentication. This blocks chat sends, meeting starts, and other realtime features on the custom domain.
 
-The updated `realtime/src/index.js` accepts `CLIENT_URL` plus the comma-separated `REALTIME_ALLOWED_ORIGINS` list, matched against exact HTTP/HTTPS origins. `neon.ts` defaults to the app subdomain and includes the existing custom-domain and Vercel origins. Redeploy the **Neon realtime function** from this updated source; deploying the Vercel client alone does not apply the origin fix. The explicit production environment settings are:
+The updated `realtime/src/index.js` accepts `CLIENT_URL` plus the comma-separated `REALTIME_ALLOWED_ORIGINS` list, matched against exact HTTP/HTTPS origins. `neon.ts` defaults to the current app domain and includes the existing custom-domain and Vercel origins. Redeploy the **Neon realtime function** from this updated source; deploying the Vercel client alone does not apply the origin fix. The explicit production environment settings are:
 
 ```env
-CLIENT_URL=https://app.loft-client.site
-REALTIME_ALLOWED_ORIGINS=https://app.loft-client.site,https://www.loft-client.site,https://loft-client.site,https://loft-client.vercel.app
+CLIENT_URL=https://client.synctayo.online
+REALTIME_ALLOWED_ORIGINS=https://client.synctayo.online,https://app.loft-client.site,https://www.loft-client.site,https://loft-client.site,https://loft-client.vercel.app
 ```
 
 Apply/redeploy the function so the running instance receives the new value. `neon.ts` sources this value from the deployment environment's `CLIENT_URL`. Keep the local Express server's `CLIENT_URL=http://localhost:5173` for local development. The production Vercel API's `CLIENT_URL` should also match the custom client origin.
@@ -70,6 +74,6 @@ The local Vite realtime proxy must send the origin accepted by the deployed func
 
 ## Verify
 
-Refresh the client and request a new download link; links expire after five minutes. Confirm the S3 response includes `Access-Control-Allow-Origin: https://app.loft-client.site`, and the realtime connection returns HTTP 101. Do not copy signed URLs or authentication tokens into diagnostics that are published or committed.
+Refresh the client and request a new download link; links expire after five minutes. Confirm the S3 response includes `Access-Control-Allow-Origin: https://client.synctayo.online`, and the authenticated realtime connection returns HTTP 101. A WebSocket upgrade from that origin without a token should return HTTP 401 rather than HTTP 403 after the origin fix is deployed. Do not copy signed URLs or authentication tokens into diagnostics that are published or committed.
 
 The pasted upload HTTP 400 is a separate request. The deployed authenticated asset-list GET returned HTTP 200. Inspect the failed upload response body for its validation error before changing upload behavior.
